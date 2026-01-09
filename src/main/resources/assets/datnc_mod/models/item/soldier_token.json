@@ -1,0 +1,6 @@
+{
+  "parent": "item/generated",
+  "textures": {
+    "layer0": "datnc_mod:item/soldier_token"
+  }
+}
