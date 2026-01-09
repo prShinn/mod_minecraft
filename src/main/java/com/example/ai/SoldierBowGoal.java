@@ -166,7 +166,8 @@ public class SoldierBowGoal extends Goal {
     public boolean shouldContinue() {
         return target != null
                 && target.isAlive()
-                && npc.getMainHandStack().getItem() instanceof BowItem;
+                && npc.getMainHandStack().getItem() instanceof BowItem
+                && npc.getVisibilityCache().canSee(target);
     }
     private float calculateInaccuracy(double distance) {
         // Công thức: độ lệch cơ bản + (khoảng cách × hệ số)

@@ -101,6 +101,7 @@ public class HealAllyGoal extends Goal {
     // =========================
     private void healTarget() {
         if (medic.getWorld().isClient) return;
+        if (medic.getAttacker() != null) return;
 
         float healAmount = getHealAmountFromAxe();
         if (healAmount <= 0) return;
@@ -110,6 +111,17 @@ public class HealAllyGoal extends Goal {
         } else {
             target.heal(healAmount);
         }
+        // ===== SOUND HEAL =====
+        medic.getWorld().playSound(
+                null, // null = tất cả player gần đó đều nghe
+                target.getX(),
+                target.getY(),
+                target.getZ(),
+                net.minecraft.sound.SoundEvents.ENTITY_PLAYER_LEVELUP,
+                net.minecraft.sound.SoundCategory.NEUTRAL,
+                0.6F,  // volume
+                1.6F   // pitch cao → cảm giác heal
+        );
     }
 
 

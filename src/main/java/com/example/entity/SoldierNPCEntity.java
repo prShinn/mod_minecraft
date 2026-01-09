@@ -8,6 +8,7 @@ import com.example.registry.ModItems;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.EquipmentSlot;
+import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.ai.goal.*;
 import net.minecraft.entity.attribute.DefaultAttributeContainer;
 import net.minecraft.entity.attribute.EntityAttributes;
@@ -15,12 +16,15 @@ import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.damage.DamageSources;
 import net.minecraft.entity.mob.HostileEntity;
 import net.minecraft.entity.mob.PathAwareEntity;
+import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.inventory.Inventories;
 import net.minecraft.inventory.SimpleInventory;
 import net.minecraft.item.*;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.MutableText;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
@@ -113,7 +117,6 @@ public class SoldierNPCEntity extends PathAwareEntity {
                 return super.canStart() && SoldierNPCEntity.this.getMainHandStack().getItem() instanceof BowItem;
             }
         });
-
         this.goalSelector.add(4, new FollowOwnerLikeGoal(this, 1.3D, FOLLOW_DISTANCE, TELEPORT_DISTANCE)); // uu tien di theo
         // đi lang thang xa
         this.goalSelector.add(6, new WanderAroundFarGoal(this, 1.0D));
@@ -127,34 +130,31 @@ public class SoldierNPCEntity extends PathAwareEntity {
         this.targetSelector.add(1, new DefendPlayerGoal(this, 32.0F)); // bảo vệ
         this.targetSelector.add(1, new ActiveTargetGoal<>(this, HostileEntity.class, true, target -> {
             // Mở rộng khoảng cách check quanh npc hoặc player: 20 block
-            return this.squaredDistanceTo(target) <= 21 * 21 || this.getOwner().squaredDistanceTo(target) <= 21 * 21;
+            PlayerEntity owner = this.getOwner();
+            return this.squaredDistanceTo(target) <= 21 * 21
+                    || (owner != null && owner.squaredDistanceTo(target) <= 21 * 21) || isThreateningVillager(target);
+
         })); // đánh hostile
         this.targetSelector.add(2, new RevengeGoal(this, PlayerEntity.class)); // đánh trả khi bị tấn công
 
     }
-
     // ===== TICK =====
     @Override
     public void tick() {
         super.tick();
         if (this.getWorld() == null || this.getWorld().isClient) return;// check ở server
-
         // Check player alive
         PlayerEntity owner = getOwner();
         if (owner != null && !owner.isAlive()) {
             this.ownerUUID = null;
         }
-
         // Display management
         updateNameDisplay();
-
         // Food system
         handleFoodSystem();
-
         // Healing system
         handleGradualHeal();
     }
-
     // ===== FOOD SYSTEM =====
     private void handleFoodSystem() {
         // Decrease hunger over time
@@ -164,7 +164,6 @@ public class SoldierNPCEntity extends PathAwareEntity {
             decreaseHunger();
             foodTickCooldown = FOOD_TICK_INTERVAL;
         }
-
         if (eatCooldown > 0) {
             eatCooldown--;
         }
@@ -172,13 +171,11 @@ public class SoldierNPCEntity extends PathAwareEntity {
             this.npcEatFood();
         }
     }
-
     private void npcEatFood() {
         if (this.getWorld().isClient) return; // Chỉ server xử lý
         for (int i = 0; i < this.foodInventory.size(); i++) {
             ItemStack stack = this.foodInventory.getStack(i);
             if (stack.isEmpty() || !stack.isFood()) continue;
-
             FoodComponent food = stack.getItem().getFoodComponent();
             if (food == null) continue;
 
@@ -190,7 +187,6 @@ public class SoldierNPCEntity extends PathAwareEntity {
             return;
         }
     }
-
     private void decreaseHunger() {
         if (hunger > 0) {
             hunger--;
@@ -199,18 +195,15 @@ public class SoldierNPCEntity extends PathAwareEntity {
             this.damage(this.getWorld().getDamageSources().starve(), 1.0F);
         }
     }
-
     private boolean shouldEat() {
         // Chỉ ăn khi food thấp hơn 50%
         return eatCooldown <= 0 && hunger <= MAX_HUNGER * 0.5f;
     }
-
     // ===== HEALING SYSTEM =====
     public void requestHeal(float amount) {
         if (amount <= 0) return;
         this.pendingHeal += amount;
     }
-
     private void handleGradualHeal() {
         // ===== ƯU TIÊN HEAL TỪ MEDIC (KHÔNG TỐN HUNGER) =====
         if (pendingHeal > 0 && this.getHealth() < this.getMaxHealth()) {
@@ -219,26 +212,20 @@ public class SoldierNPCEntity extends PathAwareEntity {
             pendingHeal -= heal;
             return;
         }
-
         if (this.getHealth() >= this.getMaxHealth()) return;
         if (hunger <= 0) {
             hunger = 0;
             return;
         }
-
         if (healTickCooldown > 0) {
             healTickCooldown--;
             return;
         }
-
-        float healAmount = 1.0F; // 0.5 tim
-
+        float healAmount = 2.0F; // 0.5 tim
         this.heal(healAmount);
-        hunger -= 2;                // 🔥 Heal tốn Hunger
+        hunger--;                // 🔥 Heal tốn Hunger
         healTickCooldown = 30;   // 1.5 giây
     }
-
-
     // ===== DISPLAY SYSTEM =====
     private void updateNameDisplay() {
         // Only search for player periodically
@@ -251,7 +238,6 @@ public class SoldierNPCEntity extends PathAwareEntity {
             }
             playerSearchCooldown = PLAYER_SEARCH_INTERVAL;
         }
-
         // Update name visibility
         if (nameVisibleTicks > 0) {
             nameVisibleTicks--;
@@ -260,7 +246,6 @@ public class SoldierNPCEntity extends PathAwareEntity {
             this.setCustomNameVisible(false);
         }
     }
-
     private boolean isPlayerNearby() {
         PlayerEntity player = this.getWorld().getClosestPlayer(this.getX(), this.getY(), this.getZ(), VIEW_DISTANCE, false);
 
@@ -270,7 +255,6 @@ public class SoldierNPCEntity extends PathAwareEntity {
         }
         return false;
     }
-
     private void updateNameText() {
         int hp = Math.round(this.getHealth());
         int maxHp = Math.round(this.getMaxHealth());
@@ -280,7 +264,6 @@ public class SoldierNPCEntity extends PathAwareEntity {
 
         this.setCustomName(name);
     }
-
     public int getTotalFoodCount() {
         int total = 0;
         for (int i = 0; i < foodInventory.size(); i++) {
@@ -291,12 +274,92 @@ public class SoldierNPCEntity extends PathAwareEntity {
         }
         return total;
     }
-
     // ===== INTERACTION =====
     @Override
     public ActionResult interactMob(PlayerEntity player, Hand hand) {
         if (this.getWorld().isClient) return ActionResult.SUCCESS;
         // ===== SHIFT + RIGHT CLICK → THU HỒI NPC =====
+        ActionResult recallResult = tryRecallNpc(player);
+        if (recallResult != null) return recallResult;
+        ItemStack held = player.getStackInHand(hand);
+        // ===== ADD FOOD =====
+        if (held.isFood()) {
+            boolean added = addFoodToInventory(held);
+            if (added) {
+                this.getWorld().playSound(null, this.getX(), this.getY(), this.getZ(),
+                        SoundEvents.ENTITY_ITEM_PICKUP, SoundCategory.NEUTRAL, 0.5F, 1.0F);
+                if (!player.isCreative()) {
+                    held.decrement(1);
+                }
+                return ActionResult.CONSUME;
+            }
+        }
+        ActionResult handleItems = tryHandleItems(player, held);
+        if (handleItems != null) return handleItems;
+
+        return super.interactMob(player, hand);
+    }
+    private boolean isThreateningVillager(LivingEntity hostile) {
+        List<VillagerEntity> villagers =
+                this.getWorld().getEntitiesByClass(
+                        VillagerEntity.class,
+                        hostile.getBoundingBox().expand(8),
+                        v -> true
+                );
+
+        return !villagers.isEmpty();
+    }
+
+    private ActionResult tryHandleItems(PlayerEntity player, ItemStack held) {
+        // Equip weapon
+        if (isWeapon(held)) {
+            ItemStack oldWeapon = this.getMainHandStack();
+            if (!oldWeapon.isEmpty()) {
+                this.dropStack(oldWeapon);
+            }
+            this.equipStack(EquipmentSlot.MAINHAND, held.copyWithCount(1));
+            if (!player.isCreative()) held.decrement(1);
+            return ActionResult.CONSUME;
+        }
+        // Equip armor
+        if (held.getItem() instanceof ArmorItem armor) {
+            EquipmentSlot slot = armor.getSlotType();
+            ItemStack equipped = this.getEquippedStack(slot);
+
+            if (equipped.isEmpty()) {
+                this.equipStack(slot, held.copyWithCount(1));
+                // Lấy âm thanh mặc giáp chuẩn theo loại giáp (da, sắt, kim cương...)
+                this.getWorld().playSound(null, this.getX(), this.getY(), this.getZ(),
+                        armor.getEquipSound(), SoundCategory.NEUTRAL, 1.0F, 1.0F);
+                if (!player.isCreative()) held.decrement(1);
+                return ActionResult.CONSUME;
+            }
+        }
+        // Remove armor (empty hand)
+        if (held.isEmpty()) {
+
+            ItemStack equippedHand = this.getEquippedStack(EquipmentSlot.MAINHAND);
+            if (!equippedHand.isEmpty()) {
+                this.equipStack(EquipmentSlot.MAINHAND, ItemStack.EMPTY);
+                this.dropStack(equippedHand);
+                return ActionResult.CONSUME;
+            }
+
+            for (EquipmentSlot slot : EquipmentSlot.values()) {
+                if (!slot.isArmorSlot()) continue;
+
+                ItemStack equipped = this.getEquippedStack(slot);
+                if (!equipped.isEmpty()) {
+                    this.equipStack(slot, ItemStack.EMPTY);
+                    this.dropStack(equipped);
+                    return ActionResult.CONSUME;
+                }
+            }
+        }
+        return null;
+    }
+
+    private ActionResult tryRecallNpc(PlayerEntity player) {
         if (player.isSneaking()) {
 
             // chỉ owner được thu hồi
@@ -320,65 +383,7 @@ public class SoldierNPCEntity extends PathAwareEntity {
 
             return ActionResult.CONSUME;
         }
-        ItemStack held = player.getStackInHand(hand);
-        // ===== ADD FOOD =====
-        if (held.isFood()) {
-            boolean added = addFoodToInventory(held);
-            if (added) {
-                if (!player.isCreative()) {
-                    held.decrement(1);
-                }
-                return ActionResult.CONSUME;
-            }
-        }
-
-        // Equip weapon
-        if (isWeapon(held)) {
-            ItemStack oldWeapon = this.getMainHandStack();
-            if (!oldWeapon.isEmpty()) {
-                this.dropStack(oldWeapon);
-            }
-            this.equipStack(EquipmentSlot.MAINHAND, held.copyWithCount(1));
-            if (!player.isCreative()) held.decrement(1);
-            return ActionResult.CONSUME;
-        }
-
-        // Equip armor
-        if (held.getItem() instanceof ArmorItem armor) {
-            EquipmentSlot slot = armor.getSlotType();
-            ItemStack equipped = this.getEquippedStack(slot);
-
-            if (equipped.isEmpty()) {
-                this.equipStack(slot, held.copyWithCount(1));
-                if (!player.isCreative()) held.decrement(1);
-                return ActionResult.CONSUME;
-            }
-        }
-
-        // Remove armor (empty hand)
-
-        if (held.isEmpty()) {
-
-            ItemStack equippedHand = this.getEquippedStack(EquipmentSlot.MAINHAND);
-            if (!equippedHand.isEmpty()) {
-                this.equipStack(EquipmentSlot.MAINHAND, ItemStack.EMPTY);
-                this.dropStack(equippedHand);
-                return ActionResult.CONSUME;
-            }
-
-            for (EquipmentSlot slot : EquipmentSlot.values()) {
-                if (!slot.isArmorSlot()) continue;
-
-                ItemStack equipped = this.getEquippedStack(slot);
-                if (!equipped.isEmpty()) {
-                    this.equipStack(slot, ItemStack.EMPTY);
-                    this.dropStack(equipped);
-                    return ActionResult.CONSUME;
-                }
-            }
-        }
-
-        return super.interactMob(player, hand);
+        return null;
     }
 
     private boolean addFoodToInventory(ItemStack foodStack) {
@@ -414,7 +419,14 @@ public class SoldierNPCEntity extends PathAwareEntity {
 
         ItemStack weapon = this.getMainHandStack();
         damage += getWeaponDamage(weapon);
-
+        this.getWorld().playSound(null, // null = tất cả player gần đó đều nghe
+                target.getX(),
+                target.getY(),
+                target.getZ(),
+                net.minecraft.sound.SoundEvents.ENTITY_PLAYER_ATTACK_SWEEP,
+                net.minecraft.sound.SoundCategory.NEUTRAL,
+                0.6F,  // volume
+                1.6F);
         DamageSources sources = this.getWorld().getDamageSources();
         boolean success = target.damage(sources.mobAttack(this), damage);
 
@@ -423,6 +435,14 @@ public class SoldierNPCEntity extends PathAwareEntity {
             if (this.random.nextInt(WEAPON_DURABILITY_CHANCE) == 0) {
                 weapon.damage(1, this, e -> e.sendEquipmentBreakStatus(EquipmentSlot.MAINHAND));
             }
+            this.getWorld().playSound(null, // null = tất cả player gần đó đều nghe
+                    target.getX(),
+                    target.getY(),
+                    target.getZ(),
+                    net.minecraft.sound.SoundEvents.ENTITY_PLAYER_ATTACK_STRONG,
+                    net.minecraft.sound.SoundCategory.NEUTRAL,
+                    0.6F,  // volume
+                    1.6F);
         }
 
         return success;
