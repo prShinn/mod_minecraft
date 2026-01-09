@@ -3,7 +3,6 @@ package com.example.ai;
 import com.example.entity.SoldierNPCEntity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.ai.goal.Goal;
-import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.entity.player.PlayerEntity;
 
 import java.util.EnumSet;
