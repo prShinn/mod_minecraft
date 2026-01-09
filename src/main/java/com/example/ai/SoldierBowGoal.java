@@ -3,23 +3,47 @@ package com.example.ai;
 import com.example.entity.SoldierNPCEntity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.ai.goal.Goal;
+import net.minecraft.entity.ai.pathing.Path;
 import net.minecraft.entity.projectile.ArrowEntity;
 import net.minecraft.item.BowItem;
 import net.minecraft.util.Hand;
+import net.minecraft.util.math.Vec3d;
+
+import java.util.EnumSet;
 
 public class SoldierBowGoal extends Goal {
     private final SoldierNPCEntity npc;
     private LivingEntity target;
     private int attackCooldown;
-
+    // Khoảng cách
+    private static final double MAX_ATTACK_DISTANCE = 15.0;
+    private static final double MIN_ATTACK_DISTANCE = 6.0;
+    private static final float BASE_INACCURACY = 4.0F;      // Độ lệch cơ bản
+    private static final float MAX_INACCURACY = 14.0F;      // Độ lệch tối đa
+    private static final float INACCURACY_PER_BLOCK = 0.5F;
     public SoldierBowGoal(SoldierNPCEntity npc) {
         this.npc = npc;
+        this.setControls(EnumSet.of(Control.MOVE, Control.LOOK));
+    }
+    @Override
+    public void start() {
+        super.start();
+        // ✅ Bật animation ngay khi có target
+        npc.setCurrentHand(Hand.MAIN_HAND);
     }
 
+    @Override
+    public void stop() {
+        super.stop();
+        // ✅ Tắt animation khi mất target
+        npc.clearActiveItem();
+    }
     @Override
     public boolean canStart() {
         LivingEntity e = npc.getTarget();
         if (e == null || !e.isAlive()) return false;
+        // Không thấy → không bắn
+        if (!npc.getVisibilityCache().canSee(e)) return false;
         this.target = e;
         return npc.getMainHandStack().getItem() instanceof BowItem;
     }
@@ -31,20 +55,92 @@ public class SoldierBowGoal extends Goal {
         npc.getLookControl().lookAt(target, 30.0F, 30.0F);
 
         double distanceSq = npc.squaredDistanceTo(target);
+        double maxDistSq = MAX_ATTACK_DISTANCE * MAX_ATTACK_DISTANCE;
+        double minDistSq = MIN_ATTACK_DISTANCE * MIN_ATTACK_DISTANCE;
 
-        if (distanceSq > 15*15) {
+        if (distanceSq > maxDistSq) {
             //nếu xa hơn 15 block thì lại gần
             npc.getNavigation().startMovingTo(target, 1.0);
+        } else if (distanceSq < minDistSq) {
+            // quá gần → lùi ra
+            moveAwayFromTarget();
         } else {
             npc.getNavigation().stop();
         }
+        // ===== BẮN =====
+        if (attackCooldown > 0) {
+            attackCooldown--;
+            return;
+        }
 
-        if (attackCooldown <= 0) {
+        // Chỉ bắn khi nhìn thấy target
+        if (npc.getVisibilityCache().canSee(target)) {
             shootArrow(target);
-            attackCooldown = 30; // 1,5 giây cooldown
-        } else attackCooldown--;
+            attackCooldown = 30; // 1.5s
+        }
     }
 
+    // ===== LÙI RA =====
+    private void moveAwayFromTarget() {
+        Vec3d dir = npc.getPos().subtract(target.getPos()).normalize();
+        Vec3d escapePos = npc.getPos().add(dir.multiply(5));
+        Path path = npc.getNavigation().findPathTo(
+                escapePos.x, escapePos.y, escapePos.z, 0
+        );
+        if (path != null && path.reachesTarget()) {
+            npc.getNavigation().startMovingTo(
+                    escapePos.x,
+                    escapePos.y,
+                    escapePos.z,
+                    1.2
+            );
+        } else {
+            moveToSideOfTarget();
+        }
+    }
+    // ===== ĐI NGANG (MỚI) =====
+    private void moveToSideOfTarget() {
+        Vec3d toTarget = target.getPos().subtract(npc.getPos()).normalize();
+
+        // Tạo vector vuông góc (đi ngang)
+        // Quay 90 độ: (x, z) → (-z, x)
+        Vec3d perpendicular = new Vec3d(-toTarget.z, 0, toTarget.x);
+
+        // Random trái hoặc phải
+        if (npc.getRandom().nextBoolean()) {
+            perpendicular = perpendicular.multiply(-1);
+        }
+
+        // Tính điểm đích (đi ngang 6 blocks)
+        Vec3d sidePos = npc.getPos().add(perpendicular.multiply(6));
+
+        // Kiểm tra path
+        Path path = npc.getNavigation().findPathTo(
+                sidePos.x, sidePos.y, sidePos.z, 0
+        );
+
+        if (path != null && path.reachesTarget()) {
+            // ✅ Đi ngang được
+            npc.getNavigation().startMovingTo(
+                    sidePos.x, sidePos.y, sidePos.z, 1.1
+            );
+        } else {
+            // ❌ Không đi được → thử đi ngang hướng ngược lại
+            perpendicular = perpendicular.multiply(-1);
+            sidePos = npc.getPos().add(perpendicular.multiply(6));
+
+            path = npc.getNavigation().findPathTo(
+                    sidePos.x, sidePos.y, sidePos.z, 0
+            );
+
+            if (path != null && path.reachesTarget()) {
+                npc.getNavigation().startMovingTo(
+                        sidePos.x, sidePos.y, sidePos.z, 1.1
+                );
+            }
+            // Nếu cả 2 hướng đều không đi được → đứng yên và cố bắn
+        }
+    }
     private void shootArrow(LivingEntity target) {
         if (npc.getWorld().isClient) return;
 
@@ -52,11 +148,32 @@ public class SoldierBowGoal extends Goal {
         double dx = target.getX() - npc.getX();
         double dy = target.getBodyY(0.333) - arrow.getY();
         double dz = target.getZ() - npc.getZ();
-        double distance = Math.sqrt(dx*dx + dz*dz) * 0.2;
+        double distance = Math.sqrt(dx * dx + dz * dz) * 0.2;
+        float inaccuracy = calculateInaccuracy(distance);
 
-        arrow.setVelocity(dx, dy + distance, dz, 1.6F, 12.0F);
+        arrow.setVelocity(dx, dy + distance, dz, 2.0F, inaccuracy);
         npc.getWorld().spawnEntity(arrow);
         npc.swingHand(Hand.MAIN_HAND);
+        // Sound effect (optional)
+        npc.playSound(
+                net.minecraft.sound.SoundEvents.ENTITY_ARROW_SHOOT,
+                1.0F,
+                1.0F / (npc.getRandom().nextFloat() * 0.4F + 1.2F) * 0.5F
+        );
+    }
+
+    @Override
+    public boolean shouldContinue() {
+        return target != null
+                && target.isAlive()
+                && npc.getMainHandStack().getItem() instanceof BowItem;
+    }
+    private float calculateInaccuracy(double distance) {
+        // Công thức: độ lệch cơ bản + (khoảng cách × hệ số)
+        float inaccuracy = BASE_INACCURACY + (float)(distance * INACCURACY_PER_BLOCK);
+
+        // Giới hạn tối đa để không quá tệ
+        return Math.min(inaccuracy, MAX_INACCURACY);
     }
 }
 

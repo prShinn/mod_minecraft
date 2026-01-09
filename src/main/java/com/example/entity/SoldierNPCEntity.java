@@ -76,7 +76,7 @@ public class SoldierNPCEntity extends PathAwareEntity {
     // ===== ATTRIBUTES =====
     public static DefaultAttributeContainer.Builder createAttributes() {
         return HostileEntity.createHostileAttributes()
-                .add(EntityAttributes.GENERIC_MAX_HEALTH, 30.0D)
+                .add(EntityAttributes.GENERIC_MAX_HEALTH, 25.0D)
                 .add(EntityAttributes.GENERIC_ATTACK_DAMAGE, 2.0D)
                 .add(EntityAttributes.GENERIC_MOVEMENT_SPEED, 0.30D);
     }
@@ -125,7 +125,10 @@ public class SoldierNPCEntity extends PathAwareEntity {
         this.goalSelector.add(9, new LookAroundGoal(this));
         // đánh quái
         this.targetSelector.add(1, new DefendPlayerGoal(this, 32.0F)); // bảo vệ
-        this.targetSelector.add(1, new ActiveTargetGoal<>(this, HostileEntity.class, true)); // đánh hostile
+        this.targetSelector.add(1, new ActiveTargetGoal<>(this, HostileEntity.class, true, target -> {
+            // Mở rộng khoảng cách check quanh npc hoặc player: 20 block
+            return this.squaredDistanceTo(target) <= 21 * 21 || this.getOwner().squaredDistanceTo(target) <= 21 * 21;
+        })); // đánh hostile
         this.targetSelector.add(2, new RevengeGoal(this, PlayerEntity.class)); // đánh trả khi bị tấn công
 
     }
