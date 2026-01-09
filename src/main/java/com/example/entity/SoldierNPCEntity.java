@@ -1,8 +1,10 @@
 package com.example.entity;
 
+import com.example.ai.DefendPlayerGoal;
 import com.example.ai.FollowOwnerLikeGoal;
 import com.example.ai.HealAllyGoal;
 import com.example.ai.SoldierBowGoal;
+import com.example.registry.ModItems;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.EquipmentSlot;
@@ -90,7 +92,6 @@ public class SoldierNPCEntity extends PathAwareEntity {
 
         this.goalSelector.add(0, new SwimGoal(this)); // ko chet duoi
         this.goalSelector.add(3, new EscapeDangerGoal(this, 1.4));
-
         this.goalSelector.add(2, new MeleeAttackGoal(this, 1.2, true) {
             @Override
             public boolean canStart() {
@@ -123,8 +124,9 @@ public class SoldierNPCEntity extends PathAwareEntity {
         // nhìn xung quanh
         this.goalSelector.add(9, new LookAroundGoal(this));
         // đánh quái
+        this.targetSelector.add(1, new DefendPlayerGoal(this, 32.0F)); // bảo vệ
         this.targetSelector.add(1, new ActiveTargetGoal<>(this, HostileEntity.class, true)); // đánh hostile
-        this.targetSelector.add(2, new RevengeGoal(this)); // đánh trả khi bị tấn công
+        this.targetSelector.add(2, new RevengeGoal(this, PlayerEntity.class)); // đánh trả khi bị tấn công
 
     }
 
@@ -291,7 +293,30 @@ public class SoldierNPCEntity extends PathAwareEntity {
     @Override
     public ActionResult interactMob(PlayerEntity player, Hand hand) {
         if (this.getWorld().isClient) return ActionResult.SUCCESS;
+        // ===== SHIFT + RIGHT CLICK → THU HỒI NPC =====
+        if (player.isSneaking()) {
 
+            // chỉ owner được thu hồi
+            if (ownerUUID != null && !player.getUuid().equals(ownerUUID)) {
+                return ActionResult.FAIL;
+            }
+
+            ItemStack token = new ItemStack(ModItems.SOLDIER_TOKEN);
+
+            NbtCompound entityNbt = new NbtCompound();
+            this.writeCustomDataToNbt(entityNbt);
+            entityNbt.putFloat("Health", this.getHealth());
+
+            token.getOrCreateNbt().put("EntityTag", entityNbt);
+
+            if (!player.getInventory().insertStack(token)) {
+                this.dropStack(token);
+            }
+
+            this.discard(); // xoá NPC
+
+            return ActionResult.CONSUME;
+        }
         ItemStack held = player.getStackInHand(hand);
         // ===== ADD FOOD =====
         if (held.isFood()) {

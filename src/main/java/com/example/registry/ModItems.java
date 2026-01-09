@@ -12,7 +12,7 @@ public class ModItems {
 
     public static void register() {
         SOLDIER_TOKEN = Registry.register(Registries.ITEM, new Identifier(ExampleMod.MODID, "soldier_token"),
-                new SoldierTokenItem(new Item.Settings().maxCount(16)));
+                new SoldierTokenItem(new Item.Settings().maxCount(1)));
     }
 
 }
