@@ -1,9 +1,6 @@
 package com.example.entity;
 
-import com.example.ai.DefendPlayerGoal;
-import com.example.ai.FollowOwnerLikeGoal;
-import com.example.ai.HealAllyGoal;
-import com.example.ai.SoldierBowGoal;
+import com.example.ai.*;
 import com.example.registry.ModItems;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
@@ -118,6 +115,8 @@ public class SoldierNPCEntity extends PathAwareEntity {
             }
         });
         this.goalSelector.add(4, new FollowOwnerLikeGoal(this, 1.3D, FOLLOW_DISTANCE, TELEPORT_DISTANCE)); // uu tien di theo
+        this.goalSelector.add(5, new ReturnToPlayerGoal(this));
+
         // đi lang thang xa
         this.goalSelector.add(6, new WanderAroundFarGoal(this, 1.0D));
         // nhin player
