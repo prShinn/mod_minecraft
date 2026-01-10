@@ -20,7 +20,7 @@ import java.util.EnumSet;
 
 public class SoldierCrossbowGoal extends Goal {
     private final SoldierNPCEntity npc;
-    private FindSightAttack mapAI;
+    private final FindSightAttack mapAI = new FindSightAttack();
     private LivingEntity target;
     private int attackCooldown;
     private int chargingTime;
@@ -187,7 +187,7 @@ public class SoldierCrossbowGoal extends Goal {
 
         arrow.setVelocity(dx, dy + heightAdjust, dz, 3.15F, inaccuracy);
         arrow.setOwner(npc);
-        if (npc.getRandom().nextFloat() < 0.3F) arrow.setCritical(true);
+        if (npc.getRandom().nextFloat() < 0.05F) arrow.setCritical(true);
 
         npc.getWorld().spawnEntity(arrow);
 

@@ -16,7 +16,7 @@ import java.util.EnumSet;
 
 public class SoldierBowGoal extends Goal {
     private final SoldierNPCEntity npc;
-    private FindSightAttack mapAI;
+    private final FindSightAttack mapAI = new FindSightAttack();
     private LivingEntity target;
     private int attackCooldown;
     // Khoảng cách
@@ -196,8 +196,8 @@ public class SoldierBowGoal extends Goal {
 
         arrow.setVelocity(dx, dy + distance, dz, 2.0F, inaccuracy);
         arrow.setOwner(npc);
-        // ===== CRITICAL HIT (Random 20%) =====
-        if (npc.getRandom().nextFloat() < 0.2F) {
+        // ===== CRITICAL HIT (Random 5%) =====
+        if (npc.getRandom().nextFloat() < 0.05F) {
             arrow.setCritical(true);
         }
         npc.getWorld().spawnEntity(arrow);

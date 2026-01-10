@@ -140,7 +140,7 @@ public class SoldierTokenItem extends Item {
             nbt.putUuid("OwnerUUID", player.getUuid());
         }
         if (!nbt.containsUuid("FollowPlayer")) {
-            nbt.putUuid("followPlayerUUID", player.getUuid());
+            nbt.putUuid("FollowPlayer", player.getUuid());
         }
 
 
