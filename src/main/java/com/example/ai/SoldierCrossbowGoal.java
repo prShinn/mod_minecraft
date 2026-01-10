@@ -14,11 +14,13 @@ import net.minecraft.item.Items;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.Hand;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.World;
 
 import java.util.EnumSet;
 
 public class SoldierCrossbowGoal extends Goal {
     private final SoldierNPCEntity npc;
+    private FindSightAttack mapAI;
     private LivingEntity target;
     private int attackCooldown;
     private int chargingTime;
@@ -32,7 +34,7 @@ public class SoldierCrossbowGoal extends Goal {
     private static final float MAX_INACCURACY = 8.0F;
     private static final float INACCURACY_PER_BLOCK = 0.3F;
 
-    private static final int BASE_CHARGE_TIME = 40;
+    private static final int BASE_CHARGE_TIME = 25;
 
     public SoldierCrossbowGoal(SoldierNPCEntity npc) {
         this.npc = npc;
@@ -91,9 +93,10 @@ public class SoldierCrossbowGoal extends Goal {
             attackCooldown--;
             return;
         }
-
-        if (!npc.getVisibilityCache().canSee(target)) return;
-
+        if (!npc.getVisibilityCache().canSee(target)) {
+            mapAI.findLineOfSight(target, npc); // không nhìn thấy tìm đường khác
+            return;
+        }
         ItemStack crossbow = npc.getMainHandStack();
 
         if (isCharged || CrossbowItem.isCharged(crossbow)) {

@@ -16,6 +16,7 @@ import java.util.EnumSet;
 
 public class SoldierBowGoal extends Goal {
     private final SoldierNPCEntity npc;
+    private FindSightAttack mapAI;
     private LivingEntity target;
     private int attackCooldown;
     // Khoảng cách
@@ -90,6 +91,8 @@ public class SoldierBowGoal extends Goal {
         if (npc.getVisibilityCache().canSee(target)) {
             shootArrow(target);
             attackCooldown = 20; // 1s
+        }else {
+            mapAI.findLineOfSight(target, npc);
         }
     }
 

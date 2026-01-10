@@ -426,7 +426,10 @@ public class SoldierNPCEntity extends PathAwareEntity {
 
     private boolean isWeapon(ItemStack stack) {
         if (stack.isEmpty()) return false;
-        return stack.getItem() instanceof SwordItem || stack.getItem() instanceof AxeItem || stack.getItem() instanceof BowItem;
+        return stack.getItem() instanceof SwordItem
+                || stack.getItem() instanceof AxeItem
+                || stack.getItem() instanceof BowItem
+                || stack.getItem() instanceof CrossbowItem;
     }
 
     // ===== COMBAT =====
