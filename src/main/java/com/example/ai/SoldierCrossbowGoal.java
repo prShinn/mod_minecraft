@@ -179,13 +179,13 @@ public class SoldierCrossbowGoal extends Goal {
 
         // Tính toán vector
         double dx = target.getX() - npc.getX();
-        double dy = target.getBodyY(0.33D) - arrow.getY();
+        double dy = target.getBodyY(0.155D) - arrow.getY();
         double dz = target.getZ() - npc.getZ();
         double distance = Math.sqrt(dx * dx + dz * dz);
         float inaccuracy = calculateInaccuracy(distance);
         double heightAdjust = distance * 0.05D;
 
-        arrow.setVelocity(dx, dy + heightAdjust, dz, 3.15F, inaccuracy);
+        arrow.setVelocity(dx, dy + heightAdjust, dz, 2.5F, inaccuracy);
         arrow.setOwner(npc);
         if (npc.getRandom().nextFloat() < 0.05F) arrow.setCritical(true);
 
