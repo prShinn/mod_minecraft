@@ -378,12 +378,10 @@ public class SoldierNPCEntity extends PathAwareEntity {
 
     private ActionResult tryRecallNpc(PlayerEntity player) {
         if (player.isSneaking()) {
-
             // chỉ owner được thu hồi
             if (ownerUUID != null && !player.getUuid().equals(ownerUUID)) {
                 return ActionResult.FAIL;
             }
-
             ItemStack token = new ItemStack(ModItems.SOLDIER_TOKEN);
 
             NbtCompound entityNbt = new NbtCompound();

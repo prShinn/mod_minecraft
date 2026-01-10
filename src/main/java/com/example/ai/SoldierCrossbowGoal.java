@@ -31,8 +31,8 @@ public class SoldierCrossbowGoal extends Goal {
     private static final double MIN_ATTACK_DISTANCE = 8.0;
 
     private static final float BASE_INACCURACY = 2.0F;
-    private static final float MAX_INACCURACY = 8.0F;
-    private static final float INACCURACY_PER_BLOCK = 0.3F;
+    private static final float MAX_INACCURACY = 6.0F;
+    private static final float INACCURACY_PER_BLOCK = 0.2F;
 
     private static final int BASE_CHARGE_TIME = 25;
 

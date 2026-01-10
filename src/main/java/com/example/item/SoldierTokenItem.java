@@ -3,6 +3,7 @@ package com.example.item;
 import com.example.entity.SoldierNPCEntity;
 import com.example.registry.ModEntities;
 import net.minecraft.item.*;
+import net.minecraft.nbt.NbtCompound;
 import net.minecraft.util.*;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.HitResult;
@@ -120,7 +121,6 @@ public class SoldierTokenItem extends Item {
         // Tạo NPC
         SoldierNPCEntity npc = ModEntities.SOLDIER_NPC.create(sw);
         if (npc == null) return TypedActionResult.fail(player.getStackInHand(hand));
-
         // Copy NBT nếu có
         ItemStack stack = player.getStackInHand(hand);
         if (stack.hasNbt() && stack.getNbt().contains("EntityTag")) {
@@ -135,6 +135,14 @@ public class SoldierTokenItem extends Item {
         npc.refreshPositionAndAngles(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5, player.getYaw(), 0);
         npc.initEquipment(sw.getRandom(), sw.getLocalDifficulty(pos));
         npc.setOwner(player);
+        NbtCompound nbt = new NbtCompound();
+        if (!nbt.containsUuid("OwnerUUID")) {
+            nbt.putUuid("OwnerUUID", player.getUuid());
+        }
+        if (!nbt.containsUuid("FollowPlayer")) {
+            nbt.putUuid("followPlayerUUID", player.getUuid());
+        }
+
 
         // Spawn
         sw.spawnEntity(npc);
