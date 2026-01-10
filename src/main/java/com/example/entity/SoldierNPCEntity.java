@@ -2,10 +2,9 @@ package com.example.entity;
 
 import com.example.ai.*;
 import com.example.registry.ModItems;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.entity.LivingEntity;
+import net.minecraft.enchantment.EnchantmentHelper;
+import net.minecraft.enchantment.Enchantments;
+import net.minecraft.entity.*;
 import net.minecraft.entity.ai.goal.*;
 import net.minecraft.entity.attribute.DefaultAttributeContainer;
 import net.minecraft.entity.attribute.EntityAttributes;
@@ -28,6 +27,7 @@ import net.minecraft.util.ActionResult;
 import net.minecraft.util.Arm;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Hand;
+import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.math.random.Random;
 import net.minecraft.world.LocalDifficulty;
 import net.minecraft.world.World;
@@ -43,11 +43,11 @@ public class SoldierNPCEntity extends PathAwareEntity {
     private static final int FOOD_TICK_INTERVAL = 1200; // 1p
     private static final int SHOW_NAME_DURATION = 20; // 1 giây
     private static final double VIEW_DISTANCE = 6.0;
-    private static final float FOLLOW_DISTANCE = 25f;
+    private static final float FOLLOW_DISTANCE = 30f;
     private static final float TELEPORT_DISTANCE = 40f;
-    private static final int PLAYER_SEARCH_INTERVAL = 20; // 1 giây
+    private static final int PLAYER_SEARCH_INTERVAL = 30; // 1 giây
     private static final int WEAPON_DURABILITY_CHANCE = 10; // 1/10 xác suất
-    private static final int ARMOR_DURABILITY_CHANCE = 10; // 1/10 xác suất
+    private static final int ARMOR_DURABILITY_CHANCE = 20; // 1/20 xác suất
 
     // ===== OWNER & FOLLOW =====
     private UUID ownerUUID;
@@ -79,7 +79,7 @@ public class SoldierNPCEntity extends PathAwareEntity {
         return HostileEntity.createHostileAttributes()
                 .add(EntityAttributes.GENERIC_MAX_HEALTH, 25.0D)
                 .add(EntityAttributes.GENERIC_ATTACK_DAMAGE, 2.0D)
-                .add(EntityAttributes.GENERIC_MOVEMENT_SPEED, 0.30D);
+                .add(EntityAttributes.GENERIC_MOVEMENT_SPEED, 0.25D);
     }
 
 
@@ -92,7 +92,6 @@ public class SoldierNPCEntity extends PathAwareEntity {
         this.targetSelector.clear(goal -> true);
 
         this.goalSelector.add(0, new SwimGoal(this)); // ko chet duoi
-        this.goalSelector.add(3, new EscapeDangerGoal(this, 1.4));
         this.goalSelector.add(2, new MeleeAttackGoal(this, 1.2, true) {
             @Override
             public boolean canStart() {
@@ -114,6 +113,7 @@ public class SoldierNPCEntity extends PathAwareEntity {
                 return super.canStart() && SoldierNPCEntity.this.getMainHandStack().getItem() instanceof BowItem;
             }
         });
+        this.goalSelector.add(3, new EscapeDangerGoal(this, 1.4));
         this.goalSelector.add(4, new FollowOwnerLikeGoal(this, 1.3D, FOLLOW_DISTANCE, TELEPORT_DISTANCE)); // uu tien di theo
         this.goalSelector.add(5, new ReturnToPlayerGoal(this));
 
@@ -137,6 +137,7 @@ public class SoldierNPCEntity extends PathAwareEntity {
         this.targetSelector.add(2, new RevengeGoal(this, PlayerEntity.class)); // đánh trả khi bị tấn công
 
     }
+
     // ===== TICK =====
     @Override
     public void tick() {
@@ -154,6 +155,7 @@ public class SoldierNPCEntity extends PathAwareEntity {
         // Healing system
         handleGradualHeal();
     }
+
     // ===== FOOD SYSTEM =====
     private void handleFoodSystem() {
         // Decrease hunger over time
@@ -170,6 +172,7 @@ public class SoldierNPCEntity extends PathAwareEntity {
             this.npcEatFood();
         }
     }
+
     private void npcEatFood() {
         if (this.getWorld().isClient) return; // Chỉ server xử lý
         for (int i = 0; i < this.foodInventory.size(); i++) {
@@ -186,6 +189,7 @@ public class SoldierNPCEntity extends PathAwareEntity {
             return;
         }
     }
+
     private void decreaseHunger() {
         if (hunger > 0) {
             hunger--;
@@ -194,15 +198,18 @@ public class SoldierNPCEntity extends PathAwareEntity {
             this.damage(this.getWorld().getDamageSources().starve(), 1.0F);
         }
     }
+
     private boolean shouldEat() {
         // Chỉ ăn khi food thấp hơn 50%
         return eatCooldown <= 0 && hunger <= MAX_HUNGER * 0.5f;
     }
+
     // ===== HEALING SYSTEM =====
     public void requestHeal(float amount) {
         if (amount <= 0) return;
         this.pendingHeal += amount;
     }
+
     private void handleGradualHeal() {
         // ===== ƯU TIÊN HEAL TỪ MEDIC (KHÔNG TỐN HUNGER) =====
         if (pendingHeal > 0 && this.getHealth() < this.getMaxHealth()) {
@@ -225,6 +232,7 @@ public class SoldierNPCEntity extends PathAwareEntity {
         hunger--;                // 🔥 Heal tốn Hunger
         healTickCooldown = 30;   // 1.5 giây
     }
+
     // ===== DISPLAY SYSTEM =====
     private void updateNameDisplay() {
         // Only search for player periodically
@@ -245,6 +253,7 @@ public class SoldierNPCEntity extends PathAwareEntity {
             this.setCustomNameVisible(false);
         }
     }
+
     private boolean isPlayerNearby() {
         PlayerEntity player = this.getWorld().getClosestPlayer(this.getX(), this.getY(), this.getZ(), VIEW_DISTANCE, false);
 
@@ -254,6 +263,7 @@ public class SoldierNPCEntity extends PathAwareEntity {
         }
         return false;
     }
+
     private void updateNameText() {
         int hp = Math.round(this.getHealth());
         int maxHp = Math.round(this.getMaxHealth());
@@ -263,6 +273,7 @@ public class SoldierNPCEntity extends PathAwareEntity {
 
         this.setCustomName(name);
     }
+
     public int getTotalFoodCount() {
         int total = 0;
         for (int i = 0; i < foodInventory.size(); i++) {
@@ -273,6 +284,7 @@ public class SoldierNPCEntity extends PathAwareEntity {
         }
         return total;
     }
+
     // ===== INTERACTION =====
     @Override
     public ActionResult interactMob(PlayerEntity player, Hand hand) {
@@ -298,6 +310,7 @@ public class SoldierNPCEntity extends PathAwareEntity {
 
         return super.interactMob(player, hand);
     }
+
     private boolean isThreateningVillager(LivingEntity hostile) {
         List<VillagerEntity> villagers =
                 this.getWorld().getEntitiesByClass(
@@ -418,6 +431,30 @@ public class SoldierNPCEntity extends PathAwareEntity {
 
         ItemStack weapon = this.getMainHandStack();
         damage += getWeaponDamage(weapon);
+        // ===== ÁP DỤNG ENCHANTMENTS =====
+        if (!weapon.isEmpty() && target instanceof LivingEntity livingTarget) {
+
+            // 1️⃣ SHARPNESS (I-V) - Tăng damage chung
+            int sharpnessLevel = EnchantmentHelper.getLevel(Enchantments.SHARPNESS, weapon);
+            if (sharpnessLevel > 0) {
+                // Công thức: +0.5 + 0.5 * level damage
+                damage += 0.5F + (sharpnessLevel * 0.5F);
+            }
+
+            // 2️⃣ SMITE (I-V) - Tăng damage với undead
+            int smiteLevel = EnchantmentHelper.getLevel(Enchantments.SMITE, weapon);
+            if (smiteLevel > 0 && livingTarget.getGroup() == EntityGroup.UNDEAD) {
+                // Công thức: +2.5 * level damage
+                damage += smiteLevel * 2.5F;
+            }
+
+            // 3️⃣ BANE OF ARTHROPODS (I-V) - Tăng damage với arthropod
+            int baneLevel = EnchantmentHelper.getLevel(Enchantments.BANE_OF_ARTHROPODS, weapon);
+            if (baneLevel > 0 && livingTarget.getGroup() == EntityGroup.ARTHROPOD) {
+                // Công thức: +2.5 * level damage
+                damage += baneLevel * 2.5F;
+            }
+        }
         this.getWorld().playSound(null, // null = tất cả player gần đó đều nghe
                 target.getX(),
                 target.getY(),
@@ -431,8 +468,39 @@ public class SoldierNPCEntity extends PathAwareEntity {
 
         // Weapon durability
         if (success && !weapon.isEmpty() && weapon.isDamageable()) {
-            if (this.random.nextInt(WEAPON_DURABILITY_CHANCE) == 0) {
-                weapon.damage(1, this, e -> e.sendEquipmentBreakStatus(EquipmentSlot.MAINHAND));
+            //không bao gio hỏng vu khi
+            //     if (this.random.nextInt(WEAPON_DURABILITY_CHANCE) == 0) {
+            //        weapon.damage(1, this, e -> e.sendEquipmentBreakStatus(EquipmentSlot.MAINHAND));
+            //     }
+            if (target instanceof LivingEntity livingTarget) {
+                // 4️⃣ FIRE ASPECT (I-II) - Đốt cháy mục tiêu
+                int fireAspectLevel = EnchantmentHelper.getLevel(Enchantments.FIRE_ASPECT, weapon);
+                if (fireAspectLevel > 0) {
+                    // Level I: 4 giây (80 ticks), Level II: 8 giây (160 ticks)
+                    int fireTicks = fireAspectLevel * 80;
+                    livingTarget.setOnFireFor(fireTicks / 20); // Convert ticks to seconds
+                }
+
+                // 5️⃣ KNOCKBACK (I-II) - Đẩy lùi mục tiêu
+                int knockbackLevel = EnchantmentHelper.getLevel(Enchantments.KNOCKBACK, weapon);
+                if (knockbackLevel > 0) {
+                    // Tính vector đẩy
+                    Vec3d direction = livingTarget.getPos()
+                            .subtract(this.getPos())
+                            .normalize()
+                            .multiply(knockbackLevel * 2); // 0.5 strength per level
+
+                    // Đẩy lùi theo chiều ngang (x, z) và hơi bay lên (y)
+                    livingTarget.takeKnockback(
+                            knockbackLevel * 2,
+                            -direction.x,
+                            -direction.z
+                    );
+
+                    // Thêm velocity bay lên một chút
+                    livingTarget.addVelocity(0, 0.5 * knockbackLevel, 0);
+                    livingTarget.velocityModified = true;
+                }
             }
             this.getWorld().playSound(null, // null = tất cả player gần đó đều nghe
                     target.getX(),

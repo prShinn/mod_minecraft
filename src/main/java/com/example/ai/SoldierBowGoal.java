@@ -1,11 +1,14 @@
 package com.example.ai;
 
 import com.example.entity.SoldierNPCEntity;
+import net.minecraft.enchantment.EnchantmentHelper;
+import net.minecraft.enchantment.Enchantments;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.ai.goal.Goal;
 import net.minecraft.entity.ai.pathing.Path;
 import net.minecraft.entity.projectile.ArrowEntity;
 import net.minecraft.item.BowItem;
+import net.minecraft.item.ItemStack;
 import net.minecraft.util.Hand;
 import net.minecraft.util.math.Vec3d;
 
@@ -22,10 +25,12 @@ public class SoldierBowGoal extends Goal {
     private static final float BASE_INACCURACY = 4.0F;      // Độ lệch cơ bản
     private static final float MAX_INACCURACY = 14.0F;      // Độ lệch tối đa
     private static final float INACCURACY_PER_BLOCK = 0.5F;
+
     public SoldierBowGoal(SoldierNPCEntity npc) {
         this.npc = npc;
         this.setControls(EnumSet.of(Control.MOVE, Control.LOOK));
     }
+
     @Override
     public void start() {
         super.start();
@@ -39,6 +44,7 @@ public class SoldierBowGoal extends Goal {
         // ✅ Tắt animation khi mất target
         npc.clearActiveItem();
     }
+
     @Override
     public boolean canStart() {
         LivingEntity e = npc.getTarget();
@@ -105,6 +111,7 @@ public class SoldierBowGoal extends Goal {
             moveToSideOfTarget();
         }
     }
+
     // ===== ĐI NGANG (MỚI) =====
     private void moveToSideOfTarget() {
         Vec3d toTarget = target.getPos().subtract(npc.getPos()).normalize();
@@ -148,10 +155,35 @@ public class SoldierBowGoal extends Goal {
             // Nếu cả 2 hướng đều không đi được → đứng yên và cố bắn
         }
     }
+
     private void shootArrow(LivingEntity target) {
         if (npc.getWorld().isClient) return;
+        ItemStack bow = npc.getMainHandStack();
+        if (!(bow.getItem() instanceof BowItem)) return;
+        ArrowEntity arrow = new ArrowEntity(npc.getWorld(), npc); // tạo arrow
+        // ===== ÁP DỤNG ENCHANTMENTS =====
+        // 1️⃣ POWER (I-V) - Tăng damage
+        int powerLevel = EnchantmentHelper.getLevel(Enchantments.POWER, bow);
+        if (powerLevel > 0) {
+            // Công thức: +0.5 damage mỗi level (+25% per level)
+            arrow.setDamage(arrow.getDamage() + (double) powerLevel * 0.5D + 0.5D);
+        }
+        // 2️⃣ PUNCH (I-II) - Knockback
+        int punchLevel = EnchantmentHelper.getLevel(Enchantments.PUNCH, bow);
+        if (punchLevel > 0) {
+            arrow.setPunch(punchLevel);
+        }
 
-        ArrowEntity arrow = new ArrowEntity(npc.getWorld(), npc);
+        // 3️⃣ FLAME (I) - Arrow bốc cháy
+        if (EnchantmentHelper.getLevel(Enchantments.FLAME, bow) > 0) {
+            arrow.setOnFireFor(100); // 5 giây
+        }
+
+        // 4️⃣ PIERCING (Bonus nếu có) - Xuyên qua entity
+        int piercingLevel = EnchantmentHelper.getLevel(Enchantments.PIERCING, bow);
+        if (piercingLevel > 0) {
+            arrow.setPierceLevel((byte) piercingLevel);
+        }
         double dx = target.getX() - npc.getX();
         double dy = target.getBodyY(0.155D) - arrow.getY();
         double dz = target.getZ() - npc.getZ();
@@ -159,6 +191,11 @@ public class SoldierBowGoal extends Goal {
         float inaccuracy = calculateInaccuracy(distance);
 
         arrow.setVelocity(dx, dy + distance, dz, 2.0F, inaccuracy);
+        arrow.setOwner(npc);
+        // ===== CRITICAL HIT (Random 20%) =====
+        if (npc.getRandom().nextFloat() < 0.2F) {
+            arrow.setCritical(true);
+        }
         npc.getWorld().spawnEntity(arrow);
         npc.swingHand(Hand.MAIN_HAND);
         // Sound effect (optional)
@@ -175,9 +212,10 @@ public class SoldierBowGoal extends Goal {
                 && target.isAlive()
                 && npc.getMainHandStack().getItem() instanceof BowItem;
     }
+
     private float calculateInaccuracy(double distance) {
         // Công thức: độ lệch cơ bản + (khoảng cách × hệ số)
-        float inaccuracy = BASE_INACCURACY + (float)(distance * INACCURACY_PER_BLOCK);
+        float inaccuracy = BASE_INACCURACY + (float) (distance * INACCURACY_PER_BLOCK);
 
         // Giới hạn tối đa để không quá tệ
         return Math.min(inaccuracy, MAX_INACCURACY);
