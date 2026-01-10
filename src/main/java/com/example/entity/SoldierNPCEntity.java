@@ -128,10 +128,10 @@ public class SoldierNPCEntity extends PathAwareEntity {
         // đánh quái
         this.targetSelector.add(1, new DefendPlayerGoal(this, 32.0F)); // bảo vệ
         this.targetSelector.add(1, new ActiveTargetGoal<>(this, HostileEntity.class, true, target -> {
-            // Mở rộng khoảng cách check quanh npc hoặc player: 20 block
+            // Mở rộng khoảng cách check quanh npc hoặc player: 25 block
             PlayerEntity owner = this.getOwner();
-            return this.squaredDistanceTo(target) <= 21 * 21
-                    || (owner != null && owner.squaredDistanceTo(target) <= 21 * 21) || isThreateningVillager(target);
+            return this.squaredDistanceTo(target) <= 26 * 26
+                    || (owner != null && owner.squaredDistanceTo(target) <= 25 * 25) || isThreateningVillager(target);
 
         })); // đánh hostile
         this.targetSelector.add(2, new RevengeGoal(this, PlayerEntity.class)); // đánh trả khi bị tấn công

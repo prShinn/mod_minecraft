@@ -16,6 +16,7 @@ public class SoldierBowGoal extends Goal {
     private LivingEntity target;
     private int attackCooldown;
     // Khoảng cách
+    private static final double DETECTION_DISTANCE = 30.0; // phát hiện xa
     private static final double MAX_ATTACK_DISTANCE = 15.0;
     private static final double MIN_ATTACK_DISTANCE = 6.0;
     private static final float BASE_INACCURACY = 4.0F;      // Độ lệch cơ bản
@@ -42,11 +43,15 @@ public class SoldierBowGoal extends Goal {
     public boolean canStart() {
         LivingEntity e = npc.getTarget();
         if (e == null || !e.isAlive()) return false;
-        // Không thấy → không bắn
-        if (!npc.getVisibilityCache().canSee(e)) return false;
+
+        // Chỉ cần có target, chưa cần trong tầm bắn
+        double distSq = npc.squaredDistanceTo(e);
+        if (distSq > DETECTION_DISTANCE * DETECTION_DISTANCE) return false;
+
         this.target = e;
         return npc.getMainHandStack().getItem() instanceof BowItem;
     }
+
 
     @Override
     public void tick() {
@@ -59,14 +64,16 @@ public class SoldierBowGoal extends Goal {
         double minDistSq = MIN_ATTACK_DISTANCE * MIN_ATTACK_DISTANCE;
 
         if (distanceSq > maxDistSq) {
-            //nếu xa hơn 15 block thì lại gần
-            npc.getNavigation().startMovingTo(target, 1.0);
+            // Xa hơn 15 → chạy lại gần
+            npc.getNavigation().startMovingTo(target, 1.1);
         } else if (distanceSq < minDistSq) {
-            // quá gần → lùi ra
+            // Quá gần → lùi
             moveAwayFromTarget();
         } else {
+            // Trong tầm bắn
             npc.getNavigation().stop();
         }
+
         // ===== BẮN =====
         if (attackCooldown > 0) {
             attackCooldown--;
@@ -76,7 +83,7 @@ public class SoldierBowGoal extends Goal {
         // Chỉ bắn khi nhìn thấy target
         if (npc.getVisibilityCache().canSee(target)) {
             shootArrow(target);
-            attackCooldown = 30; // 1.5s
+            attackCooldown = 20; // 1s
         }
     }
 
@@ -146,9 +153,9 @@ public class SoldierBowGoal extends Goal {
 
         ArrowEntity arrow = new ArrowEntity(npc.getWorld(), npc);
         double dx = target.getX() - npc.getX();
-        double dy = target.getBodyY(0.333) - arrow.getY();
+        double dy = target.getBodyY(0.155D) - arrow.getY();
         double dz = target.getZ() - npc.getZ();
-        double distance = Math.sqrt(dx * dx + dz * dz) * 0.2;
+        double distance = Math.sqrt(dx * dx + dz * dz) * 0.2F;
         float inaccuracy = calculateInaccuracy(distance);
 
         arrow.setVelocity(dx, dy + distance, dz, 2.0F, inaccuracy);
@@ -166,8 +173,7 @@ public class SoldierBowGoal extends Goal {
     public boolean shouldContinue() {
         return target != null
                 && target.isAlive()
-                && npc.getMainHandStack().getItem() instanceof BowItem
-                && npc.getVisibilityCache().canSee(target);
+                && npc.getMainHandStack().getItem() instanceof BowItem;
     }
     private float calculateInaccuracy(double distance) {
         // Công thức: độ lệch cơ bản + (khoảng cách × hệ số)
