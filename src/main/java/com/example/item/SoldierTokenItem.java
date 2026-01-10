@@ -133,7 +133,6 @@ public class SoldierTokenItem extends Item {
 
         // Set vị trí, owner, equipment
         npc.refreshPositionAndAngles(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5, player.getYaw(), 0);
-        npc.initEquipment(sw.getRandom(), sw.getLocalDifficulty(pos));
         npc.setOwner(player);
         NbtCompound nbt = new NbtCompound();
         if (!nbt.containsUuid("OwnerUUID")) {

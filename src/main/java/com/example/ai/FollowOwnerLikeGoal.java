@@ -10,16 +10,13 @@ public class FollowOwnerLikeGoal extends Goal {
     private final double speed;
     private float followDistance;
     private float teleportDistance;
-
-
     private PlayerEntity owner;
 
     public FollowOwnerLikeGoal(
             SoldierNPCEntity npc,
             double speed,
             float followDistance,
-            float teleportDistance
-    ) {
+            float teleportDistance) {
         this.npc = npc;
         this.speed = speed;
         this.followDistance = followDistance;
@@ -28,15 +25,15 @@ public class FollowOwnerLikeGoal extends Goal {
 
     @Override
     public boolean canStart() {
+        updateDistancesByMode();
         owner = npc.getOwner();
         if (owner == null) return false;
-
-
         // Đang combat thì không follow
         if (npc.getFollowPlayerUUID() != null && npc.getTarget() != null) return false;
 
         // CHỈ CHECK OWNER
         double distSq = npc.squaredDistanceTo(owner);
+
         return distSq > this.followDistance * this.followDistance;
     }
 
@@ -49,6 +46,8 @@ public class FollowOwnerLikeGoal extends Goal {
 
     @Override
     public void start() {
+        updateDistancesByMode();
+
         npc.setSprinting(true);
     }
 
@@ -60,6 +59,7 @@ public class FollowOwnerLikeGoal extends Goal {
         if (owner == null) return;
 
         double distSq = npc.squaredDistanceTo(owner);
+        updateDistancesByMode();
 
         // TELEPORT nếu quá xa
         if (distSq > teleportDistance * teleportDistance) {
@@ -83,7 +83,17 @@ public class FollowOwnerLikeGoal extends Goal {
             npc.getNavigation().stop();
         }
     }
+    private void updateDistancesByMode() {
+        ModeNpc.ModeMove currentMode = npc.getMoveMode();
 
+        if (currentMode == ModeNpc.ModeMove.WANDER) {
+            this.followDistance = SoldierNPCEntity.FOLLOW_DISTANCE;
+            this.teleportDistance = SoldierNPCEntity.TELEPORT_DISTANCE;
+        } else { // FOLLOW
+            this.followDistance = 5F;
+            this.teleportDistance = 7F;
+        }
+    }
     @Override
     public void stop() {
         npc.setSprinting(false);
