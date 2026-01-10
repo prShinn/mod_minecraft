@@ -48,6 +48,9 @@ public class SoldierNPCEntity extends PathAwareEntity {
     private static final int PLAYER_SEARCH_INTERVAL = 30; // 1 giây
     private static final int WEAPON_DURABILITY_CHANCE = 10; // 1/10 xác suất
     private static final int ARMOR_DURABILITY_CHANCE = 20; // 1/20 xác suất
+    public ModeNpc.ModeMove moveMode = ModeNpc.ModeMove.FOLLOW;
+    public FollowOwnerLikeGoal followGoal;
+    public WanderAroundGoal wanderGoal;
 
     // ===== OWNER & FOLLOW =====
     private UUID ownerUUID;
@@ -120,7 +123,8 @@ public class SoldierNPCEntity extends PathAwareEntity {
                 return super.canStart() && SoldierNPCEntity.this.getMainHandStack().getItem() instanceof AxeItem;
             }
         });
-        this.goalSelector.add(5, new FollowOwnerLikeGoal(this, 1.3D, FOLLOW_DISTANCE, TELEPORT_DISTANCE)); // uu tien di theo
+        followGoal = setFollowDistance(FOLLOW_DISTANCE, TELEPORT_DISTANCE);
+        this.goalSelector.add(5, followGoal);
         this.goalSelector.add(6, new ReturnToPlayerGoal(this));
 // nhin player
         this.goalSelector.add(7, new LookAtEntityGoal(this, PlayerEntity.class, 8.0F));
@@ -160,6 +164,22 @@ public class SoldierNPCEntity extends PathAwareEntity {
         // Healing system
         handleGradualHeal();
     }
+
+    public FollowOwnerLikeGoal setFollowDistance(float follow_distance, float tele_distance) {
+       return new FollowOwnerLikeGoal(this, 1.3D, follow_distance, tele_distance);// uu tien di theo
+    }
+
+    public void applyMoveMode() {
+        goalSelector.remove(followGoal);
+        goalSelector.remove(wanderGoal);
+        followGoal = setFollowDistance(3F, 5F);
+        if (moveMode == ModeNpc.ModeMove.FOLLOW) {
+            goalSelector.add(1, followGoal);
+        } else {
+            goalSelector.add(8, wanderGoal);
+        }
+    }
+
 
     // ===== FOOD SYSTEM =====
     private void handleFoodSystem() {
@@ -675,4 +695,5 @@ public class SoldierNPCEntity extends PathAwareEntity {
     public Arm getMainArm() {
         return Arm.RIGHT;
     }
+
 }
