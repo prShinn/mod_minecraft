@@ -24,8 +24,8 @@ public class HealAllyGoal extends Goal {
     private final PathAwareEntity medic;
     private LivingEntity target;
 
-    private static final double SEARCH_RANGE = 12.0D;
-    private static final double HEAL_DISTANCE = 4.0D;
+    private static final double SEARCH_RANGE = 15.0D;
+    private static final double HEAL_DISTANCE = 2.0D;
     private static final int HEAL_COOLDOWN_TICKS = 60; // 3s
 
     private int healCooldown = 0;
@@ -146,7 +146,7 @@ public class HealAllyGoal extends Goal {
         // 1️⃣ UNBREAKING → +20% heal mỗi level
         int unbreaking = EnchantmentHelper.getLevel(Enchantments.UNBREAKING, stack);
         if (unbreaking > 0) {
-            bonus += unbreaking * 0.2f;
+            bonus += unbreaking * 0.5f;
         }
 
         // 2️⃣ MENDING → +1 tim mỗi level
@@ -157,11 +157,11 @@ public class HealAllyGoal extends Goal {
 
         return bonus;
     }
-    private int getCooldownReduction() {
+    private float getCooldownReduction() {
         ItemStack stack = medic.getMainHandStack();
         int efficiency = EnchantmentHelper.getLevel(Enchantments.EFFICIENCY, stack);
 
-        return efficiency > 0 ? efficiency : 1;
+        return efficiency > 1 ? efficiency : efficiency == 1 ? 1.5F : 1;
     }
 
     // =========================

@@ -90,7 +90,6 @@ public class SoldierNPCEntity extends PathAwareEntity {
         // ⚠️ QUAN TRỌNG: Clear goals cũ trước
         this.goalSelector.clear(goal -> true);
         this.targetSelector.clear(goal -> true);
-
         this.goalSelector.add(0, new SwimGoal(this)); // ko chet duoi
         this.goalSelector.add(2, new MeleeAttackGoal(this, 1.2, true) {
             @Override
@@ -98,33 +97,39 @@ public class SoldierNPCEntity extends PathAwareEntity {
                 // chỉ start nếu cầm sword
                 return super.canStart() && SoldierNPCEntity.this.getMainHandStack().getItem() instanceof SwordItem;
             }
-        });
-        this.goalSelector.add(2, new HealAllyGoal(this) {
-            @Override
-            public boolean canStart() {
-                // chỉ start nếu cầm riu
-                return super.canStart() && SoldierNPCEntity.this.getMainHandStack().getItem() instanceof AxeItem;
-            }
-        });
+        }); // binh linh
         this.goalSelector.add(2, new SoldierBowGoal(this) {
             @Override
             public boolean canStart() {
                 // chỉ start nếu cầm cung
                 return super.canStart() && SoldierNPCEntity.this.getMainHandStack().getItem() instanceof BowItem;
             }
-        });
+        }); // cung thu
+        this.goalSelector.add(2, new SoldierCrossbowGoal(this) {
+            @Override
+            public boolean canStart() {
+                // chỉ start nếu cầm cung
+                return super.canStart() && SoldierNPCEntity.this.getMainHandStack().getItem() instanceof CrossbowItem;
+            }
+        }); // cung thu
         this.goalSelector.add(3, new EscapeDangerGoal(this, 1.4));
-        this.goalSelector.add(4, new FollowOwnerLikeGoal(this, 1.3D, FOLLOW_DISTANCE, TELEPORT_DISTANCE)); // uu tien di theo
-        this.goalSelector.add(5, new ReturnToPlayerGoal(this));
-
-        // đi lang thang xa
-        this.goalSelector.add(6, new WanderAroundFarGoal(this, 1.0D));
-        // nhin player
+        this.goalSelector.add(4, new HealAllyGoal(this) {
+            @Override
+            public boolean canStart() {
+                // chỉ start nếu cầm riu
+                return super.canStart() && SoldierNPCEntity.this.getMainHandStack().getItem() instanceof AxeItem;
+            }
+        });
+        this.goalSelector.add(5, new FollowOwnerLikeGoal(this, 1.3D, FOLLOW_DISTANCE, TELEPORT_DISTANCE)); // uu tien di theo
+        this.goalSelector.add(6, new ReturnToPlayerGoal(this));
+// nhin player
         this.goalSelector.add(7, new LookAtEntityGoal(this, PlayerEntity.class, 8.0F));
-        // đi xung quanh
-        this.goalSelector.add(8, new WanderAroundGoal(this, 0.8));
+        // đi lang thang xa
+        this.goalSelector.add(8, new WanderAroundFarGoal(this, 1.0D));
+        // đi xung quanh gần (phat trien sau)
+//        this.goalSelector.add(8, new WanderAroundGoal(this, 0.8));
         // nhìn xung quanh
-        this.goalSelector.add(9, new LookAroundGoal(this));
+        this.goalSelector.add(8, new LookAroundGoal(this));
         // đánh quái
         this.targetSelector.add(1, new DefendPlayerGoal(this, 32.0F)); // bảo vệ
         this.targetSelector.add(1, new ActiveTargetGoal<>(this, HostileEntity.class, true, target -> {

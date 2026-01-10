@@ -161,6 +161,7 @@ public class SoldierBowGoal extends Goal {
         ItemStack bow = npc.getMainHandStack();
         if (!(bow.getItem() instanceof BowItem)) return;
         ArrowEntity arrow = new ArrowEntity(npc.getWorld(), npc); // tạo arrow
+        arrow.setDamage(3.5F);
         // ===== ÁP DỤNG ENCHANTMENTS =====
         // 1️⃣ POWER (I-V) - Tăng damage
         int powerLevel = EnchantmentHelper.getLevel(Enchantments.POWER, bow);

@@ -13,8 +13,8 @@ public class ReturnToPlayerGoal extends Goal {
     private int wanderTimer = 0;
 
     // Khoảng cách mục tiêu (6-8 blocks)
-    private static final double MIN_DISTANCE = 6.0;
-    private static final double MAX_DISTANCE = 8.0;
+    private static final double MIN_DISTANCE = 4.0;
+    private static final double MAX_DISTANCE = 6.0;
 
     // Thời gian lang thang trước khi quay về (giây)
     private static final int WANDER_TIME = 30; // 30 giây = 600 ticks
