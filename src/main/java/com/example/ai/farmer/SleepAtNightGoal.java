@@ -16,7 +16,7 @@ import java.util.List;
 
 public class SleepAtNightGoal extends Goal {
     private static final int SEARCH_RADIUS = 10;
-    private static final int FIND_BED_COOLDOWN = 30;
+    private static final int FIND_BED_COOLDOWN = 40;
     private int cooldownFindBed = 0;
     private BlockPos cachedBedPos = null;
     private final FarmerNpcEntity npc;
@@ -31,12 +31,15 @@ public class SleepAtNightGoal extends Goal {
     public boolean canStart() {
         if (!npc.memory.isNight(npc.getWorld())) return false;
         if (npc.memory.sleeping) return false;
+        if (cooldownFindBed-- > 0) return false;
+        cooldownFindBed = FIND_BED_COOLDOWN;
         bedPos = findNearestBed();
         return bedPos != null;
     }
 
     @Override
     public void start() {
+        npc.getReservedBeds().add(bedPos);
         npc.memory.bedPos = bedPos;
         npc.getNavigation().startMovingTo(
                 bedPos.getX() + 0.5,
@@ -65,12 +68,16 @@ public class SleepAtNightGoal extends Goal {
     public boolean shouldContinue() {
         return !npc.memory.sleeping
                 && npc.memory.isNight(npc.getWorld())
-                && bedPos != null;
+                && bedPos != null && isBedValid(bedPos);
     }
 
     @Override
     public void stop() {
         npc.getNavigation().stop();
+        if (!npc.memory.sleeping && bedPos != null) {
+            npc.getReservedBeds().remove(bedPos);
+        }
+        npc.memory.bedPos = null;
         bedPos = null;
     }
 
@@ -87,15 +94,6 @@ public class SleepAtNightGoal extends Goal {
         npc.memory.bedPos = bedPos;
     }
 
-    public void wakeUp() {
-        if (!npc.memory.sleeping) return;
-
-        npc.setPose(EntityPose.STANDING);
-        npc.memory.sleeping = false;
-
-        releaseBed();
-    }
-
     private BlockPos findNearestBed() {
         if (cachedBedPos != null && isBedValid(cachedBedPos) && isBedFree(cachedBedPos)) {
             return cachedBedPos; // dùng lại giường cũ
@@ -108,8 +106,10 @@ public class SleepAtNightGoal extends Goal {
         BlockPos center = npc.getBlockPos();
 
         for (BlockPos pos : BlockPos.iterate(
-                center.add(-10, -2, -10),
-                center.add(10, 2, 10))) {
+                center.add(-SEARCH_RADIUS, -2, -SEARCH_RADIUS),
+                center.add(SEARCH_RADIUS, 2, SEARCH_RADIUS))) {
+            if (!npc.getWorld().isChunkLoaded(pos)) continue;
+
             BlockState state = npc.getWorld().getBlockState(pos);
             if (!(state.getBlock() instanceof BedBlock)) continue;
             // Luôn dùng FOOT của giường
@@ -117,17 +117,19 @@ public class SleepAtNightGoal extends Goal {
                 pos = pos.offset(state.get(BedBlock.FACING).getOpposite());
             }
             if (isBedFree(pos) && !npc.getReservedBeds().contains(pos)) {
-                npc.getReservedBeds().add(pos);
-                cachedBedPos = pos;
+                cachedBedPos = pos.toImmutable();
                 return pos;
             }
         }
         cachedBedPos = null; // không tìm thấy
         return null;
     }
+
     private boolean isBedValid(BlockPos pos) {
-        return npc.getWorld().getBlockState(pos).getBlock() instanceof BedBlock;
+        return pos != null
+                && npc.getWorld().getBlockState(pos).getBlock() instanceof BedBlock;
     }
+
     private boolean isBedFree(BlockPos bedPos) {
         Box box = new Box(bedPos).expand(0.5);
 
@@ -139,6 +141,7 @@ public class SleepAtNightGoal extends Goal {
                 );
         return sleepers.isEmpty();
     }
+
     private void releaseBed() {
         if (bedPos != null) {
             npc.getReservedBeds().remove(bedPos);

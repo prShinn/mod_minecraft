@@ -36,7 +36,7 @@ public class DepositToChestGoal extends Goal {
 //                break;
 //            }
 //        }
-//        if (!hasItems) return false;
+        if (!hasItems()) return false;
 
         chestPos = findNearestChest();
         return chestPos != null;
@@ -50,34 +50,43 @@ public class DepositToChestGoal extends Goal {
                 chestPos.getY(),
                 chestPos.getZ() + 0.5,
                 1.0);
-
+        npc.getReservedBeds().add(chestPos);
     }
 
     @Override
     public void tick() {
         taskTicks++;
-
+        if (taskTicks > MAX_TASK_TICKS || !npc.getWorld().isChunkLoaded(chestPos)) {
+            stop();
+            return;
+        }
         // Nếu đến gần rương thì cất items
         if (npc.squaredDistanceTo(Vec3d.ofCenter(chestPos)) < 2.5) {
             depositItems();
+            stop();
         }
     }
 
     @Override
     public boolean shouldContinue() {
-        if (taskTicks > MAX_TASK_TICKS) return false;
-
-        BlockEntity be = npc.getWorld().getBlockEntity(chestPos);
-        return be instanceof Inventory;
+        return chestPos != null && npc.getNavigation().isFollowingPath() && hasItems();
     }
 
     @Override
     public void stop() {
         npc.getNavigation().stop();
+        if (chestPos != null) {
+            npc.getReservedBeds().remove(chestPos);
+        }
         chestPos = null;
         taskTicks = 0;
     }
-
+    private boolean hasItems() {
+        for (int i = 0; i < npc.foodInventory.size(); i++) {
+            if (!npc.foodInventory.getStack(i).isEmpty()) return true;
+        }
+        return false;
+    }
     private void depositItems() {
         BlockEntity be = npc.getWorld().getBlockEntity(chestPos);
         if (!(be instanceof Inventory chestInv)) return;
@@ -128,6 +137,9 @@ public class DepositToChestGoal extends Goal {
 
         for (BlockPos pos : BlockPos.iterate(center.add(-12, -2, -12), center.add(12, 2, 12))) {
             BlockEntity be = npc.getWorld().getBlockEntity(pos);
+
+            // Check chest chưa bị reserve
+            if (npc.getReservedBeds().contains(pos)) continue; // hoặc RESERVED_CHESTS
             if (be instanceof Inventory) {
                 double dist = npc.squaredDistanceTo(Vec3d.ofCenter(pos));
                 if (dist < closestDist) {

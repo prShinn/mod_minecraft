@@ -41,6 +41,24 @@ public class FarmerNpcEntity extends PathAwareEntity {
     public final FarmerMemory memory = new FarmerMemory();
     // Thay vì static Set
     private static final Map<World, Set<BlockPos>> RESERVED_BEDS_MAP = new HashMap<>();
+    private static final Set<BlockPos> RESERVED_CROPS = new HashSet<>();
+
+    public boolean reserveCrop(BlockPos pos) {
+        return RESERVED_CROPS.add(pos);
+    }
+
+    public void releaseCrop(BlockPos pos) {
+        RESERVED_CROPS.remove(pos);
+    }
+    private static final Set<BlockPos> RESERVED_FARMLAND = new HashSet<>();
+
+    public boolean reserveFarmland(BlockPos pos) {
+        return RESERVED_FARMLAND.add(pos);
+    }
+
+    public void releaseFarmland(BlockPos pos) {
+        RESERVED_FARMLAND.remove(pos);
+    }
 
     public Set<BlockPos> getReservedBeds() {
         return RESERVED_BEDS_MAP.computeIfAbsent(this.getWorld(), w -> new HashSet<>());
@@ -61,30 +79,30 @@ public class FarmerNpcEntity extends PathAwareEntity {
         this.goalSelector.add(1, new EscapeDangerGoal(this, 1.4)); // chay khi bi dame
 
         this.goalSelector.add(2, new SleepAtNightGoal(this)); // di ngu
-        this.goalSelector.add(4, new HarvestCropGoal(this) {
+        this.goalSelector.add(3, new HarvestCropGoal(this) {
             @Override
             public boolean canStart() {
                 return !isSleeping() && super.canStart();
             }
         }); // thu hoach
-        this.goalSelector.add(5, new DepositToChestGoal(this) {
+        this.goalSelector.add(4, new DepositToChestGoal(this) {
             @Override
             public boolean canStart() {
                 return !isSleeping() && super.canStart();
             }
         }); // cât đô
-        this.goalSelector.add(4, new PlantSeedGoal(this) {
+        this.goalSelector.add(5, new PlantSeedGoal(this) {
             @Override
             public boolean canStart() {
                 return !isSleeping() && super.canStart();
             }
         }); // trồng cây
-        this.goalSelector.add(6, new ReturnToFarmGoal(this) {
-            @Override
-            public boolean canStart() {
-                return !isSleeping() && super.canStart();
-            }
-        }); // quay lại farm
+//        this.goalSelector.add(6, new ReturnToFarmGoal(this) {
+//            @Override
+//            public boolean canStart() {
+//                return !isSleeping() && super.canStart();
+//            }
+//        }); // quay lại farm
         this.goalSelector.add(7, new LookAtEntityGoal(this, PlayerEntity.class, 8.0F) {
             @Override
             public boolean canStart() {
