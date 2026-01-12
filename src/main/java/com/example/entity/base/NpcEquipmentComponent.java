@@ -15,6 +15,8 @@ import net.minecraft.util.Hand;
 
 import java.util.UUID;
 
+import static com.example.registry.ModItems.SOLDIER_TOKEN;
+
 public class NpcEquipmentComponent {
 
     public boolean tryEquip(PathAwareEntity npc, PlayerEntity player, ItemStack stack) {
@@ -70,8 +72,12 @@ public class NpcEquipmentComponent {
             NbtCompound entityNbt = new NbtCompound();
             this.writeCustomDataToNbt(entityNbt, npc);
             entityNbt.putFloat("Health", npc.getHealth());
-
-            token.getOrCreateNbt().put("EntityTag", entityNbt);
+            if(npc_token == ModItems.FARMER_TOKEN){
+                token.getOrCreateNbt().put("FarmerEntityTag", entityNbt);
+            }else if(npc_token == SOLDIER_TOKEN)
+            {
+                token.getOrCreateNbt().put("SoldierEntityTag", entityNbt);
+            }
 
             if (!player.getInventory().insertStack(token)) {
                 npc.dropStack(token);

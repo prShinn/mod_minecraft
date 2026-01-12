@@ -5,10 +5,7 @@ import com.example.entity.base.NpcDisplayComponent;
 import com.example.entity.base.NpcEquipmentComponent;
 import com.example.entity.base.NpcFoodComponent;
 import com.example.registry.ModItems;
-import net.minecraft.block.BedBlock;
-import net.minecraft.block.Blocks;
-import net.minecraft.block.CropBlock;
-import net.minecraft.block.FarmlandBlock;
+import net.minecraft.block.*;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.entity.EntityPose;
 import net.minecraft.entity.EntityType;
@@ -63,7 +60,14 @@ public class FarmerNpcEntity extends PathAwareEntity {
     public Set<BlockPos> getReservedBeds() {
         return RESERVED_BEDS_MAP.computeIfAbsent(this.getWorld(), w -> new HashSet<>());
     }
+    private static final Set<BlockPos> RESERVED_CHESTS = new HashSet<>();
+    public boolean reserveChest(BlockPos pos) {
+        return RESERVED_CHESTS.add(pos);
+    }
 
+    public void releaseChest(BlockPos pos) {
+        RESERVED_CHESTS.remove(pos);
+    }
     public FarmerNpcEntity(EntityType<? extends PathAwareEntity> entityType, World world) {
         super(entityType, world);
     }
@@ -97,19 +101,19 @@ public class FarmerNpcEntity extends PathAwareEntity {
                 return !isSleeping() && super.canStart();
             }
         }); // trồng cây
-//        this.goalSelector.add(6, new ReturnToFarmGoal(this) {
-//            @Override
-//            public boolean canStart() {
-//                return !isSleeping() && super.canStart();
-//            }
-//        }); // quay lại farm
+        this.goalSelector.add(6, new ReturnToFarmGoal(this) {
+            @Override
+            public boolean canStart() {
+                return !isSleeping() && super.canStart();
+            }
+        }); // quay lại farm
         this.goalSelector.add(7, new LookAtEntityGoal(this, PlayerEntity.class, 8.0F) {
             @Override
             public boolean canStart() {
                 return !isSleeping() && super.canStart();
             }
         }); // nhin player
-        this.goalSelector.add(8, new WanderAroundFarGoal(this, 1.0D) {
+        this.goalSelector.add(9, new WanderAroundFarGoal(this, 1.0D) {
             @Override
             public boolean canStart() {
                 return !isSleeping() && super.canStart();
@@ -216,51 +220,107 @@ public class FarmerNpcEntity extends PathAwareEntity {
      * Tìm farm (farmland) gần nhất trong bán kính 24 block
      * Ưu tiên: cây chín > đất trống > farmland bất kỳ
      */
+//    public BlockPos findNearestFarmland() {
+//        BlockPos center = getBlockPos();
+//        World world = getWorld();
+//        BlockPos matureCrop = null;
+//        BlockPos emptyFarmland = null;
+//
+//        for (BlockPos pos : BlockPos.iterate(center.add(-24, -2, -24), center.add(24, 2, 24))) {
+//            BlockPos farmlandPos = pos;
+//            BlockPos cropPos = pos.up();
+//
+//            // Check xem vị trí này có farmland không
+//            if (!(world.getBlockState(farmlandPos).getBlock() instanceof FarmlandBlock)) {
+//                continue;
+//            }
+//
+//            // Ưu tiên cây chín
+//            if (world.getBlockState(cropPos).getBlock() instanceof CropBlock crop) {
+//                if (crop.isMature(world.getBlockState(cropPos))) {
+//                    if (matureCrop == null ||
+//                            squaredDistanceTo(Vec3d.ofCenter(cropPos)) < squaredDistanceTo(Vec3d.ofCenter(matureCrop))) {
+//                        matureCrop = cropPos;
+//                    }
+//                }
+//            }
+//            // Thứ 2 là đất trống
+//            else if (world.getBlockState(cropPos).isAir() && emptyFarmland == null) {
+//                emptyFarmland = farmlandPos;
+//            }
+//        }
+//
+//        if (matureCrop != null) return matureCrop;
+//        if (emptyFarmland != null) return emptyFarmland;
+//        return null;
+//    }
     public BlockPos findNearestFarmland() {
-        BlockPos center = getBlockPos();
         World world = getWorld();
-        BlockPos matureCrop = null;
-        BlockPos emptyFarmland = null;
+        BlockPos center = getBlockPos();
+        BlockPos nearestMatureCrop = null;
+        double nearestCropDist = Double.MAX_VALUE;
+        BlockPos nearestEmptyFarmland = null;
+        double nearestFarmlandDist = Double.MAX_VALUE;
+        BlockPos.Mutable mutable = new BlockPos.Mutable();
+        for (int dx = -24; dx <= 24; dx++) {
+            for (int dz = -24; dz <= 24; dz++) {
+                for (int dy = -2; dy <= 2; dy++) {
+                    mutable.set(
+                            center.getX() + dx,
+                            center.getY() + dy,
+                            center.getZ() + dz
+                    );
+                    if (!world.isChunkLoaded(mutable)) continue;
+                    BlockState state = world.getBlockState(mutable);
+                    if (!(state.getBlock() instanceof FarmlandBlock)) continue;
+                    BlockPos farmlandPos = mutable.toImmutable();
+                    BlockPos cropPos = farmlandPos.up();
+                    BlockState cropState = world.getBlockState(cropPos);
 
-        for (BlockPos pos : BlockPos.iterate(center.add(-24, -2, -24), center.add(24, 2, 24))) {
-            BlockPos farmlandPos = pos;
-            BlockPos cropPos = pos.up();
+                    double dist = this.squaredDistanceTo(
+                            cropPos.getX() + 0.5,
+                            cropPos.getY() + 0.5,
+                            cropPos.getZ() + 0.5
+                    );
+                    // 🌾 Ưu tiên cây chín
+                    if (cropState.getBlock() instanceof CropBlock crop
+                            && crop.isMature(cropState)) {
 
-            // Check xem vị trí này có farmland không
-            if (!(world.getBlockState(farmlandPos).getBlock() instanceof FarmlandBlock)) {
-                continue;
-            }
+                        if (RESERVED_CROPS.contains(cropPos)) continue;
 
-            // Ưu tiên cây chín
-            if (world.getBlockState(cropPos).getBlock() instanceof CropBlock crop) {
-                if (crop.isMature(world.getBlockState(cropPos))) {
-                    if (matureCrop == null ||
-                            squaredDistanceTo(Vec3d.ofCenter(cropPos)) < squaredDistanceTo(Vec3d.ofCenter(matureCrop))) {
-                        matureCrop = cropPos;
+                        if (dist < nearestCropDist) {
+                            nearestCropDist = dist;
+                            nearestMatureCrop = cropPos.toImmutable();
+                        }
+                    }
+                    // 🌱 Farmland trống
+                    else if (cropState.isAir()) {
+
+                        if (RESERVED_FARMLAND.contains(farmlandPos)) continue;
+
+                        if (dist < nearestFarmlandDist) {
+                            nearestFarmlandDist = dist;
+                            nearestEmptyFarmland = farmlandPos.toImmutable();
+                        }
                     }
                 }
             }
-            // Thứ 2 là đất trống
-            else if (world.getBlockState(cropPos).isAir() && emptyFarmland == null) {
-                emptyFarmland = farmlandPos;
-            }
         }
-
-        if (matureCrop != null) return matureCrop;
-        if (emptyFarmland != null) return emptyFarmland;
-        return null;
+        // Ưu tiên cây chín
+        if (nearestMatureCrop != null) return nearestMatureCrop;
+        // Không có cây → trả farmland trống
+        return nearestEmptyFarmland;
     }
-
     /**
      * Check xem có hạt giống trong inventory không
      */
     public boolean hasSeeds() {
-//        for (int i = 0; i < foodInventory.size(); i++) {
-//            ItemStack stack = foodInventory.getStack(i);
-//            if (isSeedItem(stack.getItem())) {
-//                return true;
-//            }
-//        }
+        for (int i = 0; i < foodInventory.size(); i++) {
+            ItemStack stack = foodInventory.getStack(i);
+            if (isSeedItem(stack.getItem())) {
+                return true;
+            }
+        }
         Inventory chest = findNearestChest();
         if (chest == null) return false;
 
@@ -278,6 +338,14 @@ public class FarmerNpcEntity extends PathAwareEntity {
      * Lấy hạt giống từ inventory
      */
     public ItemStack takeSeed() {
+        for (int i = 0; i < foodInventory.size(); i++) {
+            ItemStack stack = foodInventory.getStack(i);
+            if (isSeedItem(stack.getItem())) {
+                return foodInventory.removeStack(i, 1);
+            }
+        }
+
+
         Inventory chest = findNearestChest();
         if (chest == null) return ItemStack.EMPTY;
 
@@ -378,5 +446,11 @@ public class FarmerNpcEntity extends PathAwareEntity {
             memory.bedPos = null;
         }
         memory.resetIdle();
+    }
+    public SimpleInventory  getInventory() {
+        return foodInventory;
+    }
+    public boolean isChestReserved(BlockPos pos) {
+        return RESERVED_CHESTS.contains(pos);
     }
 }

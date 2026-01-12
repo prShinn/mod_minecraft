@@ -123,11 +123,11 @@ public class SoldierTokenItem extends Item {
         if (npc == null) return TypedActionResult.fail(player.getStackInHand(hand));
         // Copy NBT nếu có
         ItemStack stack = player.getStackInHand(hand);
-        if (stack.hasNbt() && stack.getNbt().contains("EntityTag")) {
-            npc.readCustomDataFromNbt(stack.getNbt().getCompound("EntityTag"));
+        if (stack.hasNbt() && stack.getNbt().contains("SoldierEntityTag")) {
+            npc.readCustomDataFromNbt(stack.getNbt().getCompound("SoldierEntityTag"));
 
-            if (stack.getNbt().getCompound("EntityTag").contains("Health")) {
-                npc.setHealth(stack.getNbt().getCompound("EntityTag").getFloat("Health"));
+            if (stack.getNbt().getCompound("SoldierEntityTag").contains("Health")) {
+                npc.setHealth(stack.getNbt().getCompound("SoldierEntityTag").getFloat("Health"));
             }
         }
 

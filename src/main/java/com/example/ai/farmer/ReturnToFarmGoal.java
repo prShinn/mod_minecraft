@@ -12,7 +12,7 @@ public class ReturnToFarmGoal extends Goal {
     private final FarmerNpcEntity npc;
     private BlockPos targetPos;
     private int taskTicks;
-    private static final int MAX_TASK_TICKS = 100;
+    private static final int MAX_TASK_TICKS = 100; //5s
     private static final double REACH_DIST_SQ = 2.25;
     public ReturnToFarmGoal(FarmerNpcEntity npc) {
         this.npc = npc;

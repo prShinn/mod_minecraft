@@ -1,6 +1,7 @@
 package com.example.ai.farmer;
 
 import com.example.entity.FarmerNpcEntity;
+import net.minecraft.block.ChestBlock;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.block.entity.ChestBlockEntity;
 import net.minecraft.entity.ai.goal.Goal;
@@ -11,6 +12,7 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 
 import java.util.EnumSet;
+import net.minecraft.block.BlockState;
 
 public class DepositToChestGoal extends Goal {
 
@@ -18,13 +20,19 @@ public class DepositToChestGoal extends Goal {
     private BlockPos chestPos;
     private int taskTicks = 0;
     private static final int MAX_TASK_TICKS = 60;
+    private static final int SEARCH_RADIUS = 18;
 
     public DepositToChestGoal(FarmerNpcEntity npc) {
         this.npc = npc;
         this.setControls(EnumSet.of(Control.MOVE));
 
     }
-
+    private boolean hasItems() {
+        for (int i = 0; i < npc.foodInventory.size(); i++) {
+            if (!npc.foodInventory.getStack(i).isEmpty()) return true;
+        }
+        return false;
+    }
     @Override
     public boolean canStart() {
         if (npc.memory.sleeping) return false;
@@ -49,8 +57,8 @@ public class DepositToChestGoal extends Goal {
                 chestPos.getX() + 0.5,
                 chestPos.getY(),
                 chestPos.getZ() + 0.5,
-                1.0);
-        npc.getReservedBeds().add(chestPos);
+                1.3);
+        npc.reserveChest(chestPos);
     }
 
     @Override
@@ -67,33 +75,59 @@ public class DepositToChestGoal extends Goal {
         }
     }
 
+    //    @Override
+//    public boolean shouldContinue() {
+//        return chestPos != null && npc.getNavigation().isFollowingPath() && hasItems();
+//    }
     @Override
     public boolean shouldContinue() {
-        return chestPos != null && npc.getNavigation().isFollowingPath() && hasItems();
+        return chestPos != null && taskTicks < MAX_TASK_TICKS;
     }
+
 
     @Override
     public void stop() {
         npc.getNavigation().stop();
         if (chestPos != null) {
-            npc.getReservedBeds().remove(chestPos);
+            npc.releaseChest(chestPos);
         }
         chestPos = null;
         taskTicks = 0;
     }
-    private boolean hasItems() {
-        for (int i = 0; i < npc.foodInventory.size(); i++) {
-            if (!npc.foodInventory.getStack(i).isEmpty()) return true;
-        }
-        return false;
-    }
+
+
+
     private void depositItems() {
         BlockEntity be = npc.getWorld().getBlockEntity(chestPos);
-        if (!(be instanceof Inventory chestInv)) return;
+        Inventory chestInv = null;
+
+        if (be instanceof ChestBlockEntity) {
+            BlockState state = npc.getWorld().getBlockState(chestPos);
+
+            if (state.getBlock() instanceof ChestBlock chestBlock) {
+                chestInv = ChestBlock.getInventory(
+                        chestBlock,
+                        state,
+                        npc.getWorld(),
+                        chestPos,
+                        true
+                );
+            }
+        }
+
+        if (chestInv == null) {
+            // Nếu không phải chest, check xem có phải Inventory không
+            if (be instanceof Inventory) {
+                chestInv = (Inventory) be;
+            } else {
+                return; // Không phải chest hoặc inventory
+            }
+        }
+
 
         // Transfer tất cả items từ NPC inventory vào rương
         for (int i = 0; i < npc.foodInventory.size(); i++) {
-            ItemStack npcStack = npc.foodInventory.getStack(i).copy();
+            ItemStack npcStack = npc.foodInventory.getStack(i);
             if (npcStack.isEmpty()) continue;
 
             // Tìm slot trống trong rương
@@ -102,11 +136,10 @@ public class DepositToChestGoal extends Goal {
 
                 if (chestStack.isEmpty()) {
                     // Slot trống, cất vào
-                    chestInv.setStack(j, npcStack);
+                    chestInv.setStack(j, npcStack.copy());
                     npc.foodInventory.setStack(i, ItemStack.EMPTY);
                     break;
-                } else if (chestStack.getItem() == npcStack.getItem() &&
-                        chestStack.getDamage() == npcStack.getDamage() &&
+                } else if (ItemStack.canCombine(chestStack, npcStack) &&
                         chestStack.getCount() < chestStack.getMaxCount()) {
                     // Cùng item, add vào stack hiện tại
                     int canAdd = chestStack.getMaxCount() - chestStack.getCount();
@@ -134,21 +167,32 @@ public class DepositToChestGoal extends Goal {
         BlockPos center = npc.getBlockPos();
         double closestDist = Double.MAX_VALUE;
         BlockPos closestChest = null;
+        World world = npc.getWorld();
 
-        for (BlockPos pos : BlockPos.iterate(center.add(-12, -2, -12), center.add(12, 2, 12))) {
-            BlockEntity be = npc.getWorld().getBlockEntity(pos);
+        for (int dx = -SEARCH_RADIUS; dx <= SEARCH_RADIUS; dx++) {
+            for (int dy = -2; dy <= 2; dy++) {
+                for (int dz = -SEARCH_RADIUS; dz <= SEARCH_RADIUS; dz++) {
+                    BlockPos pos = center.add(dx, dy, dz);
+                    if (!world.isChunkLoaded(pos)) continue;
 
-            // Check chest chưa bị reserve
-            if (npc.getReservedBeds().contains(pos)) continue; // hoặc RESERVED_CHESTS
-            if (be instanceof Inventory) {
-                double dist = npc.squaredDistanceTo(Vec3d.ofCenter(pos));
-                if (dist < closestDist) {
-                    closestDist = dist;
-                    closestChest = pos;
+                    BlockEntity be = world.getBlockEntity(pos);
+
+                    // Check xem có phải chest và chưa bị reserve
+                    if (be instanceof ChestBlockEntity || be instanceof net.minecraft.block.entity.BarrelBlockEntity) {
+                        // Check chest chưa bị reserve
+                        if (npc.isChestReserved(pos)) continue;
+
+                        double dist = npc.squaredDistanceTo(Vec3d.ofCenter(pos));
+                        if (dist < closestDist) {
+                            closestDist = dist;
+                            closestChest = pos;
+                        }
+                    }
                 }
             }
         }
         return closestChest;
     }
+
 
 }

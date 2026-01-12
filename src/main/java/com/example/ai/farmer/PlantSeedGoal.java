@@ -16,6 +16,7 @@ public class PlantSeedGoal extends Goal {
     private int taskTicks;
 
     private static final int MAX_TASK_TICKS = 80;
+    private static final int FIND_DISTANCE = 80;
     private static final double PLANT_DIST_SQ = 2.25;
 
     public PlantSeedGoal(FarmerNpcEntity npc) {
@@ -46,7 +47,7 @@ public class PlantSeedGoal extends Goal {
                 farmland.getX() + 0.5,
                 farmland.getY(),
                 farmland.getZ() + 0.5,
-                1.0
+                1.3f
         );
     }
 
@@ -87,7 +88,7 @@ public class PlantSeedGoal extends Goal {
         BlockPos center = npc.getBlockPos();
         var world = npc.getWorld();
 
-        for (BlockPos pos : BlockPos.iterate(center.add(-8, -1, -8), center.add(8, 1, 8))) {
+        for (BlockPos pos : BlockPos.iterate(center.add(-FIND_DISTANCE, -1, -FIND_DISTANCE), center.add(FIND_DISTANCE, 1, FIND_DISTANCE))) {
             if (!world.isChunkLoaded(pos)) continue;
 
             if (world.getBlockState(pos).getBlock() instanceof FarmlandBlock

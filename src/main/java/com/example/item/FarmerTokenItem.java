@@ -1,12 +1,10 @@
 package com.example.item;
 
 import com.example.entity.FarmerNpcEntity;
-import com.example.entity.SoldierNPCEntity;
 import com.example.registry.ModEntities;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NbtCompound;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.Hand;
 import net.minecraft.util.TypedActionResult;
@@ -40,11 +38,11 @@ public class FarmerTokenItem extends Item {
         FarmerNpcEntity npc = ModEntities.FARMER_NPC.create(sw);
         if (npc == null) return TypedActionResult.fail(player.getStackInHand(hand));
         ItemStack stack = player.getStackInHand(hand);
-        if (stack.hasNbt() && stack.getNbt().contains("EntityTag")) {
-            npc.readCustomDataFromNbt(stack.getNbt().getCompound("EntityTag"));
+        if (stack.hasNbt() && stack.getNbt().contains("FarmerEntityTag")) {
+            npc.readCustomDataFromNbt(stack.getNbt().getCompound("FarmerEntityTag"));
 
-            if (stack.getNbt().getCompound("EntityTag").contains("Health")) {
-                npc.setHealth(stack.getNbt().getCompound("EntityTag").getFloat("Health"));
+            if (stack.getNbt().getCompound("FarmerEntityTag").contains("Health")) {
+                npc.setHealth(stack.getNbt().getCompound("FarmerEntityTag").getFloat("Health"));
             }
         }
 

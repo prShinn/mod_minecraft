@@ -414,7 +414,7 @@ public class SoldierNPCEntity extends PathAwareEntity {
             this.writeCustomDataToNbt(entityNbt);
             entityNbt.putFloat("Health", this.getHealth());
 
-            token.getOrCreateNbt().put("EntityTag", entityNbt);
+            token.getOrCreateNbt().put("SoldierEntityTag", entityNbt);
 
             if (!player.getInventory().insertStack(token)) {
                 this.dropStack(token);
