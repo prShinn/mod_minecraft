@@ -15,10 +15,12 @@ import java.util.UUID;
 
 public class ModPackets {
     public static final Identifier NPC_EQUIP =
-            new Identifier("soldier_npc", "npc_equip");
+            new Identifier("datnc_mod", "npc_equip");
 
     public static final Identifier NPC_MOVE_MODE =
-            new Identifier("soldier_npc", "npc_move_mode");
+            new Identifier("datnc_mod", "npc_move_mode");
+    public static final Identifier SYNC_MODE_PACKET =
+            new Identifier("datnc_mod", "sync_mode");
 
     public static void registerServer() {
         registerMoveMode();
@@ -76,8 +78,7 @@ public class ModPackets {
                                         .formatted(Formatting.GREEN),
                                 true // actionbar
                         );
-
-                        System.out.println("✅ NPC mode changed: " + newMode);
+                        ServerPlayNetworking.send(player, SYNC_MODE_PACKET, buf);
                     });
                 }
         );

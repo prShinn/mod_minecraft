@@ -16,14 +16,17 @@ public class SoldierNPCEquipmentScreen extends Screen {
 
     private final SoldierNPCEntity npc;
     private ButtonWidget modeButton;
+    private ModeNpc.ModeMove lastMode;
+    private ModeNpc.ModeMove currentMode;
 
     public SoldierNPCEquipmentScreen(SoldierNPCEntity npc) {
         super(Text.literal("Đệ tử" + npc.getUuid().toString()));
         this.npc = npc;
     }
+
     private Text getModeText() {
         // ✅ LẤY TRỰC TIẾP TỪ NPC thay vì dùng biến local
-        ModeNpc.ModeMove currentMode = npc.getMoveMode();
+        currentMode = npc.getMoveMode();
         return Text.literal("Mode: " + currentMode.toString())
                 .formatted(currentMode == ModeNpc.ModeMove.FOLLOW
                         ? Formatting.GREEN
@@ -39,44 +42,21 @@ public class SoldierNPCEquipmentScreen extends Screen {
                 getModeText(),
                 b -> {
                     sendMoveMode();
-                    this.close(); // đóng luôn
+//                    this.close(); // đóng luôn
                 }
         ).dimensions(x, y, 200, 20).build();
 
         addDrawableChild(modeButton);
+    }
 
+    @Override
+    public void tick() {
+        super.tick();
 
-        // ===== WEAPON =====
-//        addDrawableChild(ButtonWidget.builder(
-//                Text.literal("Equip Main Hand"),
-//                b -> sendEquip("main")
-//        ).dimensions(x, y + 25, 200, 20).build());
-//
-//        addDrawableChild(ButtonWidget.builder(
-//                Text.literal("Equip Off Hand"),
-//                b -> sendEquip("off")
-//        ).dimensions(x, y + 50, 200, 20).build());
-//
-//        // ===== ARMOR =====
-//        addDrawableChild(ButtonWidget.builder(
-//                Text.literal("Helmet"),
-//                b -> sendEquip("head")
-//        ).dimensions(x, y + 75, 95, 20).build());
-//
-//        addDrawableChild(ButtonWidget.builder(
-//                Text.literal("Chest"),
-//                b -> sendEquip("chest")
-//        ).dimensions(x + 105, y + 75, 95, 20).build());
-//
-//        addDrawableChild(ButtonWidget.builder(
-//                Text.literal("Legs"),
-//                b -> sendEquip("legs")
-//        ).dimensions(x, y + 100, 95, 20).build());
-//
-//        addDrawableChild(ButtonWidget.builder(
-//                Text.literal("Boots"),
-//                b -> sendEquip("feet")
-//        ).dimensions(x + 105, y + 100, 95, 20).build());
+        if (npc != null && modeButton != null && currentMode != lastMode) {
+            lastMode = currentMode;
+            modeButton.setMessage(getModeText());
+        }
     }
 
     private void sendMoveMode() {
