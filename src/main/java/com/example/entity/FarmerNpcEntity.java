@@ -7,14 +7,14 @@ import com.example.entity.base.NpcFoodComponent;
 import com.example.registry.ModItems;
 import net.minecraft.block.*;
 import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.entity.EntityPose;
-import net.minecraft.entity.EntityType;
+import net.minecraft.entity.*;
 import net.minecraft.entity.ai.goal.*;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.mob.PathAwareEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.inventory.Inventory;
 import net.minecraft.inventory.SimpleInventory;
+import net.minecraft.item.ArmorItem;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
@@ -23,7 +23,10 @@ import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.math.random.Random;
+import net.minecraft.world.LocalDifficulty;
 import net.minecraft.world.World;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 
@@ -47,6 +50,7 @@ public class FarmerNpcEntity extends PathAwareEntity {
     public void releaseCrop(BlockPos pos) {
         RESERVED_CROPS.remove(pos);
     }
+
     private static final Set<BlockPos> RESERVED_FARMLAND = new HashSet<>();
 
     public boolean reserveFarmland(BlockPos pos) {
@@ -60,7 +64,9 @@ public class FarmerNpcEntity extends PathAwareEntity {
     public Set<BlockPos> getReservedBeds() {
         return RESERVED_BEDS_MAP.computeIfAbsent(this.getWorld(), w -> new HashSet<>());
     }
+
     private static final Set<BlockPos> RESERVED_CHESTS = new HashSet<>();
+
     public boolean reserveChest(BlockPos pos) {
         return RESERVED_CHESTS.add(pos);
     }
@@ -68,6 +74,7 @@ public class FarmerNpcEntity extends PathAwareEntity {
     public void releaseChest(BlockPos pos) {
         RESERVED_CHESTS.remove(pos);
     }
+
     public FarmerNpcEntity(EntityType<? extends PathAwareEntity> entityType, World world) {
         super(entityType, world);
     }
@@ -127,6 +134,7 @@ public class FarmerNpcEntity extends PathAwareEntity {
         });//nhin xunh quanh
     }
 
+
     @Override
     public void tick() {
         super.tick();
@@ -149,6 +157,16 @@ public class FarmerNpcEntity extends PathAwareEntity {
                 return;
             }
         }
+        ItemStack mainHand = this.getEquippedStack(EquipmentSlot.MAINHAND);
+        if (mainHand.isEmpty()) {
+            this.equipStack(
+                    EquipmentSlot.MAINHAND,
+                    new ItemStack(Items.IRON_HOE)
+            );
+
+            // Không drop khi chết
+            this.setEquipmentDropChance(EquipmentSlot.MAINHAND, 0.0F);
+        }
         display.tick(this);
         food.tick(this);
         memory.tickIdle();
@@ -156,6 +174,20 @@ public class FarmerNpcEntity extends PathAwareEntity {
 
     @Override
     public ActionResult interactMob(PlayerEntity player, Hand hand) {
+        // Nếu player đang cố gắng lấy cuốc từ NPC
+        ItemStack held = player.getStackInHand(hand);
+        if (hand == Hand.MAIN_HAND) {
+            return ActionResult.FAIL;
+
+        }
+        // Nếu đang cầm armor hoặc food → ignore
+        if (held.getItem() instanceof ArmorItem || held.isFood()) {
+
+        } else {
+            return ActionResult.FAIL;
+        }
+
+
         ActionResult handled = equip.interactMob(this, player, ownerUUID, hand, foodInventory, ModItems.FARMER_TOKEN);
         if (!handled.equals(ActionResult.FAIL)) {
             return handled;
@@ -173,6 +205,7 @@ public class FarmerNpcEntity extends PathAwareEntity {
         if (followPlayerUUID != null) {
             nbt.putUuid("FollowPlayer", followPlayerUUID);
         }
+        nbt.putBoolean("IsFarmerNpc", true);
     }
 
     @Override
@@ -184,6 +217,17 @@ public class FarmerNpcEntity extends PathAwareEntity {
         if (nbt.containsUuid("FollowPlayer")) {
             followPlayerUUID = nbt.getUuid("FollowPlayer");
         }
+        ItemStack mainHand = this.getEquippedStack(EquipmentSlot.MAINHAND);
+        if (mainHand.isEmpty()) {
+            this.equipStack(
+                    EquipmentSlot.MAINHAND,
+                    new ItemStack(Items.IRON_HOE)
+            );
+
+            // Không drop khi chết
+            this.setEquipmentDropChance(EquipmentSlot.MAINHAND, 0.0F);
+        }
+
     }
 
     @Override
@@ -311,6 +355,7 @@ public class FarmerNpcEntity extends PathAwareEntity {
         // Không có cây → trả farmland trống
         return nearestEmptyFarmland;
     }
+
     /**
      * Check xem có hạt giống trong inventory không
      */
@@ -447,9 +492,11 @@ public class FarmerNpcEntity extends PathAwareEntity {
         }
         memory.resetIdle();
     }
-    public SimpleInventory  getInventory() {
+
+    public SimpleInventory getInventory() {
         return foodInventory;
     }
+
     public boolean isChestReserved(BlockPos pos) {
         return RESERVED_CHESTS.contains(pos);
     }
