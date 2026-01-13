@@ -1,6 +1,6 @@
 package com.example.gui;
 
-import com.example.ai.ModeNpc;
+import com.example.ai.soldỉier.ModeNpc;
 import com.example.entity.SoldierNPCEntity;
 import com.example.registry.ModPackets;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;

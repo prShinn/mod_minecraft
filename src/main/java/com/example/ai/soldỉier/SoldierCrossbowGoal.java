@@ -1,4 +1,4 @@
-package com.example.ai;
+package com.example.ai.soldỉier;
 
 import com.example.entity.SoldierNPCEntity;
 import net.minecraft.enchantment.EnchantmentHelper;
@@ -14,7 +14,6 @@ import net.minecraft.item.Items;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.Hand;
 import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
 
 import java.util.EnumSet;
 
