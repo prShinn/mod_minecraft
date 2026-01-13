@@ -3,6 +3,7 @@ package com.example.entity;
 import com.example.ai.farmer.*;
 import com.example.entity.base.NpcDisplayComponent;
 import com.example.entity.base.NpcEquipmentComponent;
+import com.example.entity.base.NpcSleepingComponent;
 import com.example.registry.ModItems;
 import net.minecraft.block.*;
 import net.minecraft.block.entity.BlockEntity;
@@ -29,6 +30,8 @@ import java.util.*;
 public class FarmerNpcEntity extends PathAwareEntity {
     private final NpcDisplayComponent display = new NpcDisplayComponent();
     private final NpcEquipmentComponent equip = new NpcEquipmentComponent();
+    public final NpcSleepingComponent sleeping = new NpcSleepingComponent();
+
     private BlockPos currentFarmPos;
     private UUID ownerUUID;
     private UUID followPlayerUUID;
@@ -134,23 +137,11 @@ public class FarmerNpcEntity extends PathAwareEntity {
     public void tick() {
         super.tick();
         if (this.getWorld() == null || this.getWorld().isClient) return;
-        if (memory.sleeping) {
-            this.getNavigation().stop();
-            if (this.hurtTime > 0) {
-                this.wakeUp();
-                return;
-            }
-            if (!memory.isNight(getWorld())) {
-                this.wakeUp();
-                return;
-            }
-            // 🛏️ GIƯỜNG BỊ PHÁ
-            if (memory.bedPos == null ||
-                    !(getWorld().getBlockState(memory.bedPos).getBlock() instanceof BedBlock)) {
+        display.tick(this, foodInventory);
 
-                wakeUpAndRetrySleep();
-                return;
-            }
+        sleeping.tick(this, getReservedBeds());
+        if (!sleeping.isSleeping()) {
+            memory.tickIdle();
         }
         ItemStack mainHand = this.getEquippedStack(EquipmentSlot.MAINHAND);
         if (mainHand.isEmpty()) {
@@ -162,8 +153,7 @@ public class FarmerNpcEntity extends PathAwareEntity {
             // Không drop khi chết
             this.setEquipmentDropChance(EquipmentSlot.MAINHAND, 0.0F);
         }
-        display.tick(this, foodInventory);
-        memory.tickIdle();
+
     }
 
     @Override
@@ -222,33 +212,19 @@ public class FarmerNpcEntity extends PathAwareEntity {
 
     @Override
     public boolean damage(DamageSource source, float amount) {
-        if (this.isSleeping()) {
-            this.wakeUp();
+        if (sleeping.isSleeping()) {
+            sleeping.wakeUp(this, getReservedBeds());
         }
         return super.damage(source, amount);
     }
 
-    public boolean isSleeping() {
-        return memory.sleeping;
-    }
-
     @Override
     public void remove(RemovalReason reason) {
-        if (memory.bedPos != null) {
-            getReservedBeds().remove(memory.bedPos);
-        }
+        sleeping.wakeUp(this, getReservedBeds());
         super.remove(reason);
     }
 
-    private void wakeUpAndRetrySleep() {
-        setPose(EntityPose.STANDING);
-        memory.sleeping = false;
-        if (memory.bedPos != null) {
-            getReservedBeds().remove(memory.bedPos);
-            memory.bedPos = null;
-        }
-        memory.resetIdle();
-    }
+
 
     /**
      * Tìm farm (farmland) gần nhất trong bán kính 24 block
@@ -473,16 +449,6 @@ public class FarmerNpcEntity extends PathAwareEntity {
         return false;
     }
 
-    public void wakeUp() {
-        setPose(EntityPose.STANDING);
-        memory.sleeping = false;
-        if (memory.bedPos != null) {
-            getReservedBeds().remove(memory.bedPos);
-            memory.bedPos = null;
-        }
-        memory.resetIdle();
-    }
-
     public SimpleInventory getInventory() {
         return foodInventory;
     }
@@ -490,8 +456,10 @@ public class FarmerNpcEntity extends PathAwareEntity {
     public boolean isChestReserved(BlockPos pos) {
         return RESERVED_CHESTS.contains(pos);
     }
+
     @Override
-    public Text getName(){
+    public Text getName() {
         return Text.literal("Nông dân");
     }
+
 }

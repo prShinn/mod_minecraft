@@ -1,0 +1,26 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "HI ",
+    "GE ",
+    "   "
+  ],
+  "key": {
+    "S": {
+      "item": "minecraft:wooden_hoe"
+    },
+    "E": {
+      "item": "minecraft:emerald"
+    },
+    "I": {
+      "item": "minecraft:iron_ingot"
+    },
+    "G": {
+      "item": "minecraft:gold_ingot"
+    }
+  },
+  "result": {
+    "item": "datnc_mod:farmer_token",
+    "count": 1
+  }
+}

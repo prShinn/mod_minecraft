@@ -35,7 +35,7 @@ public class DepositToChestGoal extends Goal {
     }
     @Override
     public boolean canStart() {
-        if (npc.memory.sleeping) return false;
+        if (npc.sleeping.isSleeping()) return false;
 // Check xem inventory có item chưa
 //        boolean hasItems = false;
 //        for (int i = 0; i < npc.foodInventory.size(); i++) {

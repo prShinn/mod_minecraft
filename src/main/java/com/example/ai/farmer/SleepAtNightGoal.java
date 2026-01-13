@@ -15,8 +15,8 @@ import java.util.EnumSet;
 import java.util.List;
 
 public class SleepAtNightGoal extends Goal {
-    private static final int SEARCH_RADIUS = 10;
-    private static final int FIND_BED_COOLDOWN = 40;
+    private static final int SEARCH_RADIUS = 16;
+    private static final int FIND_BED_COOLDOWN = 120;
     private int cooldownFindBed = 0;
     private BlockPos cachedBedPos = null;
     private final FarmerNpcEntity npc;
@@ -29,18 +29,14 @@ public class SleepAtNightGoal extends Goal {
 
     @Override
     public boolean canStart() {
-        if (!npc.memory.isNight(npc.getWorld())) return false;
-        if (npc.memory.sleeping) return false;
-        if (cooldownFindBed-- > 0) return false;
-        cooldownFindBed = FIND_BED_COOLDOWN;
-        bedPos = findNearestBed();
-        return bedPos != null;
+        return npc.getWorld().isNight()
+                && !npc.sleeping.isSleeping()
+                && findNearestBed() != null;
+
     }
 
     @Override
     public void start() {
-        npc.getReservedBeds().add(bedPos);
-        npc.memory.bedPos = bedPos;
         npc.getNavigation().startMovingTo(
                 bedPos.getX() + 0.5,
                 bedPos.getY(),
@@ -52,32 +48,29 @@ public class SleepAtNightGoal extends Goal {
 
     @Override
     public void tick() {
-        if (npc.memory.sleeping) return;
-
-        if (!isBedValid(bedPos) || !isBedFree(bedPos)) {
-            releaseBed();
+        if (npc.sleeping.isSleeping()) return;
+        if (!isBedValid(bedPos)) {
             stop();
             return;
         }
         if (npc.squaredDistanceTo(Vec3d.ofCenter(bedPos)) < 1.4) {
-            sleep();
+            npc.sleeping.startSleeping(npc, bedPos, npc.getReservedBeds());
         }
     }
 
     @Override
     public boolean shouldContinue() {
-        return !npc.memory.sleeping
-                && npc.memory.isNight(npc.getWorld())
-                && bedPos != null && isBedValid(bedPos);
+        return !npc.sleeping.isSleeping()
+                && npc.getWorld().isNight()
+                && bedPos != null;
     }
 
     @Override
     public void stop() {
-        npc.getNavigation().stop();
-        if (!npc.memory.sleeping && bedPos != null) {
-            npc.getReservedBeds().remove(bedPos);
+        if (bedPos != null && !npc.sleeping.isSleeping()) {
+            npc.getReservedBeds().remove(bedPos); // Cleanup nếu chưa ngủ
         }
-        npc.memory.bedPos = null;
+        npc.getNavigation().stop();
         bedPos = null;
     }
 
@@ -90,7 +83,6 @@ public class SleepAtNightGoal extends Goal {
                 bedPos.getY() + 0.1,
                 bedPos.getZ() + 0.5
         );
-        npc.memory.sleeping = true;
         npc.memory.bedPos = bedPos;
     }
 
@@ -117,6 +109,7 @@ public class SleepAtNightGoal extends Goal {
                 pos = pos.offset(state.get(BedBlock.FACING).getOpposite());
             }
             if (isBedFree(pos) && !npc.getReservedBeds().contains(pos)) {
+                npc.getReservedBeds().add(pos);
                 cachedBedPos = pos.toImmutable();
                 return pos;
             }
@@ -131,6 +124,9 @@ public class SleepAtNightGoal extends Goal {
     }
 
     private boolean isBedFree(BlockPos bedPos) {
+        if (npc.getReservedBeds().contains(bedPos)) {
+            return false;
+        }
         Box box = new Box(bedPos).expand(0.5);
 
         List<LivingEntity> sleepers =
@@ -140,13 +136,6 @@ public class SleepAtNightGoal extends Goal {
                         e -> e.getPose() == EntityPose.SLEEPING
                 );
         return sleepers.isEmpty();
-    }
-
-    private void releaseBed() {
-        if (bedPos != null) {
-            npc.getReservedBeds().remove(bedPos);
-        }
-        npc.memory.bedPos = null;
     }
 
 }

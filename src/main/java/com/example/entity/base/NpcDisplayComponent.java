@@ -51,7 +51,7 @@ public class NpcDisplayComponent {
         int maxHp = Math.round(npc.getMaxHealth());
         int foodCount = getTotalFoodCount(inventory);
 
-        MutableText name = Text.literal(npc.getName().toString()).formatted(Formatting.WHITE).append(Text.literal(" [" + hp + "/" + maxHp + "] ").formatted(Formatting.GREEN)).append(Text.literal("🍖[" + hunger + "/" + MAX_HUNGER + "] x" + foodCount).formatted(Formatting.GOLD));
+        MutableText name = Text.literal(npc.getName().getString()).formatted(Formatting.WHITE).append(Text.literal(" [" + hp + "/" + maxHp + "] ").formatted(Formatting.GREEN)).append(Text.literal("🍖[" + hunger + "/" + MAX_HUNGER + "] x" + foodCount).formatted(Formatting.GOLD));
 
         npc.setCustomName(name);
 

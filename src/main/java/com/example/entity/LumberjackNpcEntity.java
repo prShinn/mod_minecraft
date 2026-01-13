@@ -81,16 +81,14 @@ public class LumberjackNpcEntity extends PathAwareEntity {
     public void tick() {
         super.tick();
         if (this.getWorld() == null || this.getWorld().isClient) return;
-
+        display.tick(this, inventory);
+        memory.tickIdle();
         // Trang bị rìu nếu chưa có
         ItemStack mainHand = this.getEquippedStack(EquipmentSlot.MAINHAND);
         if (mainHand.isEmpty()) {
             this.equipStack(EquipmentSlot.MAINHAND, new ItemStack(Items.IRON_AXE));
             this.setEquipmentDropChance(EquipmentSlot.MAINHAND, 0.0F);
         }
-
-        display.tick(this, inventory);
-        memory.tickIdle();
     }
     @Override
     public ActionResult interactMob(PlayerEntity player, Hand hand) {
