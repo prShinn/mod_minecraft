@@ -1,6 +1,6 @@
 package com.example.registry;
 
-import com.example.ai.soldỉier.ModeNpc;
+import com.example.ai.soldier.ModeNpc;
 import com.example.entity.SoldierNPCEntity;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.entity.Entity;

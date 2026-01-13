@@ -1,6 +1,6 @@
 package com.example.entity;
 
-import com.example.ai.soldỉier.*;
+import com.example.ai.soldier.*;
 import com.example.registry.ModItems;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.Enchantments;

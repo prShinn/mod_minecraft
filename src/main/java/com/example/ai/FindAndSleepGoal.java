@@ -18,6 +18,7 @@ public class FindAndSleepGoal extends Goal {
 
     @Override
     public boolean canStart() {
+        if(sleepComponent == null) return false;
         if (!npc.getWorld().isNight() || sleepComponent.isSleeping()) {
             return false;
         }

@@ -14,6 +14,7 @@ public class WanderForBedGoal extends WanderAroundFarGoal {
 
     @Override
     public boolean canStart() {
+        if(sleepComponent == null) return false;
         return sleepComponent.shouldWander() && super.canStart();
     }
 

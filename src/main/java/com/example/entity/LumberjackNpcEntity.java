@@ -36,7 +36,8 @@ public class LumberjackNpcEntity extends PathAwareEntity {
     private final NpcEquipmentComponent equip = new NpcEquipmentComponent();
     public final NpcSleepingComponent sleeping = new NpcSleepingComponent()
             .withSearchRadius(16)
-            .withCooldown(120).withWanderDuration(100);
+            .withCooldown(120)
+            .withWanderDuration(100);
     private UUID ownerUUID;
     public final SimpleInventory inventory = new SimpleInventory(9);
     public final LumberjackMemory memory = new LumberjackMemory();
@@ -115,7 +116,7 @@ public class LumberjackNpcEntity extends PathAwareEntity {
     public ActionResult interactMob(PlayerEntity player, Hand hand) {
         ItemStack held = player.getStackInHand(hand);
 
-        if (held.getItem() instanceof ArmorItem || held.isFood()) {
+        if (player.isSneaking() || held.getItem() instanceof ArmorItem || held.isFood()) {
             // Được phép tương tác
         } else {
             return ActionResult.FAIL;

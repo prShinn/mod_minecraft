@@ -1,4 +1,4 @@
-package com.example.ai.soldỉier;
+package com.example.ai.soldier;
 
 import com.example.entity.SoldierNPCEntity;
 import net.minecraft.entity.ai.goal.Goal;

@@ -34,7 +34,8 @@ public class FarmerNpcEntity extends PathAwareEntity {
     private final NpcEquipmentComponent equip = new NpcEquipmentComponent();
     public final NpcSleepingComponent sleeping = new NpcSleepingComponent()
             .withSearchRadius(16)
-            .withCooldown(120);
+            .withCooldown(120)
+            .withWanderDuration(120);
 
     private BlockPos currentFarmPos;
     private UUID ownerUUID;
@@ -168,7 +169,7 @@ public class FarmerNpcEntity extends PathAwareEntity {
         // Nếu player đang cố gắng lấy cuốc từ NPC
         ItemStack held = player.getStackInHand(hand);
         // Nếu đang cầm armor hoặc food → ignore
-        if (held.getItem() instanceof ArmorItem || held.isFood()) {
+        if (player.isSneaking() || held.getItem() instanceof ArmorItem || held.isFood()) {
 
         } else {
             return ActionResult.FAIL;
