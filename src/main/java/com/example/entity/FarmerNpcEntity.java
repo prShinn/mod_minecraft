@@ -1,5 +1,7 @@
 package com.example.entity;
 
+import com.example.ai.FindAndSleepGoal;
+import com.example.ai.WanderForBedGoal;
 import com.example.ai.farmer.*;
 import com.example.entity.base.NpcDisplayComponent;
 import com.example.entity.base.NpcEquipmentComponent;
@@ -30,7 +32,9 @@ import java.util.*;
 public class FarmerNpcEntity extends PathAwareEntity {
     private final NpcDisplayComponent display = new NpcDisplayComponent();
     private final NpcEquipmentComponent equip = new NpcEquipmentComponent();
-    public final NpcSleepingComponent sleeping = new NpcSleepingComponent();
+    public final NpcSleepingComponent sleeping = new NpcSleepingComponent()
+            .withSearchRadius(16)
+            .withCooldown(120);
 
     private BlockPos currentFarmPos;
     private UUID ownerUUID;
@@ -39,6 +43,11 @@ public class FarmerNpcEntity extends PathAwareEntity {
     public final FarmerMemory memory = new FarmerMemory();
     // Thay vì static Set
     private static final Map<World, Set<BlockPos>> RESERVED_BEDS_MAP = new HashMap<>();
+
+    public Set<BlockPos> getReservedBeds() {
+        return RESERVED_BEDS_MAP.computeIfAbsent(this.getWorld(), w -> new HashSet<>());
+    }
+
     private static final Set<BlockPos> RESERVED_CROPS = new HashSet<>();
 
     public boolean reserveCrop(BlockPos pos) {
@@ -59,9 +68,6 @@ public class FarmerNpcEntity extends PathAwareEntity {
         RESERVED_FARMLAND.remove(pos);
     }
 
-    public Set<BlockPos> getReservedBeds() {
-        return RESERVED_BEDS_MAP.computeIfAbsent(this.getWorld(), w -> new HashSet<>());
-    }
 
     private static final Set<BlockPos> RESERVED_CHESTS = new HashSet<>();
 
@@ -86,48 +92,49 @@ public class FarmerNpcEntity extends PathAwareEntity {
 
         this.goalSelector.add(0, new SwimGoal(this)); // ko chet duoi
         this.goalSelector.add(1, new EscapeDangerGoal(this, 1.4)); // chay khi bi dame
-
-        this.goalSelector.add(2, new SleepAtNightGoal(this)); // di ngu
-        this.goalSelector.add(3, new HarvestCropGoal(this) {
+        // Sử dụng GenericSleepGoal
+        this.goalSelector.add(2, new FindAndSleepGoal(this, sleeping));
+        this.goalSelector.add(3, new WanderForBedGoal(this, 1.0, sleeping));
+        this.goalSelector.add(4, new HarvestCropGoal(this) {
             @Override
             public boolean canStart() {
-                return !isSleeping() && super.canStart();
+                return !sleeping.isSleeping() && super.canStart();
             }
         }); // thu hoach
-        this.goalSelector.add(4, new DepositToChestGoal(this) {
+        this.goalSelector.add(5, new DepositToChestGoal(this) {
             @Override
             public boolean canStart() {
-                return !isSleeping() && super.canStart();
+                return !sleeping.isSleeping() && super.canStart();
             }
         }); // cât đô
-        this.goalSelector.add(5, new PlantSeedGoal(this) {
+        this.goalSelector.add(6, new PlantSeedGoal(this) {
             @Override
             public boolean canStart() {
-                return !isSleeping() && super.canStart();
+                return !sleeping.isSleeping() && super.canStart();
             }
         }); // trồng cây
-        this.goalSelector.add(6, new ReturnToFarmGoal(this) {
+        this.goalSelector.add(7, new ReturnToFarmGoal(this) {
             @Override
             public boolean canStart() {
-                return !isSleeping() && super.canStart();
+                return !sleeping.isSleeping() && super.canStart();
             }
         }); // quay lại farm
-        this.goalSelector.add(7, new LookAtEntityGoal(this, PlayerEntity.class, 8.0F) {
+        this.goalSelector.add(8, new LookAtEntityGoal(this, PlayerEntity.class, 8.0F) {
             @Override
             public boolean canStart() {
-                return !isSleeping() && super.canStart();
+                return !sleeping.isSleeping() && super.canStart();
             }
         }); // nhin player
         this.goalSelector.add(9, new WanderAroundFarGoal(this, 1.0D) {
             @Override
             public boolean canStart() {
-                return !isSleeping() && super.canStart();
+                return !sleeping.isSleeping() && super.canStart();
             }
         }); // đi lang thang xa
-        this.goalSelector.add(8, new LookAroundGoal(this) {
+        this.goalSelector.add(9, new LookAroundGoal(this) {
             @Override
             public boolean canStart() {
-                return !isSleeping() && super.canStart();
+                return !sleeping.isSleeping() && super.canStart();
             }
         });//nhin xunh quanh
     }
@@ -139,7 +146,7 @@ public class FarmerNpcEntity extends PathAwareEntity {
         if (this.getWorld() == null || this.getWorld().isClient) return;
         display.tick(this, foodInventory);
 
-        sleeping.tick(this, getReservedBeds());
+        sleeping.tick(this);
         if (!sleeping.isSleeping()) {
             memory.tickIdle();
         }
@@ -213,17 +220,16 @@ public class FarmerNpcEntity extends PathAwareEntity {
     @Override
     public boolean damage(DamageSource source, float amount) {
         if (sleeping.isSleeping()) {
-            sleeping.wakeUp(this, getReservedBeds());
+            sleeping.wakeUp(this);
         }
         return super.damage(source, amount);
     }
 
     @Override
     public void remove(RemovalReason reason) {
-        sleeping.wakeUp(this, getReservedBeds());
+        sleeping.wakeUp(this);
         super.remove(reason);
     }
-
 
 
     /**

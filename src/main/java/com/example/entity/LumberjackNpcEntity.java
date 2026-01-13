@@ -1,8 +1,11 @@
 package com.example.entity;
 
+import com.example.ai.FindAndSleepGoal;
+import com.example.ai.WanderForBedGoal;
 import com.example.ai.lumberjack.*;
 import com.example.entity.base.NpcDisplayComponent;
 import com.example.entity.base.NpcEquipmentComponent;
+import com.example.entity.base.NpcSleepingComponent;
 import com.example.registry.ModItems;
 import net.minecraft.block.*;
 import net.minecraft.block.entity.BlockEntity;
@@ -31,6 +34,9 @@ import java.util.UUID;
 public class LumberjackNpcEntity extends PathAwareEntity {
     private final NpcDisplayComponent display = new NpcDisplayComponent();
     private final NpcEquipmentComponent equip = new NpcEquipmentComponent();
+    public final NpcSleepingComponent sleeping = new NpcSleepingComponent()
+            .withSearchRadius(16)
+            .withCooldown(120).withWanderDuration(100);
     private UUID ownerUUID;
     public final SimpleInventory inventory = new SimpleInventory(9);
     public final LumberjackMemory memory = new LumberjackMemory();
@@ -62,6 +68,7 @@ public class LumberjackNpcEntity extends PathAwareEntity {
     public LumberjackNpcEntity(EntityType<? extends PathAwareEntity> entityType, World world) {
         super(entityType, world);
     }
+
     @Override
     protected void initGoals() {
         super.initGoals();
@@ -70,19 +77,32 @@ public class LumberjackNpcEntity extends PathAwareEntity {
 
         this.goalSelector.add(0, new SwimGoal(this));
         this.goalSelector.add(1, new EscapeDangerGoal(this, 1.4));
-        this.goalSelector.add(2, new ChopTreeGoal(this)); // Chặt cây
-        this.goalSelector.add(3, new DepositWoodToChestGoal(this)); // Cất vao chest
-        this.goalSelector.add(4, new PlantSaplingGoal(this)); // Trồng mầm cây
-        this.goalSelector.add(5, new LookAtEntityGoal(this, PlayerEntity.class, 8.0F));
-        this.goalSelector.add(6, new WanderNearChestGoal(this)); // Lang thang và tìm chest
-        this.goalSelector.add(7, new LookAroundGoal(this));
+        this.goalSelector.add(2, new FindAndSleepGoal(this, sleeping));
+        this.goalSelector.add(3, new WanderForBedGoal(this, 1.0, sleeping));
+        this.goalSelector.add(4, new ChopTreeGoal(this)); // Chặt cây
+        this.goalSelector.add(5, new DepositWoodToChestGoal(this)); // Cất vao chest
+        this.goalSelector.add(6, new PlantSaplingGoal(this)); // Trồng mầm cây
+        this.goalSelector.add(7, new LookAtEntityGoal(this, PlayerEntity.class, 8.0F));
+        this.goalSelector.add(8, new WanderNearChestGoal(this)); // Lang thang và tìm chest
+        this.goalSelector.add(8, new LookAroundGoal(this));
+        this.goalSelector.add(9, new WanderAroundFarGoal(this, 1.0D) {
+            @Override
+            public boolean canStart() {
+                return !sleeping.isSleeping() && super.canStart();
+            }
+        }); // ✅ GIỮ - Wander NGÀY + ĐÊM (khi idle)
+
     }
+
     @Override
     public void tick() {
         super.tick();
         if (this.getWorld() == null || this.getWorld().isClient) return;
         display.tick(this, inventory);
-        memory.tickIdle();
+        sleeping.tick(this);
+        if (!sleeping.isSleeping()) {
+            memory.tickIdle();
+        }
         // Trang bị rìu nếu chưa có
         ItemStack mainHand = this.getEquippedStack(EquipmentSlot.MAINHAND);
         if (mainHand.isEmpty()) {
@@ -90,6 +110,7 @@ public class LumberjackNpcEntity extends PathAwareEntity {
             this.setEquipmentDropChance(EquipmentSlot.MAINHAND, 0.0F);
         }
     }
+
     @Override
     public ActionResult interactMob(PlayerEntity player, Hand hand) {
         ItemStack held = player.getStackInHand(hand);
@@ -106,6 +127,7 @@ public class LumberjackNpcEntity extends PathAwareEntity {
         }
         return super.interactMob(player, hand);
     }
+
     @Override
     public void writeCustomDataToNbt(NbtCompound nbt) {
         super.writeCustomDataToNbt(nbt);
@@ -114,6 +136,7 @@ public class LumberjackNpcEntity extends PathAwareEntity {
         }
         nbt.putBoolean("IsLumberjackNpc", true);
     }
+
     @Override
     public void readCustomDataFromNbt(NbtCompound nbt) {
         super.readCustomDataFromNbt(nbt);
@@ -127,10 +150,12 @@ public class LumberjackNpcEntity extends PathAwareEntity {
             this.setEquipmentDropChance(EquipmentSlot.MAINHAND, 0.0F);
         }
     }
+
     @Override
     public boolean damage(DamageSource source, float amount) {
         return super.damage(source, amount);
     }
+
     /**
      * Tìm chest gần nhất trong bán kính 7 blocks
      */
@@ -160,6 +185,7 @@ public class LumberjackNpcEntity extends PathAwareEntity {
         }
         return closestChest;
     }
+
     /**
      * Tìm cây gần nhất trong bán kính 7 blocks từ chest
      * Chỉ tìm log có độ cao >= chest
@@ -200,6 +226,7 @@ public class LumberjackNpcEntity extends PathAwareEntity {
 
         return closestTree;
     }
+
     /**
      * Kiểm tra xem block có phải là log hoặc leaves
      */
@@ -216,6 +243,7 @@ public class LumberjackNpcEntity extends PathAwareEntity {
                         block == Blocks.CHERRY_LOG
         ) || block instanceof LeavesBlock;
     }
+
     /**
      * Kiểm tra có gỗ trong inventory không
      */
@@ -227,9 +255,11 @@ public class LumberjackNpcEntity extends PathAwareEntity {
         }
         return false;
     }
+
     public SimpleInventory getInventory() {
         return inventory;
     }
+
     @Override
     public Text getName() {
         return Text.literal("Tiều phu");
