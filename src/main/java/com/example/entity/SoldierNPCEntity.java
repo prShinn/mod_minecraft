@@ -51,11 +51,11 @@ public class SoldierNPCEntity extends PathAwareEntity {
     public static final float FOLLOW_DISTANCE = 30f;
     public static final float TELEPORT_DISTANCE = 40f;
     private float followDistance = FOLLOW_DISTANCE;
-    private  float teleportDistance = TELEPORT_DISTANCE;
+    private float teleportDistance = TELEPORT_DISTANCE;
     private static final int PLAYER_SEARCH_INTERVAL = 30; // 1 giây
     private static final int WEAPON_DURABILITY_CHANCE = 10; // 1/10 xác suất
     private static final int ARMOR_DURABILITY_CHANCE = 20; // 1/20 xác suất
-
+    private String nameNpc = "";
     public ModeNpc.ModeMove moveMode = ModeNpc.ModeMove.WANDER;
     public FollowOwnerLikeGoal followGoal;
 
@@ -78,6 +78,7 @@ public class SoldierNPCEntity extends PathAwareEntity {
 
     // ===== INVENTORY =====
     public final SimpleInventory foodInventory = new SimpleInventory(9);
+
     public ModeNpc.ModeMove getMoveMode() {
         int id = this.dataTracker.get(MOVE_MODE);
         return ModeNpc.ModeMove.values()[MathHelper.clamp(id, 0, ModeNpc.ModeMove.values().length - 1)];
@@ -87,8 +88,17 @@ public class SoldierNPCEntity extends PathAwareEntity {
         this.moveMode = moveMode;
         this.dataTracker.set(MOVE_MODE, moveMode.ordinal());
     }
+
     public static final TrackedData<Integer> MOVE_MODE =
             DataTracker.registerData(SoldierNPCEntity.class, TrackedDataHandlerRegistry.INTEGER);
+
+    public String getNameNpc() {
+        return nameNpc;
+    }
+
+    public void setNameNpc(String nameNpc) {
+        this.nameNpc = nameNpc;
+    }
 
     // ===== CONSTRUCTOR =====
     public SoldierNPCEntity(EntityType<? extends SoldierNPCEntity> type, World world) {
@@ -121,21 +131,33 @@ public class SoldierNPCEntity extends PathAwareEntity {
             @Override
             public boolean canStart() {
                 // chỉ start nếu cầm sword
-                return super.canStart() && SoldierNPCEntity.this.getMainHandStack().getItem() instanceof SwordItem;
+                if (SoldierNPCEntity.this.getMainHandStack().getItem() instanceof SwordItem) {
+                    setNameNpc("Chiến binh");
+                    return super.canStart();
+                }
+                return false;
             }
         }); // binh linh
         this.goalSelector.add(2, new SoldierBowGoal(this) {
             @Override
             public boolean canStart() {
                 // chỉ start nếu cầm cung
-                return super.canStart() && SoldierNPCEntity.this.getMainHandStack().getItem() instanceof BowItem;
+                if (SoldierNPCEntity.this.getMainHandStack().getItem() instanceof BowItem) {
+                    setNameNpc("Cung thủ");
+                    return super.canStart();
+                }
+                return false;
             }
         }); // cung thu
         this.goalSelector.add(2, new SoldierCrossbowGoal(this) {
             @Override
             public boolean canStart() {
-                // chỉ start nếu cầm cung
-                return super.canStart() && SoldierNPCEntity.this.getMainHandStack().getItem() instanceof CrossbowItem;
+                // chỉ start nếu cầm nỏ
+                if (SoldierNPCEntity.this.getMainHandStack().getItem() instanceof CrossbowItem) {
+                    setNameNpc("Xạ tiễn");
+                    return super.canStart();
+                }
+                return false;
             }
         }); // cung thu
         this.goalSelector.add(3, new EscapeDangerGoal(this, 1.4));
@@ -143,7 +165,11 @@ public class SoldierNPCEntity extends PathAwareEntity {
             @Override
             public boolean canStart() {
                 // chỉ start nếu cầm riu
-                return super.canStart() && SoldierNPCEntity.this.getMainHandStack().getItem() instanceof AxeItem;
+                if(SoldierNPCEntity.this.getMainHandStack().getItem() instanceof AxeItem){
+                    setNameNpc("Bác sĩ");
+                    return super.canStart();
+                }
+                return false;
             }
         });
         this.goalSelector.add(5, new FollowOwnerLikeGoal(this, 1.3D, followDistance, teleportDistance));
@@ -299,8 +325,7 @@ public class SoldierNPCEntity extends PathAwareEntity {
         int hp = Math.round(this.getHealth());
         int maxHp = Math.round(this.getMaxHealth());
         int foodCount = getTotalFoodCount();
-
-        MutableText name = Text.literal("Đệ tử").formatted(Formatting.WHITE).append(Text.literal(" [" + hp + "/" + maxHp + "] ").formatted(Formatting.GREEN)).append(Text.literal("🍖[" + hunger + "/" + MAX_HUNGER + "] x" + foodCount).formatted(Formatting.GOLD));
+        MutableText name = Text.literal(getNameNpc()).formatted(Formatting.WHITE).append(Text.literal(" [" + hp + "/" + maxHp + "] ").formatted(Formatting.GREEN)).append(Text.literal("🍖[" + hunger + "/" + MAX_HUNGER + "] x" + foodCount).formatted(Formatting.GOLD));
 
         this.setCustomName(name);
     }

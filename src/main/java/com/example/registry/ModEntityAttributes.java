@@ -13,6 +13,10 @@ public class ModEntityAttributes {
                 ModEntities.FARMER_NPC,
                 SoldierNPCEntity.createAttributes()
         );
+        FabricDefaultAttributeRegistry.register(
+                ModEntities.LUMBERJACK_NPC,
+                SoldierNPCEntity.createAttributes()
+        );
     }
 
 }

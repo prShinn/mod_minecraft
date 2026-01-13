@@ -33,6 +33,10 @@ public class ExampleMod implements ModInitializer {
 				.register(entries -> {
 					entries.add(ModItems.FARMER_TOKEN);
 				});
+		ItemGroupEvents.modifyEntriesEvent(ItemGroups.INGREDIENTS)
+				.register(entries -> {
+					entries.add(ModItems.LUMBERJACK_TOKEN);
+				});
 		System.out.println("[SoldierNPC] Server init");
 
 		ModPackets.registerServer();

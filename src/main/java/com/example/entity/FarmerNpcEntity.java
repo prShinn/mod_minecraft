@@ -170,10 +170,6 @@ public class FarmerNpcEntity extends PathAwareEntity {
     public ActionResult interactMob(PlayerEntity player, Hand hand) {
         // Nếu player đang cố gắng lấy cuốc từ NPC
         ItemStack held = player.getStackInHand(hand);
-        if (hand == Hand.MAIN_HAND) {
-            return ActionResult.FAIL;
-
-        }
         // Nếu đang cầm armor hoặc food → ignore
         if (held.getItem() instanceof ArmorItem || held.isFood()) {
 
