@@ -10,6 +10,9 @@ import net.minecraft.entity.attribute.DefaultAttributeContainer;
 import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.damage.DamageSources;
+import net.minecraft.entity.data.DataTracker;
+import net.minecraft.entity.data.TrackedData;
+import net.minecraft.entity.data.TrackedDataHandlerRegistry;
 import net.minecraft.entity.mob.HostileEntity;
 import net.minecraft.entity.mob.PathAwareEntity;
 import net.minecraft.entity.passive.VillagerEntity;
@@ -27,6 +30,7 @@ import net.minecraft.util.ActionResult;
 import net.minecraft.util.Arm;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Hand;
+import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.math.random.Random;
 import net.minecraft.world.LocalDifficulty;
@@ -34,6 +38,7 @@ import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
@@ -43,11 +48,16 @@ public class SoldierNPCEntity extends PathAwareEntity {
     private static final int FOOD_TICK_INTERVAL = 1200; // 1p
     private static final int SHOW_NAME_DURATION = 20; // 1 giây
     private static final double VIEW_DISTANCE = 6.0;
-    private static final float FOLLOW_DISTANCE = 30f;
-    private static final float TELEPORT_DISTANCE = 40f;
+    public static final float FOLLOW_DISTANCE = 30f;
+    public static final float TELEPORT_DISTANCE = 40f;
+    private float followDistance = FOLLOW_DISTANCE;
+    private  float teleportDistance = TELEPORT_DISTANCE;
     private static final int PLAYER_SEARCH_INTERVAL = 30; // 1 giây
     private static final int WEAPON_DURABILITY_CHANCE = 10; // 1/10 xác suất
     private static final int ARMOR_DURABILITY_CHANCE = 20; // 1/20 xác suất
+
+    public ModeNpc.ModeMove moveMode = ModeNpc.ModeMove.WANDER;
+    public FollowOwnerLikeGoal followGoal;
 
     // ===== OWNER & FOLLOW =====
     private UUID ownerUUID;
@@ -68,6 +78,17 @@ public class SoldierNPCEntity extends PathAwareEntity {
 
     // ===== INVENTORY =====
     public final SimpleInventory foodInventory = new SimpleInventory(9);
+    public ModeNpc.ModeMove getMoveMode() {
+        int id = this.dataTracker.get(MOVE_MODE);
+        return ModeNpc.ModeMove.values()[MathHelper.clamp(id, 0, ModeNpc.ModeMove.values().length - 1)];
+    }
+
+    public void setMoveMode(ModeNpc.ModeMove moveMode) {
+        this.moveMode = moveMode;
+        this.dataTracker.set(MOVE_MODE, moveMode.ordinal());
+    }
+    public static final TrackedData<Integer> MOVE_MODE =
+            DataTracker.registerData(SoldierNPCEntity.class, TrackedDataHandlerRegistry.INTEGER);
 
     // ===== CONSTRUCTOR =====
     public SoldierNPCEntity(EntityType<? extends SoldierNPCEntity> type, World world) {
@@ -82,6 +103,11 @@ public class SoldierNPCEntity extends PathAwareEntity {
                 .add(EntityAttributes.GENERIC_MOVEMENT_SPEED, 0.25D);
     }
 
+    @Override
+    protected void initDataTracker() {
+        super.initDataTracker();
+        this.dataTracker.startTracking(MOVE_MODE, ModeNpc.ModeMove.WANDER.ordinal());
+    }
 
     // ===== AI GOALS =====
     @Override
@@ -120,7 +146,7 @@ public class SoldierNPCEntity extends PathAwareEntity {
                 return super.canStart() && SoldierNPCEntity.this.getMainHandStack().getItem() instanceof AxeItem;
             }
         });
-        this.goalSelector.add(5, new FollowOwnerLikeGoal(this, 1.3D, FOLLOW_DISTANCE, TELEPORT_DISTANCE)); // uu tien di theo
+        this.goalSelector.add(5, new FollowOwnerLikeGoal(this, 1.3D, followDistance, teleportDistance));
         this.goalSelector.add(6, new ReturnToPlayerGoal(this));
 // nhin player
         this.goalSelector.add(7, new LookAtEntityGoal(this, PlayerEntity.class, 8.0F));
@@ -388,7 +414,7 @@ public class SoldierNPCEntity extends PathAwareEntity {
             this.writeCustomDataToNbt(entityNbt);
             entityNbt.putFloat("Health", this.getHealth());
 
-            token.getOrCreateNbt().put("EntityTag", entityNbt);
+            token.getOrCreateNbt().put("SoldierEntityTag", entityNbt);
 
             if (!player.getInventory().insertStack(token)) {
                 this.dropStack(token);
@@ -591,6 +617,8 @@ public class SoldierNPCEntity extends PathAwareEntity {
         nbt.putInt("Hunger", hunger);
 
         Inventories.writeNbt(nbt, foodInventory.stacks);
+
+        nbt.putInt("MoveMode", this.dataTracker.get(MOVE_MODE));
     }
 
     @Override
@@ -614,6 +642,10 @@ public class SoldierNPCEntity extends PathAwareEntity {
         if (nbt.contains("Hunger")) hunger = nbt.getInt("Hunger");
 
         Inventories.readNbt(nbt, foodInventory.stacks);
+
+        if (nbt.contains("MoveMode")) {
+            this.dataTracker.set(MOVE_MODE, nbt.getInt("MoveMode"));
+        }
 
     }
 
@@ -665,14 +697,10 @@ public class SoldierNPCEntity extends PathAwareEntity {
         return followPlayerUUID;
     }
 
-    // ===== MISC =====
-    @Override
-    public void initEquipment(Random random, LocalDifficulty difficulty) {
-        // Không spawn với trang bị ngẫu nhiên
-    }
-
     @Override
     public Arm getMainArm() {
         return Arm.RIGHT;
     }
+
+
 }

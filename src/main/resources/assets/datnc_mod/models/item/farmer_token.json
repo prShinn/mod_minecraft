@@ -1,6 +1,6 @@
 {
   "parent": "item/generated",
   "textures": {
-    "layer0": "datnc_mod:item/combat_npc"
+    "layer0": "datnc_mod:item/farmer_npc"
   }
 }
