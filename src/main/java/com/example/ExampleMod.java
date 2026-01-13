@@ -3,6 +3,7 @@ package com.example;
 import com.example.registry.ModEntities;
 import com.example.registry.ModEntityAttributes;
 import com.example.registry.ModItems;
+import com.example.registry.ModPackets;
 import net.fabricmc.api.ModInitializer;
 
 import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
@@ -14,7 +15,6 @@ public class ExampleMod implements ModInitializer {
 	// This logger is used to write text to the console and the log file.
 	// It is considered best practice to use your mod id as the logger's name.
 	// That way, it's clear which mod wrote info, warnings, and errors.
-    public static final Logger LOGGER = LoggerFactory.getLogger("modid");
 	public static final String MODID = "datnc_mod";
 
 	@Override
@@ -29,7 +29,12 @@ public class ExampleMod implements ModInitializer {
 				.register(entries -> {
 					entries.add(ModItems.SOLDIER_TOKEN);
 				});
+		ItemGroupEvents.modifyEntriesEvent(ItemGroups.INGREDIENTS)
+				.register(entries -> {
+					entries.add(ModItems.FARMER_TOKEN);
+				});
+		System.out.println("[SoldierNPC] Server init");
 
-		LOGGER.info("Hello Fabric world!");
+		ModPackets.registerServer();
 	}
 }

@@ -123,17 +123,16 @@ public class SoldierTokenItem extends Item {
         if (npc == null) return TypedActionResult.fail(player.getStackInHand(hand));
         // Copy NBT nếu có
         ItemStack stack = player.getStackInHand(hand);
-        if (stack.hasNbt() && stack.getNbt().contains("EntityTag")) {
-            npc.readCustomDataFromNbt(stack.getNbt().getCompound("EntityTag"));
+        if (stack.hasNbt() && stack.getNbt().contains("SoldierEntityTag")) {
+            npc.readCustomDataFromNbt(stack.getNbt().getCompound("SoldierEntityTag"));
 
-            if (stack.getNbt().getCompound("EntityTag").contains("Health")) {
-                npc.setHealth(stack.getNbt().getCompound("EntityTag").getFloat("Health"));
+            if (stack.getNbt().getCompound("SoldierEntityTag").contains("Health")) {
+                npc.setHealth(stack.getNbt().getCompound("SoldierEntityTag").getFloat("Health"));
             }
         }
 
         // Set vị trí, owner, equipment
         npc.refreshPositionAndAngles(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5, player.getYaw(), 0);
-        npc.initEquipment(sw.getRandom(), sw.getLocalDifficulty(pos));
         npc.setOwner(player);
         NbtCompound nbt = new NbtCompound();
         if (!nbt.containsUuid("OwnerUUID")) {

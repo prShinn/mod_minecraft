@@ -63,9 +63,7 @@ public class SoldierBowGoal extends Goal {
     @Override
     public void tick() {
         if (target == null) return;
-
         npc.getLookControl().lookAt(target, 30.0F, 30.0F);
-
         double distanceSq = npc.squaredDistanceTo(target);
         double maxDistSq = MAX_ATTACK_DISTANCE * MAX_ATTACK_DISTANCE;
         double minDistSq = MIN_ATTACK_DISTANCE * MIN_ATTACK_DISTANCE;
@@ -95,7 +93,6 @@ public class SoldierBowGoal extends Goal {
             mapAI.findLineOfSight(target, npc);
         }
     }
-
     // ===== LÙI RA =====
     private void moveAwayFromTarget() {
         Vec3d dir = npc.getPos().subtract(target.getPos()).normalize();
