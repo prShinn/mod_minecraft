@@ -45,14 +45,10 @@ public class FarmerTokenItem extends Item {
                 npc.setHealth(stack.getNbt().getCompound("FarmerEntityTag").getFloat("Health"));
             }
         }
-
         // Set vị trí, owner, equipment
         npc.refreshPositionAndAngles(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5, player.getYaw(), 0);
-
-
         // Spawn
         sw.spawnEntity(npc);
-
         // Trừ item nếu không phải creative
         if (!player.isCreative()) stack.decrement(1);
         return TypedActionResult.consume(stack);

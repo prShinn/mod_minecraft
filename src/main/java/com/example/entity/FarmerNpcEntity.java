@@ -3,7 +3,6 @@ package com.example.entity;
 import com.example.ai.farmer.*;
 import com.example.entity.base.NpcDisplayComponent;
 import com.example.entity.base.NpcEquipmentComponent;
-import com.example.entity.base.NpcFoodComponent;
 import com.example.registry.ModItems;
 import net.minecraft.block.*;
 import net.minecraft.block.entity.BlockEntity;
@@ -19,20 +18,16 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.nbt.NbtCompound;
+import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.math.random.Random;
-import net.minecraft.world.LocalDifficulty;
 import net.minecraft.world.World;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 
 public class FarmerNpcEntity extends PathAwareEntity {
     private final NpcDisplayComponent display = new NpcDisplayComponent();
-    private final NpcFoodComponent food = new NpcFoodComponent();
     private final NpcEquipmentComponent equip = new NpcEquipmentComponent();
     private BlockPos currentFarmPos;
     private UUID ownerUUID;
@@ -167,8 +162,7 @@ public class FarmerNpcEntity extends PathAwareEntity {
             // Không drop khi chết
             this.setEquipmentDropChance(EquipmentSlot.MAINHAND, 0.0F);
         }
-        display.tick(this);
-        food.tick(this);
+        display.tick(this, foodInventory);
         memory.tickIdle();
     }
 
@@ -499,5 +493,9 @@ public class FarmerNpcEntity extends PathAwareEntity {
 
     public boolean isChestReserved(BlockPos pos) {
         return RESERVED_CHESTS.contains(pos);
+    }
+    @Override
+    public Text getName(){
+        return Text.literal("Nông dân");
     }
 }
