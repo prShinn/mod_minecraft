@@ -95,7 +95,6 @@ public class LumberjackNpcEntity extends PathAwareEntity {
         ) {
             @Override
             public boolean canStart() {
-                super.canStart();
                 return !sleeping.isSleeping() && super.canStart();
             }
         });
@@ -104,21 +103,18 @@ public class LumberjackNpcEntity extends PathAwareEntity {
         this.goalSelector.add(4, new ChopTreeGoal(this) {
             @Override
             public boolean canStart() {
-                super.canStart();
                 return !sleeping.isSleeping() && super.canStart();
             }
         }); // Chặt cây
         this.goalSelector.add(5, new DepositWoodToChestGoal(this) {
             @Override
             public boolean canStart() {
-                super.canStart();
                 return !sleeping.isSleeping() && super.canStart();
             }
         }); // Cất vao chest
         this.goalSelector.add(6, new PlantSaplingGoal(this) {
             @Override
             public boolean canStart() {
-                super.canStart();
                 return !sleeping.isSleeping() && super.canStart();
             }
         }); // Trồng mầm cây
@@ -126,7 +122,6 @@ public class LumberjackNpcEntity extends PathAwareEntity {
         this.goalSelector.add(8, new WanderNearChestGoal(this) {
             @Override
             public boolean canStart() {
-                super.canStart();
                 return !sleeping.isSleeping() && super.canStart();
             }
         }); // Lang thang và tìm chest
@@ -134,7 +129,6 @@ public class LumberjackNpcEntity extends PathAwareEntity {
         this.goalSelector.add(9, new WanderAroundFarGoal(this, 1.0D) {
             @Override
             public boolean canStart() {
-                super.canStart();
                 return !sleeping.isSleeping() && super.canStart();
             }
         }); // ✅ GIỮ - Wander NGÀY + ĐÊM (khi idle)

@@ -97,7 +97,12 @@ public class FarmerNpcEntity extends PathAwareEntity {
         this.goalSelector.add(0, new SwimGoal(this)); // ko chet duoi
         this.goalSelector.add(1, new EscapeDangerGoal(this, 1.4)); // chay khi bi dame
         // Sử dụng GenericSleepGoal
-        this.goalSelector.add(2, new FindAndSleepGoal(this, sleeping));
+        this.goalSelector.add(2, new FindAndSleepGoal(this, sleeping) {
+            @Override
+            public boolean canStart() {
+                return getWorld().isNight() && super.canStart();
+            }
+        });
         this.goalSelector.add(2, new FindAndEatFoodGoal(
                 this,
                 foodInventory,  // NPC inventory
@@ -105,7 +110,6 @@ public class FarmerNpcEntity extends PathAwareEntity {
         ) {
             @Override
             public boolean canStart() {
-                super.canStart();
                 return !sleeping.isSleeping() && super.canStart();
             }
         });
@@ -113,49 +117,42 @@ public class FarmerNpcEntity extends PathAwareEntity {
         this.goalSelector.add(4, new HarvestCropGoal(this) {
             @Override
             public boolean canStart() {
-                super.canStart();
                 return !sleeping.isSleeping() && super.canStart();
             }
         }); // thu hoach
         this.goalSelector.add(5, new DepositToChestGoal(this) {
             @Override
             public boolean canStart() {
-                super.canStart();
                 return !sleeping.isSleeping() && super.canStart();
             }
         }); // cât đô
         this.goalSelector.add(6, new PlantSeedGoal(this) {
             @Override
             public boolean canStart() {
-                super.canStart();
                 return !sleeping.isSleeping() && super.canStart();
             }
         }); // trồng cây
         this.goalSelector.add(7, new ReturnToFarmGoal(this) {
             @Override
             public boolean canStart() {
-                super.canStart();
                 return !sleeping.isSleeping() && super.canStart();
             }
         }); // quay lại farm
         this.goalSelector.add(8, new LookAtEntityGoal(this, PlayerEntity.class, 8.0F) {
             @Override
             public boolean canStart() {
-                super.canStart();
                 return !sleeping.isSleeping() && super.canStart();
             }
         }); // nhin player
         this.goalSelector.add(9, new WanderAroundFarGoal(this, 1.0D) {
             @Override
             public boolean canStart() {
-                super.canStart();
                 return !sleeping.isSleeping() && super.canStart();
             }
         }); // đi lang thang xa
         this.goalSelector.add(9, new LookAroundGoal(this) {
             @Override
             public boolean canStart() {
-                super.canStart();
                 return !sleeping.isSleeping() && super.canStart();
             }
         });//nhin xunh quanh

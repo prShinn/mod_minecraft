@@ -17,11 +17,11 @@ public class FindAndEatFoodGoal extends Goal {
     private final int searchRadius;
 
     private BlockPos targetFoodChest = null;
-    private int cooldown = 0;
+    private int searchCooldown = 0;
+    private int actionCooldown = 0;
     private static final int SEARCH_COOLDOWN = 100; // Search mỗi 5 giây nếu không có cache
-    private static final int FOOD_THRESHOLD = 1; // Npc sẽ lấy food cho đến khi có này
+    private static final int FOOD_THRESHOLD = 2; // Npc sẽ lấy food cho đến khi có này
 
-    // ===== CACHING =====
     private final FoodChestCacheManager cacheManager = new FoodChestCacheManager();
 
     public FindAndEatFoodGoal(PathAwareEntity npc, SimpleInventory npcInventory, int searchRadius) {
@@ -33,49 +33,43 @@ public class FindAndEatFoodGoal extends Goal {
 
     @Override
     public boolean canStart() {
-        // ===== CONDITION 1: Inventory đủ food? =====
-        if (hasEnoughFood()) {
-            targetFoodChest = null;
+        if (searchCooldown > 0) {
+            searchCooldown--;
             return false;
         }
 
-        // ===== CONDITION 2: Có cached chest hợp lệ? =====
-        BlockPos cachedChest = cacheManager.getCachedFoodChest(npc);
-        if (cachedChest != null) {
-            // ✅ Chest còn hợp lệ → dùng cache
-            targetFoodChest = cachedChest;
+        if (hasEnoughFood()) {
+            return false;
+        }
+
+        BlockPos cached = cacheManager.getCachedFoodChest(npc);
+        if (cached != null) {
+            targetFoodChest = cached;
             return true;
         }
-
-        // ===== CONDITION 3: Cooldown (tránh spam search) =====
-        if (cooldown > 0) {
-            cooldown--;
-            return false;
-        }
-
-        // ===== CONDITION 4: Scan chest mới =====
         targetFoodChest = findNearestFoodChest();
-        cooldown = SEARCH_COOLDOWN;
-
         if (targetFoodChest != null) {
-            // ✅ Tìm thấy → cache nó
             cacheManager.cacheChestPosition(targetFoodChest, npc.getWorld());
             return true;
+        } else {
+            searchCooldown = SEARCH_COOLDOWN;
+            return false;
         }
-
-        return false;
     }
 
     @Override
     public void start() {
         if (targetFoodChest == null) return;
 
-        npc.getNavigation().startMovingTo(
-                targetFoodChest.getX() + 0.5,
-                targetFoodChest.getY() + 0.5,
-                targetFoodChest.getZ() + 0.5,
-                1.0
-        );
+        if (npc.getNavigation().isIdle() && targetFoodChest != null || npc.age % 40 == 0) {
+            npc.getNavigation().startMovingTo(
+                    targetFoodChest.getX() + 0.5,
+                    targetFoodChest.getY() + 0.5,
+                    targetFoodChest.getZ() + 0.5,
+                    1.3f
+            );
+        }
+
     }
 
     @Override
@@ -84,44 +78,37 @@ public class FindAndEatFoodGoal extends Goal {
 
         World world = npc.getWorld();
         if (world == null || world.isClient()) return;
-        if (cooldown > 0) {
-            cooldown--;
+        if (actionCooldown > 0) {
+            actionCooldown--;
             return;
         }
-        cooldown = SEARCH_COOLDOWN;
+        actionCooldown = SEARCH_COOLDOWN;
         double dist = npc.squaredDistanceTo(
                 targetFoodChest.getX() + 0.5,
                 targetFoodChest.getY() + 0.5,
                 targetFoodChest.getZ() + 0.5
         );
 
-        // ===== CHECK: Quá xa chest =====
         if (dist > searchRadius * searchRadius) {
             targetFoodChest = null;
             return;
         }
 
-        // ===== CHECK: Reached chest =====
         if (dist < 1.5) {
-            // Check xem chest còn valid không
             if (!FoodChestHelper.isValidFoodChest(targetFoodChest, world)) {
-                // Chest bị phá → reset cache
                 cacheManager.invalidateCache();
                 targetFoodChest = null;
                 return;
             }
 
-            // Lấy food từ chest
             ItemStack food = FoodChestHelper.takeFood(targetFoodChest, world);
             if (!food.isEmpty() && npcInventory != null) {
                 npcInventory.addStack(food);
 
-                // Nếu inventory đủ → stop
                 if (hasEnoughFood()) {
                     targetFoodChest = null;
                 }
             } else {
-                // Chest hết food → không reset cache, có thể có food sau
                 targetFoodChest = null;
             }
         }
@@ -136,7 +123,9 @@ public class FindAndEatFoodGoal extends Goal {
         if (targetFoodChest == null) {
             return false;
         }
-
+        if (!FoodChestHelper.isValidFoodChest(targetFoodChest, npc.getWorld())) {
+            return false;
+        }
         double dist = npc.squaredDistanceTo(
                 targetFoodChest.getX() + 0.5,
                 targetFoodChest.getY() + 0.5,
@@ -149,22 +138,13 @@ public class FindAndEatFoodGoal extends Goal {
     @Override
     public void stop() {
         npc.getNavigation().stop();
-        // ⚠️ Không reset targetFoodChest - cho tick() xử lý
     }
 
-    // ===== HELPER METHODS =====
-
-    /**
-     * Check xem NPC đã có đủ food không
-     */
     private boolean hasEnoughFood() {
         int foodCount = getTotalFoodCount();
         return foodCount >= FOOD_THRESHOLD;
     }
 
-    /**
-     * Tính tổng food trong NPC inventory
-     */
     private int getTotalFoodCount() {
         if (npcInventory == null) return 0;
         int total = 0;
@@ -177,10 +157,6 @@ public class FindAndEatFoodGoal extends Goal {
         return total;
     }
 
-    /**
-     * Scan tìm vanilla FoodChest gần nhất
-     * ✅ Chỉ scan khi cache invalid hoặc timeout
-     */
     private BlockPos findNearestFoodChest() {
         BlockPos npcPos = npc.getBlockPos();
         World world = npc.getWorld();
@@ -189,7 +165,6 @@ public class FindAndEatFoodGoal extends Goal {
         double closestDist = Double.MAX_VALUE;
         BlockPos closestChest = null;
 
-        // Scan radius
         for (int dx = -searchRadius; dx <= searchRadius; dx++) {
             for (int dy = -3; dy <= 3; dy++) {
                 for (int dz = -searchRadius; dz <= searchRadius; dz++) {
@@ -197,12 +172,10 @@ public class FindAndEatFoodGoal extends Goal {
 
                     if (!world.isChunkLoaded(checkPos)) continue;
 
-                    // Check xem là FoodChest không
                     if (!FoodChestHelper.isFoodChest(checkPos, world)) {
                         continue;
                     }
 
-                    // Check có food không
                     if (!FoodChestHelper.hasFood(checkPos, world)) {
                         continue;
                     }
@@ -219,10 +192,4 @@ public class FindAndEatFoodGoal extends Goal {
         return closestChest;
     }
 
-    /**
-     * Get cache info (cho debug logging)
-     */
-    public String getCacheInfo() {
-        return cacheManager.getCacheInfo();
-    }
 }

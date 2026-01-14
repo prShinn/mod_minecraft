@@ -47,9 +47,6 @@ public class NpcSleepingComponent {
         return sleeping;
     }
 
-    public BlockPos getBedPos() {
-        return bedPos;
-    }
     public BlockPos getTargetBed() {
         return targetBed;
     }
