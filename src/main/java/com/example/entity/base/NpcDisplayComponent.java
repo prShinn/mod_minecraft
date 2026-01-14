@@ -40,17 +40,23 @@ public class NpcDisplayComponent {
 
 
         if (player != null) {
-            npc.setCustomNameVisible(true);
+            if (!npc.isCustomNameVisible()) {
+                npc.setCustomNameVisible(true);
+                lastDisplayName = ""; // 🔥 ép sync lại
+            }
             visibleTicks = SHOW_NAME_DURATION;
             updateName(npc, inventory);
         } else if (visibleTicks-- <= 0) {
             npc.setCustomNameVisible(false);
+            lastDisplayName = "";
         }
     }
+
     public void requestHeal(float amount) {
         if (amount <= 0) return;
         this.pendingHeal += amount;
     }
+
     private void handleGradualHeal(PathAwareEntity npc) {
         // ===== ƯU TIÊN HEAL TỪ MEDIC (KHÔNG TỐN HUNGER) =====
         if (pendingHeal > 0 && npc.getHealth() < npc.getMaxHealth()) {
@@ -73,6 +79,7 @@ public class NpcDisplayComponent {
         hunger--;                // 🔥 Heal tốn Hunger
         healTickCooldown = 30;   // 1.5 giây
     }
+
     private void handleFoodSystem(PathAwareEntity npc, SimpleInventory inventory) {
         // Decrease hunger over time
         if (foodTickCooldown > 0) {
@@ -88,6 +95,7 @@ public class NpcDisplayComponent {
             this.npcEatFood(npc, inventory);
         }
     }
+
     private void decreaseHunger(PathAwareEntity npc) {
         if (hunger > 0) {
             hunger--;
@@ -103,14 +111,17 @@ public class NpcDisplayComponent {
         int maxHp = Math.round(npc.getMaxHealth());
         int foodCount = getTotalFoodCount(inventory);
         // Build name text
-        String _nameNpc = "";
-        if(npc instanceof FarmerNpcEntity){
+        String _nameNpc = "NPC";
+        if (npc instanceof FarmerNpcEntity) {
             _nameNpc = "Nông dân";
-        }else if(npc instanceof LumberjackNpcEntity){
+        } else if (npc instanceof LumberjackNpcEntity) {
             _nameNpc = "Tiều phu";
         }
         displayStr = _nameNpc + " [" + hp + "/" + maxHp + "] 🍖[" + hunger + "/" + MAX_HUNGER + "] x" + foodCount;
-
+        if (displayStr.equals(lastDisplayName)) {
+            return;
+        }
+        lastDisplayName = displayStr;
         MutableText displayName = Text.literal(_nameNpc)
                 .formatted(Formatting.WHITE)
                 .append(Text.literal(" [" + hp + "/" + maxHp + "]")
@@ -133,10 +144,12 @@ public class NpcDisplayComponent {
         }
         return total;
     }
+
     private boolean shouldEat() {
         // Chỉ ăn khi food thấp hơn 50%
         return eatCooldown <= 0 && hunger <= MAX_HUNGER * 0.5f;
     }
+
     private void npcEatFood(PathAwareEntity npc, SimpleInventory foodInventory) {
         if (npc.getWorld().isClient) return; // Chỉ server xử lý
         for (int i = 0; i < foodInventory.size(); i++) {
