@@ -128,7 +128,7 @@ public class DepositToChestGoal extends Goal {
         // Transfer tất cả items từ NPC inventory vào rương
         for (int i = 0; i < npc.foodInventory.size(); i++) {
             ItemStack npcStack = npc.foodInventory.getStack(i);
-            if (npcStack.isEmpty()) continue;
+            if (npcStack.isEmpty() || isMeat(npcStack)) continue;
 
             // Tìm slot trống trong rương
             for (int j = 0; j < chestInv.size(); j++) {
@@ -193,6 +193,10 @@ public class DepositToChestGoal extends Goal {
         }
         return closestChest;
     }
-
+    private boolean isMeat(ItemStack stack) {
+        return stack.isFood()
+                && stack.getItem().getFoodComponent() != null
+                && stack.getItem().getFoodComponent().isMeat();
+    }
 
 }

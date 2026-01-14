@@ -32,7 +32,7 @@ import net.minecraft.world.World;
 import java.util.*;
 
 public class FarmerNpcEntity extends PathAwareEntity {
-    private final NpcDisplayComponent display = new NpcDisplayComponent();
+    public final NpcDisplayComponent display = new NpcDisplayComponent();
     private final NpcEquipmentComponent equip = new NpcEquipmentComponent();
     public final NpcSleepingComponent sleeping = new NpcSleepingComponent()
             .withSearchRadius(16)
@@ -45,6 +45,8 @@ public class FarmerNpcEntity extends PathAwareEntity {
     public final SimpleInventory foodInventory = new SimpleInventory(9);
     public final FarmerMemory memory = new FarmerMemory();
     private static final int FIND_CHEST_DISTANCE = 16; // 1 second
+
+
     // Thay vì static Set
 
     // ===== COOLDOWN VARIABLES =====
@@ -106,6 +108,7 @@ public class FarmerNpcEntity extends PathAwareEntity {
         ) {
             @Override
             public boolean canStart() {
+                super.canStart();
                 return !sleeping.isSleeping() && super.canStart();
             }
         });
@@ -113,45 +116,62 @@ public class FarmerNpcEntity extends PathAwareEntity {
         this.goalSelector.add(4, new HarvestCropGoal(this) {
             @Override
             public boolean canStart() {
+                super.canStart();
                 return !sleeping.isSleeping() && super.canStart();
             }
         }); // thu hoach
         this.goalSelector.add(5, new DepositToChestGoal(this) {
             @Override
             public boolean canStart() {
+                super.canStart();
                 return !sleeping.isSleeping() && super.canStart();
             }
         }); // cât đô
         this.goalSelector.add(6, new PlantSeedGoal(this) {
             @Override
             public boolean canStart() {
+                super.canStart();
                 return !sleeping.isSleeping() && super.canStart();
             }
         }); // trồng cây
         this.goalSelector.add(7, new ReturnToFarmGoal(this) {
             @Override
             public boolean canStart() {
+                super.canStart();
                 return !sleeping.isSleeping() && super.canStart();
             }
         }); // quay lại farm
         this.goalSelector.add(8, new LookAtEntityGoal(this, PlayerEntity.class, 8.0F) {
             @Override
             public boolean canStart() {
+                super.canStart();
                 return !sleeping.isSleeping() && super.canStart();
             }
         }); // nhin player
         this.goalSelector.add(9, new WanderAroundFarGoal(this, 1.0D) {
             @Override
             public boolean canStart() {
+                super.canStart();
                 return !sleeping.isSleeping() && super.canStart();
             }
         }); // đi lang thang xa
         this.goalSelector.add(9, new LookAroundGoal(this) {
             @Override
             public boolean canStart() {
+                super.canStart();
                 return !sleeping.isSleeping() && super.canStart();
             }
         });//nhin xunh quanh
+        ItemStack mainHand = this.getEquippedStack(EquipmentSlot.MAINHAND);
+        if (mainHand.isEmpty()) {
+            this.equipStack(
+                    EquipmentSlot.MAINHAND,
+                    new ItemStack(Items.IRON_HOE)
+            );
+
+            // Không drop khi chết
+            this.setEquipmentDropChance(EquipmentSlot.MAINHAND, 0.0F);
+        }
     }
 
 
@@ -165,16 +185,7 @@ public class FarmerNpcEntity extends PathAwareEntity {
         if (!sleeping.isSleeping()) {
             memory.tickIdle();
         }
-        ItemStack mainHand = this.getEquippedStack(EquipmentSlot.MAINHAND);
-        if (mainHand.isEmpty()) {
-            this.equipStack(
-                    EquipmentSlot.MAINHAND,
-                    new ItemStack(Items.IRON_HOE)
-            );
 
-            // Không drop khi chết
-            this.setEquipmentDropChance(EquipmentSlot.MAINHAND, 0.0F);
-        }
         if (farmlandSearchCooldown > 0) {
             farmlandSearchCooldown--;
         }
@@ -475,6 +486,7 @@ public class FarmerNpcEntity extends PathAwareEntity {
         World world = getWorld();
 
         for (BlockPos pos : BlockPos.iterate(center.add(-FIND_CHEST_DISTANCE, -2, -FIND_CHEST_DISTANCE), center.add(FIND_CHEST_DISTANCE, 2, FIND_CHEST_DISTANCE))) {
+            if (!world.isChunkLoaded(pos)) continue;
             BlockEntity be = world.getBlockEntity(pos);
             if (be instanceof Inventory inv) {
                 if (reservationSystem.isReservedByOthers(pos, this.getUuid(), "CHEST")) {

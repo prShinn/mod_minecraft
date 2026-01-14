@@ -19,7 +19,7 @@ public class FindAndEatFoodGoal extends Goal {
     private BlockPos targetFoodChest = null;
     private int cooldown = 0;
     private static final int SEARCH_COOLDOWN = 100; // Search mỗi 5 giây nếu không có cache
-    private static final int FOOD_THRESHOLD = 5; // Npc sẽ lấy food cho đến khi có này
+    private static final int FOOD_THRESHOLD = 1; // Npc sẽ lấy food cho đến khi có này
 
     // ===== CACHING =====
     private final FoodChestCacheManager cacheManager = new FoodChestCacheManager();
@@ -83,8 +83,12 @@ public class FindAndEatFoodGoal extends Goal {
         if (targetFoodChest == null) return;
 
         World world = npc.getWorld();
-        if (world == null) return;
-
+        if (world == null || world.isClient()) return;
+        if (cooldown > 0) {
+            cooldown--;
+            return;
+        }
+        cooldown = SEARCH_COOLDOWN;
         double dist = npc.squaredDistanceTo(
                 targetFoodChest.getX() + 0.5,
                 targetFoodChest.getY() + 0.5,
@@ -162,7 +166,7 @@ public class FindAndEatFoodGoal extends Goal {
      * Tính tổng food trong NPC inventory
      */
     private int getTotalFoodCount() {
-        if(npcInventory == null) return 0;
+        if (npcInventory == null) return 0;
         int total = 0;
         for (int i = 0; i < npcInventory.size(); i++) {
             ItemStack stack = npcInventory.getStack(i);

@@ -11,7 +11,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 
 public class FoodChestHelper {
-    public static final String FOOD_CHEST_MARKER_NAME = "FOOD CHEST";
+    // ✅ REMOVED - Không cần dùng
 
     public static boolean isFoodChest(BlockPos pos, World world) {
         if (world == null || world.isClient) return false;
@@ -33,17 +33,17 @@ public class FoodChestHelper {
     private static boolean isFoodChestMarker(ItemStack stack) {
         if (stack.isEmpty()) return false;
 
-        // Check custom name
-        if (stack.hasCustomName()) {
-            String name = stack.getName().getString();
-            // Kiểm tra xem tên có chứa "FOOD CHEST" không
-            return name.contains("FOOD CHEST");
-        }
-
-        // Hoặc check NBT tag
+        // ===== CHECK 1: NBT tag (ưu tiên) =====
         NbtCompound nbt = stack.getNbt();
         if (nbt != null && nbt.getBoolean("IsFoodChestMarker")) {
             return true;
+        }
+
+        // ===== CHECK 2: Custom name (loại bỏ formatting) =====
+        if (stack.hasCustomName()) {
+            String name = stack.getName().getString();
+            String cleanName = name.replaceAll("§[0-9a-fk-or]", "");
+            return cleanName.contains("FOOD CHEST");
         }
 
         return false;
@@ -51,19 +51,15 @@ public class FoodChestHelper {
 
     /**
      * Tạo marker item
-     * Có thể gửi cho player qua recipe hoặc command
      */
     public static ItemStack createFoodChestMarker() {
-        // Dùng WRITTEN_BOOK làm marker
         ItemStack marker = new ItemStack(net.minecraft.item.Items.WRITTEN_BOOK);
 
-        // Set custom name
         marker.setCustomName(
                 net.minecraft.text.Text.literal("§c§lFOOD CHEST§r")
                         .formatted(net.minecraft.util.Formatting.RED, net.minecraft.util.Formatting.BOLD)
         );
 
-        // Set NBT tag
         NbtCompound nbt = marker.getOrCreateNbt();
         nbt.putBoolean("IsFoodChestMarker", true);
         nbt.putString("author", "Npc");
@@ -90,7 +86,6 @@ public class FoodChestHelper {
         Inventory inv = getFoodChestInventory(pos, world);
         if (inv == null) return false;
 
-        // Bắt đầu từ slot 1 (slot 0 là marker)
         for (int i = 1; i < inv.size(); i++) {
             ItemStack stack = inv.getStack(i);
             if (!stack.isEmpty() && stack.isFood()) {
@@ -107,7 +102,6 @@ public class FoodChestHelper {
         Inventory inv = getFoodChestInventory(pos, world);
         if (inv == null) return ItemStack.EMPTY;
 
-        // Bắt đầu từ slot 1
         for (int i = 1; i < inv.size(); i++) {
             ItemStack stack = inv.getStack(i);
             if (!stack.isEmpty() && stack.isFood()) {
@@ -138,7 +132,6 @@ public class FoodChestHelper {
         if (inv == null) return 0;
 
         int total = 0;
-        // Bắt đầu từ slot 1
         for (int i = 1; i < inv.size(); i++) {
             ItemStack stack = inv.getStack(i);
             if (!stack.isEmpty() && stack.isFood()) {
