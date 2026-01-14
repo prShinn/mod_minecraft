@@ -1,7 +1,9 @@
 package com.example.entity;
 
 import com.example.ai.FindAndSleepGoal;
+import com.example.ai.GlobalReservationSystem;
 import com.example.ai.WanderForBedGoal;
+import com.example.ai.foodChest.FindAndEatFoodGoal;
 import com.example.ai.lumberjack.*;
 import com.example.entity.base.NpcDisplayComponent;
 import com.example.entity.base.NpcEquipmentComponent;
@@ -43,27 +45,35 @@ public class LumberjackNpcEntity extends PathAwareEntity {
     public final LumberjackMemory memory = new LumberjackMemory();
     public final static int FIND_CHEST_DISTANCE = 16;
     public final static int FIND_TREE_DISTANCE = 7;
-    private static final Set<BlockPos> RESERVED_TREES = new HashSet<>();
+    private final GlobalReservationSystem reservationSystem = GlobalReservationSystem.getInstance();
+    private int treeSearchCooldown = 0;
+    private static final int TREE_SEARCH_COOLDOWN = 20; // 1 second (20 ticks)
+
+
     private static final Set<BlockPos> RESERVED_CHESTS = new HashSet<>();
 
     public boolean reserveTree(BlockPos pos) {
-        return RESERVED_TREES.add(pos);
+        return reservationSystem.tryReserve(pos, this.getUuid(), "TREE");
     }
 
     public void releaseTree(BlockPos pos) {
-        RESERVED_TREES.remove(pos);
+        reservationSystem.release(pos, this.getUuid(), "TREE");
     }
 
     public boolean reserveChest(BlockPos pos) {
-        return RESERVED_CHESTS.add(pos);
+        return reservationSystem.tryReserve(pos, this.getUuid(), "CHEST");
     }
 
     public void releaseChest(BlockPos pos) {
-        RESERVED_CHESTS.remove(pos);
+        reservationSystem.release(pos, this.getUuid(), "CHEST");
     }
 
     public boolean isChestReserved(BlockPos pos) {
-        return RESERVED_CHESTS.contains(pos);
+        return reservationSystem.isReservedByOthers(pos, this.getUuid(), "CHEST");
+    }
+
+    private void cleanupAllReservations() {
+        reservationSystem.releaseAll(this.getUuid());
     }
 
     public LumberjackNpcEntity(EntityType<? extends PathAwareEntity> entityType, World world) {
@@ -79,12 +89,43 @@ public class LumberjackNpcEntity extends PathAwareEntity {
         this.goalSelector.add(0, new SwimGoal(this));
         this.goalSelector.add(1, new EscapeDangerGoal(this, 1.4));
         this.goalSelector.add(2, new FindAndSleepGoal(this, sleeping));
+        this.goalSelector.add(2, new FindAndEatFoodGoal(
+                this,
+                inventory,  // NPC inventory
+                24              // search radius
+        ) {
+            @Override
+            public boolean canStart() {
+                return !sleeping.isSleeping() && super.canStart();
+            }
+        });
+
         this.goalSelector.add(3, new WanderForBedGoal(this, 1.0, sleeping));
-        this.goalSelector.add(4, new ChopTreeGoal(this)); // Chặt cây
-        this.goalSelector.add(5, new DepositWoodToChestGoal(this)); // Cất vao chest
-        this.goalSelector.add(6, new PlantSaplingGoal(this)); // Trồng mầm cây
+        this.goalSelector.add(4, new ChopTreeGoal(this) {
+            @Override
+            public boolean canStart() {
+                return !sleeping.isSleeping() && super.canStart();
+            }
+        }); // Chặt cây
+        this.goalSelector.add(5, new DepositWoodToChestGoal(this) {
+            @Override
+            public boolean canStart() {
+                return !sleeping.isSleeping() && super.canStart();
+            }
+        }); // Cất vao chest
+        this.goalSelector.add(6, new PlantSaplingGoal(this) {
+            @Override
+            public boolean canStart() {
+                return !sleeping.isSleeping() && super.canStart();
+            }
+        }); // Trồng mầm cây
         this.goalSelector.add(7, new LookAtEntityGoal(this, PlayerEntity.class, 8.0F));
-        this.goalSelector.add(8, new WanderNearChestGoal(this)); // Lang thang và tìm chest
+        this.goalSelector.add(8, new WanderNearChestGoal(this) {
+            @Override
+            public boolean canStart() {
+                return !sleeping.isSleeping() && super.canStart();
+            }
+        }); // Lang thang và tìm chest
         this.goalSelector.add(8, new LookAroundGoal(this));
         this.goalSelector.add(9, new WanderAroundFarGoal(this, 1.0D) {
             @Override
@@ -109,6 +150,9 @@ public class LumberjackNpcEntity extends PathAwareEntity {
         if (mainHand.isEmpty()) {
             this.equipStack(EquipmentSlot.MAINHAND, new ItemStack(Items.IRON_AXE));
             this.setEquipmentDropChance(EquipmentSlot.MAINHAND, 0.0F);
+        }
+        if (treeSearchCooldown > 0) {
+            treeSearchCooldown--;
         }
     }
 
@@ -154,12 +198,20 @@ public class LumberjackNpcEntity extends PathAwareEntity {
 
     @Override
     public boolean damage(DamageSource source, float amount) {
+        if (sleeping.isSleeping()) {
+            sleeping.wakeUp(this);
+        }
         return super.damage(source, amount);
     }
 
-    /**
-     * Tìm chest gần nhất trong bán kính 7 blocks
-     */
+    @Override
+    public void remove(RemovalReason reason) {
+        // ✅ Fixed: Added proper cleanup
+        sleeping.wakeUp(this);
+        cleanupAllReservations(); // 🔥 CLEANUP ALL (bed + trees + chests)
+        super.remove(reason);
+    }
+
     public Inventory findNearestChest() {
         BlockPos center = getBlockPos();
         World world = getWorld();
@@ -174,6 +226,9 @@ public class LumberjackNpcEntity extends PathAwareEntity {
 
                     BlockEntity be = world.getBlockEntity(pos);
                     if (be instanceof Inventory inv) {
+                        if (reservationSystem.isReservedByOthers(pos, this.getUuid(), "CHEST")) {
+                            continue;
+                        }
                         double dist = this.squaredDistanceTo(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
                         if (dist < closestDist) {
                             closestDist = dist;
@@ -192,6 +247,9 @@ public class LumberjackNpcEntity extends PathAwareEntity {
      * Chỉ tìm log có độ cao >= chest
      */
     public BlockPos findNearestTree() {
+        if (treeSearchCooldown > 0) {
+            return null;
+        }
         if (memory.lastChestPos == null) {
             findNearestChest(); // Tìm chest trước
         }
@@ -213,7 +271,9 @@ public class LumberjackNpcEntity extends PathAwareEntity {
 
                     // Kiểm tra xem có phải log hoặc leaves không
                     if (isTreeBlock(state)) {
-                        if (RESERVED_TREES.contains(pos)) continue;
+                        if (reservationSystem.isReservedByOthers(pos, this.getUuid(), "TREE")) {
+                            continue;
+                        }
 
                         double dist = this.squaredDistanceTo(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
                         if (dist < closestDist) {
@@ -224,7 +284,7 @@ public class LumberjackNpcEntity extends PathAwareEntity {
                 }
             }
         }
-
+        treeSearchCooldown = TREE_SEARCH_COOLDOWN;
         return closestTree;
     }
 
@@ -245,24 +305,12 @@ public class LumberjackNpcEntity extends PathAwareEntity {
         ) || block instanceof LeavesBlock;
     }
 
-    /**
-     * Kiểm tra có gỗ trong inventory không
-     */
-    public boolean hasWood() {
-        for (int i = 0; i < inventory.size(); i++) {
-            if (!inventory.getStack(i).isEmpty()) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     public SimpleInventory getInventory() {
         return inventory;
     }
 
     @Override
     public Text getName() {
-        return Text.literal("Tiều phu");
+        return Text.literal("Tiều phu" + display.displayStr);
     }
 }

@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "RRR",
+    "RBR",
+    "RRR"
+  ],
+  "key": {
+    "R": {
+      "item": "minecraft:red_wool"
+    },
+    "B": {
+      "item": "minecraft:book"
+    }
+  },
+  "result": {
+    "item": "minecraft:written_book",
+    "count": 1,
+    "nbt": "{IsFoodChestMarker:1b,author:\"Npc\",title:\"Food Chest Marker\"}"
+  }
+}

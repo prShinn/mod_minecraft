@@ -1,8 +1,10 @@
 package com.example.entity;
 
 import com.example.ai.FindAndSleepGoal;
+import com.example.ai.GlobalReservationSystem;
 import com.example.ai.WanderForBedGoal;
 import com.example.ai.farmer.*;
+import com.example.ai.foodChest.FindAndEatFoodGoal;
 import com.example.entity.base.NpcDisplayComponent;
 import com.example.entity.base.NpcEquipmentComponent;
 import com.example.entity.base.NpcSleepingComponent;
@@ -36,48 +38,50 @@ public class FarmerNpcEntity extends PathAwareEntity {
             .withSearchRadius(16)
             .withCooldown(120)
             .withWanderDuration(120);
-
+    private final GlobalReservationSystem reservationSystem = GlobalReservationSystem.getInstance();
     private BlockPos currentFarmPos;
     private UUID ownerUUID;
     private UUID followPlayerUUID;
     public final SimpleInventory foodInventory = new SimpleInventory(9);
     public final FarmerMemory memory = new FarmerMemory();
+    private static final int FIND_CHEST_DISTANCE = 16; // 1 second
     // Thay vì static Set
-    private static final Map<World, Set<BlockPos>> RESERVED_BEDS_MAP = new HashMap<>();
 
-    public Set<BlockPos> getReservedBeds() {
-        return RESERVED_BEDS_MAP.computeIfAbsent(this.getWorld(), w -> new HashSet<>());
-    }
+    // ===== COOLDOWN VARIABLES =====
+    private int farmlandSearchCooldown = 0;
+    private static final int FARMLAND_SEARCH_COOLDOWN = 20; // 1 second
 
-    private static final Set<BlockPos> RESERVED_CROPS = new HashSet<>();
-
+    // ===== HELPER METHODS FOR RESERVATION MAPS =====
     public boolean reserveCrop(BlockPos pos) {
-        return RESERVED_CROPS.add(pos);
+        return reservationSystem.tryReserve(pos, this.getUuid(), "CROP");
     }
 
     public void releaseCrop(BlockPos pos) {
-        RESERVED_CROPS.remove(pos);
+        reservationSystem.release(pos, this.getUuid(), "CROP");
     }
 
-    private static final Set<BlockPos> RESERVED_FARMLAND = new HashSet<>();
-
     public boolean reserveFarmland(BlockPos pos) {
-        return RESERVED_FARMLAND.add(pos);
+        return reservationSystem.tryReserve(pos, this.getUuid(), "FARMLAND");
     }
 
     public void releaseFarmland(BlockPos pos) {
-        RESERVED_FARMLAND.remove(pos);
+        reservationSystem.release(pos, this.getUuid(), "FARMLAND");
     }
 
-
-    private static final Set<BlockPos> RESERVED_CHESTS = new HashSet<>();
-
     public boolean reserveChest(BlockPos pos) {
-        return RESERVED_CHESTS.add(pos);
+        return reservationSystem.tryReserve(pos, this.getUuid(), "CHEST");
     }
 
     public void releaseChest(BlockPos pos) {
-        RESERVED_CHESTS.remove(pos);
+        reservationSystem.release(pos, this.getUuid(), "CHEST");
+    }
+
+    public boolean isChestReserved(BlockPos pos) {
+        return reservationSystem.isReservedByOthers(pos, this.getUuid(), "CHEST");
+    }
+
+    private void cleanupAllReservations() {
+        reservationSystem.releaseAll(this.getUuid());
     }
 
     public FarmerNpcEntity(EntityType<? extends PathAwareEntity> entityType, World world) {
@@ -95,6 +99,16 @@ public class FarmerNpcEntity extends PathAwareEntity {
         this.goalSelector.add(1, new EscapeDangerGoal(this, 1.4)); // chay khi bi dame
         // Sử dụng GenericSleepGoal
         this.goalSelector.add(2, new FindAndSleepGoal(this, sleeping));
+        this.goalSelector.add(2, new FindAndEatFoodGoal(
+                this,
+                foodInventory,  // NPC inventory
+                24              // search radius
+        ) {
+            @Override
+            public boolean canStart() {
+                return !sleeping.isSleeping() && super.canStart();
+            }
+        });
         this.goalSelector.add(3, new WanderForBedGoal(this, 1.0, sleeping));
         this.goalSelector.add(4, new HarvestCropGoal(this) {
             @Override
@@ -161,7 +175,9 @@ public class FarmerNpcEntity extends PathAwareEntity {
             // Không drop khi chết
             this.setEquipmentDropChance(EquipmentSlot.MAINHAND, 0.0F);
         }
-
+        if (farmlandSearchCooldown > 0) {
+            farmlandSearchCooldown--;
+        }
     }
 
     @Override
@@ -174,7 +190,6 @@ public class FarmerNpcEntity extends PathAwareEntity {
         } else {
             return ActionResult.FAIL;
         }
-
 
         ActionResult handled = equip.interactMob(this, player, ownerUUID, hand, foodInventory, ModItems.FARMER_TOKEN);
         if (!handled.equals(ActionResult.FAIL)) {
@@ -193,6 +208,9 @@ public class FarmerNpcEntity extends PathAwareEntity {
         if (followPlayerUUID != null) {
             nbt.putUuid("FollowPlayer", followPlayerUUID);
         }
+        if (currentFarmPos != null) {
+            nbt.putLong("CurrentFarmPos", currentFarmPos.asLong());
+        }
         nbt.putBoolean("IsFarmerNpc", true);
     }
 
@@ -204,6 +222,9 @@ public class FarmerNpcEntity extends PathAwareEntity {
         }
         if (nbt.containsUuid("FollowPlayer")) {
             followPlayerUUID = nbt.getUuid("FollowPlayer");
+        }
+        if (nbt.contains("CurrentFarmPos")) {
+            currentFarmPos = BlockPos.fromLong(nbt.getLong("CurrentFarmPos"));
         }
         ItemStack mainHand = this.getEquippedStack(EquipmentSlot.MAINHAND);
         if (mainHand.isEmpty()) {
@@ -229,6 +250,7 @@ public class FarmerNpcEntity extends PathAwareEntity {
     @Override
     public void remove(RemovalReason reason) {
         sleeping.wakeUp(this);
+        cleanupAllReservations();
         super.remove(reason);
     }
 
@@ -272,13 +294,21 @@ public class FarmerNpcEntity extends PathAwareEntity {
 //        return null;
 //    }
     public BlockPos findNearestFarmland() {
+        // ===== COOLDOWN CHECK =====
+        if (farmlandSearchCooldown > 0) {
+            return null; // Skip search nếu đang cooldown
+        }
         World world = getWorld();
+        if (world == null) return null;
+
         BlockPos center = getBlockPos();
         BlockPos nearestMatureCrop = null;
         double nearestCropDist = Double.MAX_VALUE;
         BlockPos nearestEmptyFarmland = null;
         double nearestFarmlandDist = Double.MAX_VALUE;
+
         BlockPos.Mutable mutable = new BlockPos.Mutable();
+
         for (int dx = -24; dx <= 24; dx++) {
             for (int dz = -24; dz <= 24; dz++) {
                 for (int dy = -2; dy <= 2; dy++) {
@@ -288,8 +318,10 @@ public class FarmerNpcEntity extends PathAwareEntity {
                             center.getZ() + dz
                     );
                     if (!world.isChunkLoaded(mutable)) continue;
+
                     BlockState state = world.getBlockState(mutable);
                     if (!(state.getBlock() instanceof FarmlandBlock)) continue;
+
                     BlockPos farmlandPos = mutable.toImmutable();
                     BlockPos cropPos = farmlandPos.up();
                     BlockState cropState = world.getBlockState(cropPos);
@@ -302,9 +334,9 @@ public class FarmerNpcEntity extends PathAwareEntity {
                     // 🌾 Ưu tiên cây chín
                     if (cropState.getBlock() instanceof CropBlock crop
                             && crop.isMature(cropState)) {
-
-                        if (RESERVED_CROPS.contains(cropPos)) continue;
-
+                        if (reservationSystem.isReservedByOthers(cropPos, this.getUuid(), "CROP")) {
+                            continue;
+                        }
                         if (dist < nearestCropDist) {
                             nearestCropDist = dist;
                             nearestMatureCrop = cropPos.toImmutable();
@@ -312,9 +344,9 @@ public class FarmerNpcEntity extends PathAwareEntity {
                     }
                     // 🌱 Farmland trống
                     else if (cropState.isAir()) {
-
-                        if (RESERVED_FARMLAND.contains(farmlandPos)) continue;
-
+                        if (reservationSystem.isReservedByOthers(farmlandPos, this.getUuid(), "FARMLAND")) {
+                            continue;
+                        }
                         if (dist < nearestFarmlandDist) {
                             nearestFarmlandDist = dist;
                             nearestEmptyFarmland = farmlandPos.toImmutable();
@@ -323,6 +355,8 @@ public class FarmerNpcEntity extends PathAwareEntity {
                 }
             }
         }
+        // ===== SET COOLDOWN AFTER SEARCH =====
+        farmlandSearchCooldown = FARMLAND_SEARCH_COOLDOWN;
         // Ưu tiên cây chín
         if (nearestMatureCrop != null) return nearestMatureCrop;
         // Không có cây → trả farmland trống
@@ -434,15 +468,18 @@ public class FarmerNpcEntity extends PathAwareEntity {
     }
 
     /**
-     * Tìm rương gần nhất trong bán kính 12 block
+     * Tìm rương gần nhất trong bán kính FIND_CHEST_DISTANCE block
      */
     public Inventory findNearestChest() {
         BlockPos center = getBlockPos();
         World world = getWorld();
 
-        for (BlockPos pos : BlockPos.iterate(center.add(-12, -2, -12), center.add(12, 2, 12))) {
+        for (BlockPos pos : BlockPos.iterate(center.add(-FIND_CHEST_DISTANCE, -2, -FIND_CHEST_DISTANCE), center.add(FIND_CHEST_DISTANCE, 2, FIND_CHEST_DISTANCE))) {
             BlockEntity be = world.getBlockEntity(pos);
             if (be instanceof Inventory inv) {
+                if (reservationSystem.isReservedByOthers(pos, this.getUuid(), "CHEST")) {
+                    continue;
+                }
                 return inv;
             }
         }
@@ -459,14 +496,4 @@ public class FarmerNpcEntity extends PathAwareEntity {
     public SimpleInventory getInventory() {
         return foodInventory;
     }
-
-    public boolean isChestReserved(BlockPos pos) {
-        return RESERVED_CHESTS.contains(pos);
-    }
-
-    @Override
-    public Text getName() {
-        return Text.literal("Nông dân");
-    }
-
 }

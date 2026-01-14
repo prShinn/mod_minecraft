@@ -1,5 +1,7 @@
 package com.example.entity.base;
 
+import com.example.entity.FarmerNpcEntity;
+import com.example.entity.LumberjackNpcEntity;
 import net.minecraft.entity.mob.PathAwareEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.inventory.SimpleInventory;
@@ -19,6 +21,8 @@ public class NpcDisplayComponent {
     private int cooldown = FOOD_TICK;
 
     private int visibleTicks = 0;
+    public String lastDisplayName = "";
+    public String displayStr = "";
 
     public void tick(PathAwareEntity npc, SimpleInventory inventory) {
         World world = npc.getWorld();
@@ -50,10 +54,24 @@ public class NpcDisplayComponent {
         int hp = Math.round(npc.getHealth());
         int maxHp = Math.round(npc.getMaxHealth());
         int foodCount = getTotalFoodCount(inventory);
+        // Build name text
+        String _nameNpc = "";
+        if(npc instanceof FarmerNpcEntity){
+            _nameNpc = "Nông dân";
+        }else if(npc instanceof LumberjackNpcEntity){
+            _nameNpc = "Tiều phu";
+        }
+        displayStr = _nameNpc + " [" + hp + "/" + maxHp + "] 🍖[" + hunger + "/" + MAX_HUNGER + "] x" + foodCount;
 
-        MutableText name = Text.literal(npc.getName().getString()).formatted(Formatting.WHITE).append(Text.literal(" [" + hp + "/" + maxHp + "] ").formatted(Formatting.GREEN)).append(Text.literal("🍖[" + hunger + "/" + MAX_HUNGER + "] x" + foodCount).formatted(Formatting.GOLD));
-
-        npc.setCustomName(name);
+        MutableText displayName = Text.literal(_nameNpc)
+                .formatted(Formatting.WHITE)
+                .append(Text.literal(" [" + hp + "/" + maxHp + "]")
+                        .formatted(Formatting.GREEN))
+                .append(Text.literal(" 🍖[" + hunger + "/" + MAX_HUNGER + "]")
+                        .formatted(Formatting.GOLD))
+                .append(Text.literal(" x" + foodCount)
+                        .formatted(Formatting.GOLD));
+        npc.setCustomName(displayName);
 
     }
 

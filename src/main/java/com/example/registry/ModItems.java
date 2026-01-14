@@ -13,6 +13,7 @@ public class ModItems {
     public static Item SOLDIER_TOKEN;
     public static Item FARMER_TOKEN;
     public static Item LUMBERJACK_TOKEN;
+    public static Item MINER_TOKEN;
 
     public static void register() {
         SOLDIER_TOKEN = Registry.register(Registries.ITEM, new Identifier(ExampleMod.MODID, "soldier_token"),

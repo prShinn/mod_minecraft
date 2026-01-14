@@ -5,6 +5,7 @@ import com.example.entity.FarmerNpcEntity;
 import com.example.entity.LumberjackNpcEntity;
 import com.example.entity.SoldierNPCEntity;
 import net.fabricmc.fabric.api.object.builder.v1.entity.FabricEntityTypeBuilder;
+import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.entity.*;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
@@ -15,6 +16,7 @@ public class ModEntities {
     public static EntityType<SoldierNPCEntity> SOLDIER_NPC;
     public static EntityType<FarmerNpcEntity> FARMER_NPC;
     public static EntityType<LumberjackNpcEntity> LUMBERJACK_NPC;
+
 
     public static void register() {
 
