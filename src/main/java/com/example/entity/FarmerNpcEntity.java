@@ -18,10 +18,7 @@ import net.minecraft.entity.mob.PathAwareEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.inventory.Inventory;
 import net.minecraft.inventory.SimpleInventory;
-import net.minecraft.item.ArmorItem;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
+import net.minecraft.item.*;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
@@ -45,7 +42,7 @@ public class FarmerNpcEntity extends PathAwareEntity {
     public final SimpleInventory foodInventory = new SimpleInventory(9);
     public final FarmerMemory memory = new FarmerMemory();
     private static final int FIND_CHEST_DISTANCE = 16; // 1 second
-
+    private Inventory cachedInventory;
 
     // Thay vì static Set
 
@@ -384,7 +381,12 @@ public class FarmerNpcEntity extends PathAwareEntity {
                 return true;
             }
         }
-        Inventory chest = findNearestChest();
+        Inventory chest;
+        if (cachedInventory != null) {
+            chest = cachedInventory;
+        } else {
+            chest = findNearestChest();
+        }
         if (chest == null) return false;
 
         for (int i = 0; i < chest.size(); i++) {
@@ -409,7 +411,12 @@ public class FarmerNpcEntity extends PathAwareEntity {
         }
 
 
-        Inventory chest = findNearestChest();
+        Inventory chest;
+        if (cachedInventory != null) {
+            chest = cachedInventory;
+        } else {
+            chest = findNearestChest();
+        }
         if (chest == null) return ItemStack.EMPTY;
 
         for (int i = 0; i < chest.size(); i++) {
@@ -449,7 +456,15 @@ public class FarmerNpcEntity extends PathAwareEntity {
             foodInventory.addStack(seed);
             return;
         }
-
+        // Tự động tìm Block liên kết với Item (áp dụng cho hầu hết các loại hạt giống)
+        if (seed.getItem() instanceof BlockItem blockItem) {
+            BlockState state = blockItem.getBlock().getDefaultState();
+            // Kiểm tra xem block đó có trồng được trên farmland không (ví dụ CropBlock)
+            if (state.getBlock() instanceof CropBlock || state.getBlock() instanceof StemBlock) {
+                getWorld().setBlockState(cropPos, state);
+                return;
+            }
+        }
         // Trồng dựa vào loại hạt giống
         if (seed.getItem() == Items.WHEAT_SEEDS) {
             world.setBlockState(cropPos, net.minecraft.block.Blocks.WHEAT.getDefaultState());
@@ -474,7 +489,12 @@ public class FarmerNpcEntity extends PathAwareEntity {
         if (hasSeeds()) return true;
 
         // Check rương gần
-        Inventory chest = findNearestChest();
+        Inventory chest;
+        if (cachedInventory != null) {
+            chest = cachedInventory;
+        } else {
+            chest = findNearestChest();
+        }
         return chest != null && hasSpaceInInventory(chest);
     }
 
@@ -492,9 +512,11 @@ public class FarmerNpcEntity extends PathAwareEntity {
                 if (reservationSystem.isReservedByOthers(pos, this.getUuid(), "CHEST")) {
                     continue;
                 }
+                cachedInventory = inv;
                 return inv;
             }
         }
+        cachedInventory = null;
         return null;
     }
 

@@ -20,7 +20,7 @@ public class SoldierNPCEquipmentScreen extends Screen {
     private ModeNpc.ModeMove currentMode;
 
     public SoldierNPCEquipmentScreen(SoldierNPCEntity npc) {
-        super(Text.literal("Đệ tử" + npc.getUuid().toString()));
+        super(Text.literal("Binh lính" + npc.getUuid().toString()));
         this.npc = npc;
     }
 
@@ -42,7 +42,7 @@ public class SoldierNPCEquipmentScreen extends Screen {
                 getModeText(),
                 b -> {
                     sendMoveMode();
-//                    this.close(); // đóng luôn
+                    this.close(); // đóng luôn
                 }
         ).dimensions(x, y, 200, 20).build();
 

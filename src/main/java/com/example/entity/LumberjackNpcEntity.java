@@ -23,6 +23,7 @@ import net.minecraft.item.ArmorItem;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.nbt.NbtCompound;
+import net.minecraft.registry.tag.BlockTags;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
@@ -49,8 +50,6 @@ public class LumberjackNpcEntity extends PathAwareEntity {
     private int treeSearchCooldown = 0;
     private static final int TREE_SEARCH_COOLDOWN = 20; // 1 second (20 ticks)
 
-
-    private static final Set<BlockPos> RESERVED_CHESTS = new HashSet<>();
 
     public boolean reserveTree(BlockPos pos) {
         return reservationSystem.tryReserve(pos, this.getUuid(), "TREE");
@@ -269,7 +268,7 @@ public class LumberjackNpcEntity extends PathAwareEntity {
 
         for (int dx = -FIND_TREE_DISTANCE; dx <= FIND_TREE_DISTANCE; dx++) {
             for (int dz = -FIND_TREE_DISTANCE; dz <= FIND_TREE_DISTANCE; dz++) {
-                for (int dy = 0; dy <= 40; dy++) { // Tìm từ độ cao chest đến 40 block
+                for (int dy = 0; dy <= 7; dy++) {
                     BlockPos pos = chestPos.add(dx, dy, dz);
                     if (!world.isChunkLoaded(pos)) continue;
 
@@ -299,7 +298,7 @@ public class LumberjackNpcEntity extends PathAwareEntity {
      */
     private boolean isTreeBlock(BlockState state) {
         Block block = state.getBlock();
-        return block instanceof PillarBlock && (
+        return state.isIn(BlockTags.LOGS) || state.isIn(BlockTags.LEAVES) || (block instanceof PillarBlock && (
                 block == Blocks.OAK_LOG ||
                         block == Blocks.SPRUCE_LOG ||
                         block == Blocks.BIRCH_LOG ||
@@ -308,15 +307,11 @@ public class LumberjackNpcEntity extends PathAwareEntity {
                         block == Blocks.DARK_OAK_LOG ||
                         block == Blocks.MANGROVE_LOG ||
                         block == Blocks.CHERRY_LOG
-        ) || block instanceof LeavesBlock;
+        ) || block instanceof LeavesBlock);
     }
 
     public SimpleInventory getInventory() {
         return inventory;
     }
 
-    @Override
-    public Text getName() {
-        return Text.literal("Tiều phu" + display.displayStr);
-    }
 }
