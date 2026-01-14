@@ -1,6 +1,7 @@
 package com.example;
 
 import com.example.entity.FarmerNpcEntity;
+import com.example.entity.LumberjackNpcEntity;
 import com.example.entity.SoldierNPCEntity;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
 import net.minecraft.client.render.entity.BipedEntityRenderer;
@@ -57,6 +58,38 @@ public class ModEntityRenderers {
 
                     @Override
                     public Identifier getTexture(FarmerNpcEntity entity) {
+                        return new Identifier(
+                                "minecraft",
+                                "textures/entity/villager/villager.png"
+                        );
+                    }
+
+                    {
+                        this.addFeature(new ArmorFeatureRenderer<>(
+                                this,
+                                new BipedEntityModel<>(ctx.getPart(
+                                        EntityModelLayers.ZOMBIE_VILLAGER_INNER_ARMOR)),
+                                new BipedEntityModel<>(ctx.getPart(
+                                        EntityModelLayers.ZOMBIE_VILLAGER_OUTER_ARMOR)),
+                                ctx.getModelManager()
+                        ));
+                    }
+                }
+        );
+
+        EntityRendererRegistry.register(
+                ModEntities.LUMBERJACK_NPC,
+                ctx -> new BipedEntityRenderer<
+                        LumberjackNpcEntity,
+                        BipedEntityModel<LumberjackNpcEntity>
+                        >(
+                        ctx,
+                        new BipedEntityModel<>(ctx.getPart(EntityModelLayers.ZOMBIE_VILLAGER)),
+                        0.5f
+                ) {
+
+                    @Override
+                    public Identifier getTexture(LumberjackNpcEntity entity) {
                         return new Identifier(
                                 "minecraft",
                                 "textures/entity/villager/villager.png"

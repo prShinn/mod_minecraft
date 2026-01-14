@@ -1,5 +1,7 @@
-package com.example.ai;
+package com.example.ai.soldier;
 
+import com.example.entity.FarmerNpcEntity;
+import com.example.entity.LumberjackNpcEntity;
 import com.example.entity.SoldierNPCEntity;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.Enchantments;
@@ -111,6 +113,10 @@ public class HealAllyGoal extends Goal {
 
         if (target instanceof SoldierNPCEntity soldier) {
             soldier.requestHeal(healAmount);
+        } else if (target instanceof FarmerNpcEntity farmer) {
+            farmer.display.requestHeal(healAmount);
+        } else if (target instanceof LumberjackNpcEntity lumberjack) {
+            lumberjack.display.requestHeal(healAmount);
         } else {
             target.heal(healAmount);
         }
@@ -126,6 +132,7 @@ public class HealAllyGoal extends Goal {
                 1.6F   // pitch cao → cảm giác heal
         );
     }
+
     private float getFinalHealAmount() {
         ItemStack stack = medic.getMainHandStack();
         if (!(stack.getItem() instanceof AxeItem axe)) return 0f;
@@ -157,6 +164,7 @@ public class HealAllyGoal extends Goal {
 
         return bonus;
     }
+
     private float getCooldownReduction() {
         ItemStack stack = medic.getMainHandStack();
         int efficiency = EnchantmentHelper.getLevel(Enchantments.EFFICIENCY, stack);

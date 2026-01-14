@@ -1,49 +1,40 @@
-package com.example.ai.farmer;
+package com.example.ai.lumberjack;
 
-import com.example.entity.FarmerNpcEntity;
+import com.example.entity.LumberjackNpcEntity;
+import net.minecraft.block.BlockState;
 import net.minecraft.block.ChestBlock;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.block.entity.ChestBlockEntity;
 import net.minecraft.entity.ai.goal.Goal;
 import net.minecraft.inventory.Inventory;
+import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 
 import java.util.EnumSet;
-import net.minecraft.block.BlockState;
 
-public class DepositToChestGoal extends Goal {
-
-    private final FarmerNpcEntity npc;
+public class DepositWoodToChestGoal extends Goal {
+    private final LumberjackNpcEntity npc;
     private BlockPos chestPos;
     private int taskTicks = 0;
     private static final int MAX_TASK_TICKS = 60;
-    private static final int SEARCH_RADIUS = 18;
+    private static final int SEARCH_RADIUS = 7;
 
-    public DepositToChestGoal(FarmerNpcEntity npc) {
+    public DepositWoodToChestGoal(LumberjackNpcEntity npc) {
         this.npc = npc;
         this.setControls(EnumSet.of(Control.MOVE));
-
     }
     private boolean hasItems() {
-        for (int i = 0; i < npc.foodInventory.size(); i++) {
-            if (!npc.foodInventory.getStack(i).isEmpty()) return true;
+        for (int i = 0; i < npc.inventory.size(); i++) {
+            if (!npc.inventory.getStack(i).isEmpty()) return true;
         }
         return false;
     }
+
     @Override
     public boolean canStart() {
-        if (npc.sleeping.isSleeping()) return false;
-// Check xem inventory có item chưa
-//        boolean hasItems = false;
-//        for (int i = 0; i < npc.foodInventory.size(); i++) {
-//            if (!npc.foodInventory.getStack(i).isEmpty()) {
-//                hasItems = true;
-//                break;
-//            }
-//        }
         if (!hasItems()) return false;
 
         chestPos = findNearestChest();
@@ -57,33 +48,30 @@ public class DepositToChestGoal extends Goal {
                 chestPos.getX() + 0.5,
                 chestPos.getY(),
                 chestPos.getZ() + 0.5,
-                1.3);
+                1.3
+        );
         npc.reserveChest(chestPos);
     }
 
     @Override
     public void tick() {
         taskTicks++;
+
         if (taskTicks > MAX_TASK_TICKS || !npc.getWorld().isChunkLoaded(chestPos)) {
             stop();
             return;
         }
-        // Nếu đến gần rương thì cất items
+
         if (npc.squaredDistanceTo(Vec3d.ofCenter(chestPos)) < 2.5) {
             depositItems();
             stop();
         }
     }
 
-    //    @Override
-//    public boolean shouldContinue() {
-//        return chestPos != null && npc.getNavigation().isFollowingPath() && hasItems();
-//    }
     @Override
     public boolean shouldContinue() {
         return chestPos != null && taskTicks < MAX_TASK_TICKS;
     }
-
 
     @Override
     public void stop() {
@@ -94,9 +82,6 @@ public class DepositToChestGoal extends Goal {
         chestPos = null;
         taskTicks = 0;
     }
-
-
-
     private void depositItems() {
         BlockEntity be = npc.getWorld().getBlockEntity(chestPos);
         Inventory chestInv = null;
@@ -116,51 +101,46 @@ public class DepositToChestGoal extends Goal {
         }
 
         if (chestInv == null) {
-            // Nếu không phải chest, check xem có phải Inventory không
             if (be instanceof Inventory) {
                 chestInv = (Inventory) be;
             } else {
-                return; // Không phải chest hoặc inventory
+                return;
             }
         }
 
+        // Transfer items từ NPC vào chest
+        for (int i = 0; i < npc.inventory.size(); i++) {
+            ItemStack npcStack = npc.inventory.getStack(i);
+            if (npcStack.isEmpty() || !isTreeItem(npcStack)) continue;
 
-        // Transfer tất cả items từ NPC inventory vào rương
-        for (int i = 0; i < npc.foodInventory.size(); i++) {
-            ItemStack npcStack = npc.foodInventory.getStack(i);
-            if (npcStack.isEmpty() || isMeat(npcStack)) continue;
-
-            // Tìm slot trống trong rương
             for (int j = 0; j < chestInv.size(); j++) {
                 ItemStack chestStack = chestInv.getStack(j);
 
                 if (chestStack.isEmpty()) {
-                    // Slot trống, cất vào
                     chestInv.setStack(j, npcStack.copy());
-                    npc.foodInventory.setStack(i, ItemStack.EMPTY);
+                    npc.inventory.setStack(i, ItemStack.EMPTY);
                     break;
                 } else if (ItemStack.canCombine(chestStack, npcStack) &&
                         chestStack.getCount() < chestStack.getMaxCount()) {
-                    // Cùng item, add vào stack hiện tại
                     int canAdd = chestStack.getMaxCount() - chestStack.getCount();
                     int toAdd = Math.min(canAdd, npcStack.getCount());
                     chestStack.increment(toAdd);
                     npcStack.decrement(toAdd);
 
                     if (npcStack.isEmpty()) {
-                        npc.foodInventory.setStack(i, ItemStack.EMPTY);
+                        npc.inventory.setStack(i, ItemStack.EMPTY);
                         break;
                     }
                 }
             }
 
-            // Nếu rương đầy, cập nhật lại stack
             if (!npcStack.isEmpty()) {
-                npc.foodInventory.setStack(i, npcStack);
+                npc.inventory.setStack(i, npcStack);
             }
         }
 
         npc.memory.lastChestPos = chestPos;
+        npc.memory.resetIdle();
     }
 
     private BlockPos findNearestChest() {
@@ -177,9 +157,7 @@ public class DepositToChestGoal extends Goal {
 
                     BlockEntity be = world.getBlockEntity(pos);
 
-                    // Check xem có phải chest và chưa bị reserve
                     if (be instanceof ChestBlockEntity || be instanceof net.minecraft.block.entity.BarrelBlockEntity) {
-                        // Check chest chưa bị reserve
                         if (npc.isChestReserved(pos)) continue;
 
                         double dist = npc.squaredDistanceTo(Vec3d.ofCenter(pos));
@@ -193,10 +171,14 @@ public class DepositToChestGoal extends Goal {
         }
         return closestChest;
     }
-    private boolean isMeat(ItemStack stack) {
-        return stack.isFood()
-                && stack.getItem().getFoodComponent() != null
-                && stack.getItem().getFoodComponent().isMeat();
+    private boolean isTreeItem(ItemStack stack) {
+        Item item = stack.getItem();
+
+        return item instanceof net.minecraft.item.BlockItem blockItem &&
+                (blockItem.getBlock() instanceof net.minecraft.block.PillarBlock ||   // log, wood
+                        blockItem.getBlock() instanceof net.minecraft.block.LeavesBlock ||   // leaves
+                        blockItem.getBlock() instanceof net.minecraft.block.SaplingBlock)    // sapling
+                || item == net.minecraft.item.Items.APPLE;
     }
 
 }

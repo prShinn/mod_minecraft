@@ -1,8 +1,8 @@
 //package com.example.entity;
 //
-//import com.example.ai.FollowOwnerLikeGoal;
-//import com.example.ai.HealAllyGoal;
-//import com.example.ai.SoldierBowGoal;
+//import com.example.ai.soldỉier.FollowOwnerLikeGoal;
+//import com.example.ai.soldỉier.HealAllyGoal;
+//import com.example.ai.soldỉier.SoldierBowGoal;
 //import net.minecraft.entity.Entity;
 //import net.minecraft.entity.EntityType;
 //import net.minecraft.entity.EquipmentSlot;

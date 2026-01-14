@@ -1,7 +1,7 @@
-package com.example.ai.farmer;
+package com.example.ai;
 
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
+
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
