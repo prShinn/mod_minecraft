@@ -67,15 +67,15 @@ public class FarmerNpcEntity extends PathAwareEntity {
     }
 
     public boolean reserveChest(BlockPos pos) {
-        return reservationSystem.tryReserve(pos, this.getUuid(), "CHEST");
+        return reservationSystem.tryReserve(pos, this.getUuid(), "WORK_CHEST");
     }
 
     public void releaseChest(BlockPos pos) {
-        reservationSystem.release(pos, this.getUuid(), "CHEST");
+        reservationSystem.release(pos, this.getUuid(), "WORK_CHEST");
     }
 
     public boolean isChestReserved(BlockPos pos) {
-        return reservationSystem.isReservedByOthers(pos, this.getUuid(), "CHEST");
+        return reservationSystem.isReservedByOthers(pos, this.getUuid(), "WORK_CHEST");
     }
 
     private void cleanupAllReservations() {
@@ -109,7 +109,7 @@ public class FarmerNpcEntity extends PathAwareEntity {
         ) {
             @Override
             public boolean canStart() {
-                return !sleeping.isSleeping() && super.canStart();
+                return display.findFood() && !sleeping.isSleeping() && super.canStart();
             }
         });
         this.goalSelector.add(3, new WanderForBedGoal(this, 1.0, sleeping));
@@ -505,7 +505,7 @@ public class FarmerNpcEntity extends PathAwareEntity {
             if (!world.isChunkLoaded(pos)) continue;
             BlockEntity be = world.getBlockEntity(pos);
             if (be instanceof Inventory inv) {
-                if (reservationSystem.isReservedByOthers(pos, this.getUuid(), "CHEST")) {
+                if (reservationSystem.isReservedByOthers(pos, this.getUuid(), "WORK_CHEST")) {
                     continue;
                 }
                 cachedInventory = inv;

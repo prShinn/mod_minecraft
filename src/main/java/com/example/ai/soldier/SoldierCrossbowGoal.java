@@ -178,7 +178,7 @@ public class SoldierCrossbowGoal extends Goal {
 
         // Tính toán vector
         double dx = target.getX() - npc.getX();
-        double dy = target.getBodyY(0.155D) - arrow.getY();
+        double dy = target.getBodyY(0.123D) - arrow.getY();
         double dz = target.getZ() - npc.getZ();
         double distance = Math.sqrt(dx * dx + dz * dz);
         float inaccuracy = calculateInaccuracy(distance);

@@ -44,11 +44,13 @@ public class LumberjackNpcEntity extends PathAwareEntity {
     private UUID ownerUUID;
     public final SimpleInventory inventory = new SimpleInventory(9);
     public final LumberjackMemory memory = new LumberjackMemory();
-    public final static int FIND_CHEST_DISTANCE = 16;
+    public final static int FIND_CHEST_DISTANCE = 20;
     public final static int FIND_TREE_DISTANCE = 7;
     private final GlobalReservationSystem reservationSystem = GlobalReservationSystem.getInstance();
     private int treeSearchCooldown = 0;
-    private static final int TREE_SEARCH_COOLDOWN = 20; // 1 second (20 ticks)
+    private int chestSearchCooldown = 0;
+    private static final int TREE_SEARCH_COOLDOWN = 100; // 5 second (20 ticks)
+    private static final int CHEST_SEARCH_COOLDOWN = 100; // 5 second (20 ticks)
 
 
     public boolean reserveTree(BlockPos pos) {
@@ -60,15 +62,15 @@ public class LumberjackNpcEntity extends PathAwareEntity {
     }
 
     public boolean reserveChest(BlockPos pos) {
-        return reservationSystem.tryReserve(pos, this.getUuid(), "CHEST");
+        return reservationSystem.tryReserve(pos, this.getUuid(), "WORK_CHEST");
     }
 
     public void releaseChest(BlockPos pos) {
-        reservationSystem.release(pos, this.getUuid(), "CHEST");
+        reservationSystem.release(pos, this.getUuid(), "WORK_CHEST");
     }
 
     public boolean isChestReserved(BlockPos pos) {
-        return reservationSystem.isReservedByOthers(pos, this.getUuid(), "CHEST");
+        return reservationSystem.isReservedByOthers(pos, this.getUuid(), "WORK_CHEST");
     }
 
     private void cleanupAllReservations() {
@@ -95,7 +97,7 @@ public class LumberjackNpcEntity extends PathAwareEntity {
         ) {
             @Override
             public boolean canStart() {
-                return !sleeping.isSleeping() && super.canStart();
+                return display.findFood() && !sleeping.isSleeping() && super.canStart();
             }
         });
 
@@ -150,8 +152,8 @@ public class LumberjackNpcEntity extends PathAwareEntity {
             memory.tickIdle();
         }
 
-        if (treeSearchCooldown > 0) {
-            treeSearchCooldown--;
+        if (chestSearchCooldown > 0) {
+            chestSearchCooldown--;
         }
     }
 
@@ -212,6 +214,11 @@ public class LumberjackNpcEntity extends PathAwareEntity {
     }
 
     public Inventory findNearestChest() {
+        if (chestSearchCooldown > 0) {
+            memory.lastChestPos = null;
+            return null;
+        }
+        chestSearchCooldown--;
         BlockPos center = getBlockPos();
         World world = getWorld();
         double closestDist = Double.MAX_VALUE;
@@ -225,7 +232,7 @@ public class LumberjackNpcEntity extends PathAwareEntity {
 
                     BlockEntity be = world.getBlockEntity(pos);
                     if (be instanceof Inventory inv) {
-                        if (reservationSystem.isReservedByOthers(pos, this.getUuid(), "CHEST")) {
+                        if (reservationSystem.isReservedByOthers(pos, this.getUuid(), "WORK_CHEST")) {
                             continue;
                         }
                         double dist = this.squaredDistanceTo(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
@@ -246,13 +253,15 @@ public class LumberjackNpcEntity extends PathAwareEntity {
      * Chỉ tìm log có độ cao >= chest
      */
     public BlockPos findNearestTree() {
-        if (treeSearchCooldown > 0) {
-            return null;
-        }
         if (memory.lastChestPos == null) {
             findNearestChest(); // Tìm chest trước
         }
+        treeSearchCooldown--;
+        if (treeSearchCooldown > 0) {
+            return null;
+        }
 
+        chestSearchCooldown = CHEST_SEARCH_COOLDOWN;
         if (memory.lastChestPos == null) return null;
 
         BlockPos chestPos = memory.lastChestPos;

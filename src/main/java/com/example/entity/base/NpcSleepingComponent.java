@@ -296,4 +296,8 @@ public class NpcSleepingComponent {
         );
         return occupants.isEmpty();
     }
+
+    public boolean shouldWander() {
+        return shouldWander;
+    }
 }

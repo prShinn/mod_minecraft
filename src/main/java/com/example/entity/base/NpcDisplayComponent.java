@@ -20,7 +20,7 @@ public class NpcDisplayComponent {
 
     private int hunger = MAX_HUNGER;
     private int foodTickCooldown = 0;
-    private int eatCooldown = 0;
+    public int eatCooldown = 0;
 
     // ===== HEALING =====
     private float pendingHeal = 0.0F;
@@ -29,6 +29,10 @@ public class NpcDisplayComponent {
     private int visibleTicks = 0;
     public String lastDisplayName = "";
     public String displayStr = "";
+
+    public boolean findFood() {
+        return hunger < MAX_HUNGER * 0.5f;
+    }
 
     public void tick(PathAwareEntity npc, SimpleInventory inventory) {
         World world = npc.getWorld();
@@ -80,7 +84,7 @@ public class NpcDisplayComponent {
         healTickCooldown = 30;   // 1.5 giây
     }
 
-    private void handleFoodSystem(PathAwareEntity npc, SimpleInventory inventory) {
+    public void handleFoodSystem(PathAwareEntity npc, SimpleInventory inventory) {
         // Decrease hunger over time
         if (foodTickCooldown > 0) {
             foodTickCooldown--;
@@ -135,6 +139,7 @@ public class NpcDisplayComponent {
     }
 
     public int getTotalFoodCount(SimpleInventory foodInventory) {
+        if (foodInventory == null) return 0;
         int total = 0;
         for (int i = 0; i < foodInventory.size(); i++) {
             ItemStack stack = foodInventory.getStack(i);
@@ -147,10 +152,10 @@ public class NpcDisplayComponent {
 
     private boolean shouldEat() {
         // Chỉ ăn khi food thấp hơn 50%
-        return eatCooldown <= 0 && hunger <= MAX_HUNGER * 0.5f;
+        return eatCooldown <= 0 && findFood();
     }
 
-    private void npcEatFood(PathAwareEntity npc, SimpleInventory foodInventory) {
+    public void npcEatFood(PathAwareEntity npc, SimpleInventory foodInventory) {
         if (npc.getWorld().isClient) return; // Chỉ server xử lý
         for (int i = 0; i < foodInventory.size(); i++) {
             ItemStack stack = foodInventory.getStack(i);

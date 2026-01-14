@@ -186,7 +186,7 @@ public class SoldierBowGoal extends Goal {
             arrow.setPierceLevel((byte) piercingLevel);
         }
         double dx = target.getX() - npc.getX();
-        double dy = target.getBodyY(0.155D) - arrow.getY();
+        double dy = target.getBodyY(0.123D) - arrow.getY();
         double dz = target.getZ() - npc.getZ();
         double distance = Math.sqrt(dx * dx + dz * dz) * 0.2F;
         float inaccuracy = calculateInaccuracy(distance);

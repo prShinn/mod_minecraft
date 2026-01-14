@@ -62,7 +62,7 @@ public class DepositWoodToChestGoal extends Goal {
             return;
         }
 
-        if (npc.squaredDistanceTo(Vec3d.ofCenter(chestPos)) < 2.5) {
+        if (npc.squaredDistanceTo(Vec3d.ofCenter(chestPos)) < 3) {
             depositItems();
             stop();
         }

@@ -1,6 +1,9 @@
 package com.example.ai.foodChest;
 
 
+import com.example.entity.FarmerNpcEntity;
+import com.example.entity.LumberjackNpcEntity;
+import com.example.entity.base.NpcDisplayComponent;
 import com.example.helper.FoodChestHelper;
 import net.minecraft.entity.ai.goal.Goal;
 import net.minecraft.entity.mob.PathAwareEntity;
@@ -20,7 +23,7 @@ public class FindAndEatFoodGoal extends Goal {
     private int searchCooldown = 0;
     private int actionCooldown = 0;
     private static final int SEARCH_COOLDOWN = 100; // Search mỗi 5 giây nếu không có cache
-    private static final int FOOD_THRESHOLD = 2; // Npc sẽ lấy food cho đến khi có này
+    private static final int FOOD_THRESHOLD = 1; // Npc sẽ lấy food cho đến khi có này
 
     private final FoodChestCacheManager cacheManager = new FoodChestCacheManager();
 
@@ -82,7 +85,7 @@ public class FindAndEatFoodGoal extends Goal {
             actionCooldown--;
             return;
         }
-        actionCooldown = SEARCH_COOLDOWN;
+
         double dist = npc.squaredDistanceTo(
                 targetFoodChest.getX() + 0.5,
                 targetFoodChest.getY() + 0.5,
@@ -94,7 +97,11 @@ public class FindAndEatFoodGoal extends Goal {
             return;
         }
 
-        if (dist < 1.5) {
+        if (dist < 3) {
+            if (!FoodChestHelper.hasFood(targetFoodChest, world)) {
+                targetFoodChest = null;
+                return;
+            }
             if (!FoodChestHelper.isValidFoodChest(targetFoodChest, world)) {
                 cacheManager.invalidateCache();
                 targetFoodChest = null;
@@ -104,10 +111,15 @@ public class FindAndEatFoodGoal extends Goal {
             ItemStack food = FoodChestHelper.takeFood(targetFoodChest, world);
             if (!food.isEmpty() && npcInventory != null) {
                 npcInventory.addStack(food);
-
+                if (npc instanceof FarmerNpcEntity farmer) {
+                    farmer.display.npcEatFood(npc, npcInventory);
+                } else if (npc instanceof LumberjackNpcEntity lumberjack) {
+                    lumberjack.display.npcEatFood(npc, npcInventory);
+                }
                 if (hasEnoughFood()) {
                     targetFoodChest = null;
                 }
+                actionCooldown = SEARCH_COOLDOWN;
             } else {
                 targetFoodChest = null;
             }
@@ -116,13 +128,10 @@ public class FindAndEatFoodGoal extends Goal {
 
     @Override
     public boolean shouldContinue() {
-        if (hasEnoughFood()) {
-            return false;
-        }
-
         if (targetFoodChest == null) {
             return false;
         }
+
         if (!FoodChestHelper.isValidFoodChest(targetFoodChest, npc.getWorld())) {
             return false;
         }
@@ -138,6 +147,7 @@ public class FindAndEatFoodGoal extends Goal {
     @Override
     public void stop() {
         npc.getNavigation().stop();
+        targetFoodChest = null;
     }
 
     private boolean hasEnoughFood() {

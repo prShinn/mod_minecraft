@@ -21,7 +21,7 @@ public class PlantSaplingGoal extends Goal {
     private int taskTicks = 0;
     private static final int MAX_TASK_TICKS = 80;
     private static final double PLANT_DIST_SQ = 2.25;
-    private static final int PLANT_DISTANCE = 7;
+    private static final int PLANT_DISTANCE = 2;
     private int searchCooldown = 0;
     public PlantSaplingGoal(LumberjackNpcEntity npc) {
         this.npc = npc;

@@ -40,7 +40,7 @@ public class GlobalReservationSystem {
     }
 
     private enum ReservationType {
-        CHEST, CROP, FARMLAND, BED
+        FOOD_CHEST, WORK_CHEST, CROP, FARMLAND, BED, TREE
     }
 
     // ========== PUBLIC API ==========
