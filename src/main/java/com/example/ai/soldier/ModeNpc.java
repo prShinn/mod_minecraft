@@ -1,4 +1,4 @@
-package com.example.ai;
+package com.example.ai.soldier;
 
 public class ModeNpc {
     public enum ModeMove {
