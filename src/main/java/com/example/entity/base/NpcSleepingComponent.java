@@ -26,19 +26,10 @@ public class NpcSleepingComponent {
     private int findBedCooldown = 120;
     private int wanderDuration = 100;
     private static final Map<World, Set<BlockPos>> RESERVED_BEDS_MAP = new HashMap<>();
+
     public static Set<BlockPos> getReservedBeds(World world) {
         synchronized (RESERVED_BEDS_MAP) {
             return RESERVED_BEDS_MAP.computeIfAbsent(world, w -> new HashSet<>());
-        }
-    }
-    public static void clearReservationsForWorld(World world) {
-        synchronized (RESERVED_BEDS_MAP) {
-            RESERVED_BEDS_MAP.remove(world);
-        }
-    }
-    public static void clearAllReservations() {
-        synchronized (RESERVED_BEDS_MAP) {
-            RESERVED_BEDS_MAP.clear();
         }
     }
 
@@ -50,9 +41,7 @@ public class NpcSleepingComponent {
     public BlockPos getTargetBed() {
         return targetBed;
     }
-    public boolean shouldWander() {
-        return shouldWander;
-    }
+
     public NpcSleepingComponent withSearchRadius(int radius) {
         this.searchRadius = radius;
         return this;
@@ -62,6 +51,7 @@ public class NpcSleepingComponent {
         this.findBedCooldown = cooldown;
         return this;
     }
+
     public NpcSleepingComponent withWanderDuration(int duration) {
         this.wanderDuration = duration;
         return this;
@@ -82,17 +72,14 @@ public class NpcSleepingComponent {
 
         return true;
     }
-    /**
-     * Tìm và reserve giường gần nhất
-     * @return BlockPos của giường hoặc null
-     */
+
+
     public BlockPos findAndReserveBed(PathAwareEntity npc) {
         Set<BlockPos> reservedBeds = getReservedBeds(npc.getWorld());
 
         shouldWander = false;
         wanderTime = 0;
 
-        // Case 1: Cache hợp lệ
         if (cachedBedPos != null && isBedValid(npc, cachedBedPos) && isBedFree(npc, cachedBedPos, reservedBeds)) {
             synchronized (reservedBeds) {
                 if (!reservedBeds.contains(cachedBedPos)) {
@@ -103,7 +90,6 @@ public class NpcSleepingComponent {
             return cachedBedPos;
         }
 
-        // Case 2: Đang cooldown
         if (cooldownFindBed > 0) {
             cooldownFindBed--;
             if (cachedBedPos != null && isBedValid(npc, cachedBedPos) && isBedFree(npc, cachedBedPos, reservedBeds)) {
@@ -119,7 +105,6 @@ public class NpcSleepingComponent {
             return null;
         }
 
-        // Case 3: Scan giường mới
         BlockPos found = scanForNewBed(npc, reservedBeds);
 
         if (found == null) {
@@ -128,6 +113,7 @@ public class NpcSleepingComponent {
 
         return found;
     }
+
     public boolean startMovingToBed(PathAwareEntity npc) {
         if (targetBed == null) return false;
 
@@ -142,29 +128,23 @@ public class NpcSleepingComponent {
         );
     }
 
-
-
-    /**
-     * Tick khi đang di chuyển đến giường
-     */
     public void tickMovingToBed(PathAwareEntity npc) {
         if (sleeping || targetBed == null) return;
 
         Set<BlockPos> reservedBeds = getReservedBeds(npc.getWorld());
 
-        // Giường bị phá hoặc chiếm mất
-        if (!isBedValid(npc, targetBed) || !isBedFree(npc, targetBed, reservedBeds)) {
+        if (npc.getNavigation().isIdle() || !isBedValid(npc, targetBed) || !isBedFree(npc, targetBed, reservedBeds)) {
             cancelMovingToBed(npc);
             startWandering();
             return;
         }
 
-        // Đã đến gần giường
         if (npc.squaredDistanceTo(Vec3d.ofCenter(targetBed)) < 1.4) {
             startSleeping(npc, targetBed);
         }
 
     }
+
     public void tickWandering() {
         if (!shouldWander) return;
 
@@ -174,9 +154,7 @@ public class NpcSleepingComponent {
             shouldWander = false;
         }
     }
-    /**
-     * Bắt đầu ngủ tại giường
-     */
+
     public void startSleeping(PathAwareEntity npc, BlockPos bed) {
         Set<BlockPos> reservedBeds = getReservedBeds(npc.getWorld());
 
@@ -203,10 +181,6 @@ public class NpcSleepingComponent {
         );
     }
 
-
-    /**
-     * Hủy di chuyển đến giường
-     */
     public void cancelMovingToBed(PathAwareEntity npc) {
         if (targetBed != null && !sleeping) {
             Set<BlockPos> reservedBeds = getReservedBeds(npc.getWorld());
@@ -236,18 +210,17 @@ public class NpcSleepingComponent {
             wakeUp(npc);
         }
     }
+
     private void startWandering() {
         shouldWander = true;
         wanderTime = wanderDuration;
         cooldownFindBed = findBedCooldown;
     }
-    /**
-     * Thức dậy
-     */
+
     public void wakeUp(PathAwareEntity npc) {
         sleeping = false;
         npc.setPose(EntityPose.STANDING);
-
+        cachedBedPos = null;
         if (bedPos != null) {
             Set<BlockPos> reservedBeds = getReservedBeds(npc.getWorld());
             synchronized (reservedBeds) {
@@ -259,11 +232,6 @@ public class NpcSleepingComponent {
         shouldWander = false;
         wanderTime = 0;
     }
-
-
-    // ===================================
-    // PRIVATE HELPERS
-    // ===================================
 
     private BlockPos scanForNewBed(PathAwareEntity npc, Set<BlockPos> reservedBeds) {
         cooldownFindBed = findBedCooldown;
@@ -285,13 +253,11 @@ public class NpcSleepingComponent {
 
             BlockState state = world.getBlockState(pos);
             if (!(state.getBlock() instanceof BedBlock)) continue;
-
             BlockPos footPos = pos;
             if (state.get(BedBlock.PART) == BedPart.HEAD) {
                 footPos = pos.offset(state.get(BedBlock.FACING).getOpposite());
                 if (!world.isChunkLoaded(footPos)) continue;
             }
-
             if (isBedFree(npc, footPos, reservedBeds)) {
                 if (distSquared < nearestDist) {
                     nearestDist = distSquared;
@@ -299,7 +265,6 @@ public class NpcSleepingComponent {
                 }
             }
         }
-
         if (nearestBed != null) {
             synchronized (reservedBeds) {
                 reservedBeds.add(nearestBed);
@@ -308,7 +273,6 @@ public class NpcSleepingComponent {
             targetBed = nearestBed.toImmutable();
             return nearestBed;
         }
-
         cachedBedPos = null;
         return null;
     }
@@ -320,19 +284,16 @@ public class NpcSleepingComponent {
 
     private boolean isBedFree(PathAwareEntity npc, BlockPos bedPos, Set<BlockPos> reservedBeds) {
         synchronized (reservedBeds) {
-            if (reservedBeds.contains(bedPos)) {
+            if (reservedBeds.contains(bedPos) && !bedPos.equals(targetBed)) {
                 return false;
             }
         }
-
         Box box = new Box(bedPos).expand(0.5);
         List<LivingEntity> occupants = npc.getWorld().getEntitiesByClass(
                 LivingEntity.class,
                 box,
                 e -> e.getPose() == EntityPose.SLEEPING
         );
-
         return occupants.isEmpty();
-
     }
 }
