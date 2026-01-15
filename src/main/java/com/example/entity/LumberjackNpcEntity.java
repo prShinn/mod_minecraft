@@ -50,7 +50,7 @@ public class LumberjackNpcEntity extends PathAwareEntity {
     private int treeSearchCooldown = 0;
     private int chestSearchCooldown = 0;
     private static final int TREE_SEARCH_COOLDOWN = 100; // 5 second (20 ticks)
-    private static final int CHEST_SEARCH_COOLDOWN = 100; // 5 second (20 ticks)
+    private static final int CHEST_SEARCH_COOLDOWN = 20; // 1 second (20 ticks)
 
 
     public boolean reserveTree(BlockPos pos) {
@@ -101,7 +101,7 @@ public class LumberjackNpcEntity extends PathAwareEntity {
             }
         });
 
-        this.goalSelector.add(3, new WanderForBedGoal(this, 1.0, sleeping));
+//        this.goalSelector.add(3, new WanderForBedGoal(this, 1.0, sleeping));
         this.goalSelector.add(4, new ChopTreeGoal(this) {
             @Override
             public boolean canStart() {
@@ -207,18 +207,20 @@ public class LumberjackNpcEntity extends PathAwareEntity {
 
     @Override
     public void remove(RemovalReason reason) {
-        // ✅ Fixed: Added proper cleanup
-        sleeping.wakeUp(this);
-        cleanupAllReservations(); // 🔥 CLEANUP ALL (bed + trees + chests)
+        if (reason == RemovalReason.KILLED
+                || reason == RemovalReason.DISCARDED) {
+            sleeping.wakeUp(this);
+            cleanupAllReservations();
+        }
         super.remove(reason);
     }
 
     public Inventory findNearestChest() {
         if (chestSearchCooldown > 0) {
+            chestSearchCooldown--;
             memory.lastChestPos = null;
             return null;
         }
-        chestSearchCooldown--;
         BlockPos center = getBlockPos();
         World world = getWorld();
         double closestDist = Double.MAX_VALUE;

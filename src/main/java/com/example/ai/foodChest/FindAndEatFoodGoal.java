@@ -17,15 +17,16 @@ import java.util.EnumSet;
 public class FindAndEatFoodGoal extends Goal {
     private final PathAwareEntity npc;
     private final SimpleInventory npcInventory;
-    private final int searchRadius;
+    private int searchRadius;
 
     private BlockPos targetFoodChest = null;
     private int searchCooldown = 0;
-    private int actionCooldown = 0;
+    private int eatCooldown = 0;
     private static final int SEARCH_COOLDOWN = 100; // Search mỗi 5 giây nếu không có cache
-    private static final int FOOD_THRESHOLD = 1; // Npc sẽ lấy food cho đến khi có này
+    // Npc sẽ lấy food cho đến khi có này
+    private static final int EAT_COOLDOWN = 20;
 
-    private final FoodChestCacheManager cacheManager = new FoodChestCacheManager();
+    private static final GlobalFoodChestCache globalCache = GlobalFoodChestCache.getInstance();
 
     public FindAndEatFoodGoal(PathAwareEntity npc, SimpleInventory npcInventory, int searchRadius) {
         this.npc = npc;
@@ -45,26 +46,27 @@ public class FindAndEatFoodGoal extends Goal {
             return false;
         }
 
-        BlockPos cached = cacheManager.getCachedFoodChest(npc);
-        if (cached != null) {
+        BlockPos cached = globalCache.getCachedFoodChest(npc.getWorld());
+        if (cached != null && isChestInRange(cached)) {
             targetFoodChest = cached;
             return true;
         }
         targetFoodChest = findNearestFoodChest();
         if (targetFoodChest != null) {
-            cacheManager.cacheChestPosition(targetFoodChest, npc.getWorld());
+            globalCache.cacheChestPosition(targetFoodChest, npc.getWorld());
             return true;
-        } else {
-            searchCooldown = SEARCH_COOLDOWN;
-            return false;
         }
+
+        searchCooldown = SEARCH_COOLDOWN;
+        return false;
+
     }
 
     @Override
     public void start() {
         if (targetFoodChest == null) return;
 
-        if (npc.getNavigation().isIdle() && targetFoodChest != null || npc.age % 40 == 0) {
+        if (npc.getNavigation().isIdle()) {
             npc.getNavigation().startMovingTo(
                     targetFoodChest.getX() + 0.5,
                     targetFoodChest.getY() + 0.5,
@@ -81,8 +83,8 @@ public class FindAndEatFoodGoal extends Goal {
 
         World world = npc.getWorld();
         if (world == null || world.isClient()) return;
-        if (actionCooldown > 0) {
-            actionCooldown--;
+        if (eatCooldown > 0) {
+            eatCooldown--;
             return;
         }
 
@@ -93,33 +95,46 @@ public class FindAndEatFoodGoal extends Goal {
         );
 
         if (dist > searchRadius * searchRadius) {
+            globalCache.invalidateCache();
             targetFoodChest = null;
             return;
         }
 
         if (dist < 3) {
-            if (!FoodChestHelper.hasFood(targetFoodChest, world)) {
+            if (!FoodChestHelper.isValidFoodChest(targetFoodChest, world)) {
+                globalCache.invalidateCache();
                 targetFoodChest = null;
                 return;
             }
-            if (!FoodChestHelper.isValidFoodChest(targetFoodChest, world)) {
-                cacheManager.invalidateCache();
+            if (!FoodChestHelper.hasFood(targetFoodChest, world)) {
+                globalCache.invalidateCache();
                 targetFoodChest = null;
                 return;
             }
 
+
             ItemStack food = FoodChestHelper.takeFood(targetFoodChest, world);
-            if (!food.isEmpty() && npcInventory != null) {
-                npcInventory.addStack(food);
+            if (!food.isEmpty()) {
+//                npcInventory.addStack(food);
                 if (npc instanceof FarmerNpcEntity farmer) {
-                    farmer.display.npcEatFood(npc, npcInventory);
+                    farmer.display.eat(food);
+//                    farmer.display.npcEatFood(npc, npcInventory);
+                    if (!farmer.display.findFood()) {
+                        targetFoodChest = null;
+                        this.stop();
+                        return;
+                    }
                 } else if (npc instanceof LumberjackNpcEntity lumberjack) {
-                    lumberjack.display.npcEatFood(npc, npcInventory);
+                    lumberjack.display.eat(food);
+//                    lumberjack.display.npcEatFood(npc, npcInventory);
+                    if (!lumberjack.display.findFood()) {
+                        targetFoodChest = null;
+                        this.stop();
+                        return;
+                    }
                 }
-                if (hasEnoughFood()) {
-                    targetFoodChest = null;
-                }
-                actionCooldown = SEARCH_COOLDOWN;
+
+                eatCooldown = EAT_COOLDOWN;
             } else {
                 targetFoodChest = null;
             }
@@ -131,8 +146,11 @@ public class FindAndEatFoodGoal extends Goal {
         if (targetFoodChest == null) {
             return false;
         }
-
+        if (hasEnoughFood()) {
+            return false;
+        }
         if (!FoodChestHelper.isValidFoodChest(targetFoodChest, npc.getWorld())) {
+            globalCache.invalidateCache();
             return false;
         }
         double dist = npc.squaredDistanceTo(
@@ -151,22 +169,25 @@ public class FindAndEatFoodGoal extends Goal {
     }
 
     private boolean hasEnoughFood() {
-        int foodCount = getTotalFoodCount();
-        return foodCount >= FOOD_THRESHOLD;
-    }
-
-    private int getTotalFoodCount() {
-        if (npcInventory == null) return 0;
-        int total = 0;
-        for (int i = 0; i < npcInventory.size(); i++) {
-            ItemStack stack = npcInventory.getStack(i);
-            if (!stack.isEmpty() && stack.isFood()) {
-                total += stack.getCount();
-            }
+        if (npc instanceof FarmerNpcEntity farmer) {
+            return !farmer.display.findFood();  // findFood() = hunger < 50%
+        } else if (npc instanceof LumberjackNpcEntity lumberjack) {
+            return !lumberjack.display.findFood();
         }
-        return total;
+        return false;
     }
-
+    /**
+     * Kiểm tra chest có trong range không
+     */
+    private boolean isChestInRange(BlockPos pos) {
+        if (pos == null) return false;
+        double dist = npc.squaredDistanceTo(
+                pos.getX() + 0.5,
+                pos.getY() + 0.5,
+                pos.getZ() + 0.5
+        );
+        return dist <= searchRadius * searchRadius;
+    }
     private BlockPos findNearestFoodChest() {
         BlockPos npcPos = npc.getBlockPos();
         World world = npc.getWorld();
@@ -179,17 +200,13 @@ public class FindAndEatFoodGoal extends Goal {
             for (int dy = -3; dy <= 3; dy++) {
                 for (int dz = -searchRadius; dz <= searchRadius; dz++) {
                     BlockPos checkPos = npcPos.add(dx, dy, dz);
-
                     if (!world.isChunkLoaded(checkPos)) continue;
-
                     if (!FoodChestHelper.isFoodChest(checkPos, world)) {
                         continue;
                     }
-
                     if (!FoodChestHelper.hasFood(checkPos, world)) {
                         continue;
                     }
-
                     double dist = npcPos.getSquaredDistance(checkPos);
                     if (dist < closestDist) {
                         closestDist = dist;
@@ -198,7 +215,6 @@ public class FindAndEatFoodGoal extends Goal {
                 }
             }
         }
-
         return closestChest;
     }
 

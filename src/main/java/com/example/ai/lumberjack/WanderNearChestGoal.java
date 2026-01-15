@@ -15,8 +15,8 @@ public class WanderNearChestGoal extends Goal {
     private int searchChestCooldown = 0;
     private int wanderCooldown = 0;
     private BlockPos wanderTarget;
-    private static final int WANDER_RADIUS = 12;
-    private static final int SEARCH_CHEST_INTERVAL = 200; // Tìm chest mỗi 2 giây
+    private static final int WANDER_RADIUS = 16;
+    private static final int SEARCH_CHEST_INTERVAL = 100; // Tìm chest mỗi 5 giây
     private static final int WANDER_INTERVAL = 60; // Chọn điểm mới mỗi 3 giây
 
     public WanderNearChestGoal(LumberjackNpcEntity npc) {

@@ -19,7 +19,6 @@ public class ChopTreeGoal extends Goal {
     private BlockPos lastChopPos;
     private Set<BlockPos> treeBlocks = new HashSet<>();
     private int maxTaskTicks = 0;
-    private static final double CHOP_DISTANCE = 27.0;
     private BlockPos basePos;
     private int treeHeight = 0;
 
@@ -30,6 +29,16 @@ public class ChopTreeGoal extends Goal {
 
     @Override
     public boolean canStart() {
+        if (npc.memory.hasUnfinishedTree()) {
+            targetTree = npc.memory.lastTreePos;
+            treeBlocks = new HashSet<>(npc.memory.remainingTreeBlocks);
+
+            if (!treeBlocks.isEmpty()) {
+                calculateTreeHeight();
+                calculateChoppingTime();
+                return true;
+            }
+        }
         BlockPos tree = npc.findNearestTree();
         if (tree == null) return false;
 
@@ -41,6 +50,8 @@ public class ChopTreeGoal extends Goal {
             npc.releaseTree(tree);
             return false;
         }
+        // ✅ Lưu vào memory
+        npc.memory.startChoppingTree(tree, treeBlocks);
 
         // Tính chiều cao và thời gian chặt
         calculateTreeHeight();
@@ -58,9 +69,9 @@ public class ChopTreeGoal extends Goal {
         basePos = findLowestLog();
         if (basePos != null) {
             npc.getNavigation().startMovingTo(
-                    basePos.getX() + 0.5,
+                    basePos.getX() + 2.5,
                     basePos.getY(),
-                    basePos.getZ() + 0.5,
+                    basePos.getZ() + 2.5,
                     1.2f
             );
         }
@@ -76,6 +87,12 @@ public class ChopTreeGoal extends Goal {
             if (pickupDelay == 0 && lastChopPos != null) {
                 pickupNearbyDrops();
             }
+            return;
+        }
+        // ✅ Check inventory có space không
+        if (!hasInventorySpace()) {
+            // Inventory đầy → dừng chặt, đi cất vào chest
+            this.stop();
             return;
         }
         // Nếu chưa đến gốc cây thì chờ
@@ -98,13 +115,18 @@ public class ChopTreeGoal extends Goal {
 
             chopBlock(nextLog);
             treeBlocks.remove(nextLog);
+            npc.memory.updateRemainingBlocks(treeBlocks);
         } else {
             // Không còn log -> chặt leaves
             BlockPos nextLeaf = findAnyLeafInTree();
             if (nextLeaf != null) {
                 chopBlock(nextLeaf);
                 treeBlocks.remove(nextLeaf);
+                npc.memory.updateRemainingBlocks(treeBlocks);
             }
+        }
+        if (npc.getNavigation().isIdle() && taskTicks > 40) {
+            stop();
         }
     }
 
@@ -121,7 +143,15 @@ public class ChopTreeGoal extends Goal {
     public void stop() {
         npc.getNavigation().stop();
         if (targetTree != null) {
-            npc.releaseTree(targetTree);
+            if (treeBlocks.isEmpty()) {
+                // Cây chặt xong → release
+                npc.releaseTree(targetTree);
+                npc.memory.finishChoppingTree();
+            } else {
+                // Cây chưa xong → giữ reservation + save memory
+                npc.memory.updateRemainingBlocks(treeBlocks);
+            }
+
         }
         targetTree = null;
         treeBlocks.clear();
@@ -133,6 +163,16 @@ public class ChopTreeGoal extends Goal {
         maxTaskTicks = 0;
         npc.memory.resetIdle();
     }
+    private boolean hasInventorySpace() {
+        SimpleInventory inv = npc.getInventory();
+        for (int i = 0; i < inv.size(); i++) {
+            if (inv.getStack(i).isEmpty()) {
+                return true;  // Còn ít nhất 1 slot trống
+            }
+        }
+        return false;  // Inventory đầy
+    }
+
     /**
      * Tính chiều cao cây (từ log thấp nhất đến cao nhất)
      */

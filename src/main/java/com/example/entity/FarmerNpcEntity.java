@@ -96,13 +96,8 @@ public class FarmerNpcEntity extends PathAwareEntity {
         this.goalSelector.add(0, new SwimGoal(this)); // ko chet duoi
         this.goalSelector.add(1, new EscapeDangerGoal(this, 1.4)); // chay khi bi dame
         // Sử dụng GenericSleepGoal
-        this.goalSelector.add(2, new FindAndSleepGoal(this, sleeping) {
-            @Override
-            public boolean canStart() {
-                return getWorld().isNight() && super.canStart();
-            }
-        });
-        this.goalSelector.add(2, new FindAndEatFoodGoal(
+        this.goalSelector.add(2, new FindAndSleepGoal(this, sleeping));
+        this.goalSelector.add(3, new FindAndEatFoodGoal(
                 this,
                 foodInventory,  // NPC inventory
                 24              // search radius
@@ -112,7 +107,7 @@ public class FarmerNpcEntity extends PathAwareEntity {
                 return display.findFood() && !sleeping.isSleeping() && super.canStart();
             }
         });
-        this.goalSelector.add(3, new WanderForBedGoal(this, 1.0, sleeping));
+//        this.goalSelector.add(3, new WanderForBedGoal(this, 1.0, sleeping));
         this.goalSelector.add(4, new HarvestCropGoal(this) {
             @Override
             public boolean canStart() {
@@ -253,8 +248,11 @@ public class FarmerNpcEntity extends PathAwareEntity {
 
     @Override
     public void remove(RemovalReason reason) {
-        sleeping.wakeUp(this);
-        cleanupAllReservations();
+        if (reason == RemovalReason.KILLED
+                || reason == RemovalReason.DISCARDED) {
+            sleeping.wakeUp(this);
+            cleanupAllReservations();
+        }
         super.remove(reason);
     }
 

@@ -20,7 +20,7 @@ public class DepositWoodToChestGoal extends Goal {
     private BlockPos chestPos;
     private int taskTicks = 0;
     private static final int MAX_TASK_TICKS = 60;
-    private static final int SEARCH_RADIUS = 7;
+    private static final int SEARCH_RADIUS = 10;
 
     public DepositWoodToChestGoal(LumberjackNpcEntity npc) {
         this.npc = npc;
@@ -45,9 +45,9 @@ public class DepositWoodToChestGoal extends Goal {
     public void start() {
         taskTicks = 0;
         npc.getNavigation().startMovingTo(
-                chestPos.getX() + 0.5,
+                chestPos.getX() + 3,
                 chestPos.getY(),
-                chestPos.getZ() + 0.5,
+                chestPos.getZ() + 3,
                 1.3
         );
         npc.reserveChest(chestPos);
@@ -62,7 +62,7 @@ public class DepositWoodToChestGoal extends Goal {
             return;
         }
 
-        if (npc.squaredDistanceTo(Vec3d.ofCenter(chestPos)) < 3) {
+        if (npc.squaredDistanceTo(Vec3d.ofCenter(chestPos)) < 4 * 4) {
             depositItems();
             stop();
         }

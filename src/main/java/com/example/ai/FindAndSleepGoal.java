@@ -19,36 +19,55 @@ public class FindAndSleepGoal extends Goal {
     @Override
     public boolean canStart() {
         if(sleepComponent == null) return false;
-        if (!npc.getWorld().isNight() || sleepComponent.isSleeping()) {
+        if (sleepComponent.isSleeping()) {
             return false;
         }
+        long time = npc.getWorld().getTimeOfDay() % 24000;
+        if (time < 12541 || time > 23458) return false;
 
-        if (sleepComponent.shouldWander()) {
-            return false;
-        }
 
         if (sleepComponent.getTargetBed() != null) {
             return true;
         }
 
-        return sleepComponent.shouldFindBed(npc)
-                && sleepComponent.findAndReserveBed(npc) != null;
+        return sleepComponent.findAndReserveBed(npc) != null;
     }
 
     @Override
     public void start() {
-        sleepComponent.startMovingToBed(npc);
+        boolean started = sleepComponent.startMovingToBed(npc);
+        System.out.println("[FindAndSleepGoal] Navigation started: " + started);
+
+        if (!started) {
+            sleepComponent.findAndReserveBed(npc); // Thử tìm giường khác
+        }
     }
 
     @Override
     public void tick() {
         sleepComponent.tickMovingToBed(npc);
+        if (sleepComponent.isSleeping()) {
+            long time = npc.getWorld().getTimeOfDay() % 24000;
+            boolean isNight = time >= 12541 && time <= 23458;
+
+            // Thức dậy nếu hết đêm hoặc bị tấn công
+            if (!isNight || npc.hurtTime > 0) {
+                sleepComponent.wakeUp(npc);
+            }
+        }
     }
 
     @Override
     public boolean shouldContinue() {
-        return !sleepComponent.isSleeping()
-                && npc.getWorld().isNight()
+        if (sleepComponent.isSleeping()) {
+            long time = npc.getWorld().getTimeOfDay() % 24000;
+            boolean isNight = time >= 12541 && time <= 23458;
+            return isNight; // Tiếp tục ngủ trong đêm
+        }
+        long time = npc.getWorld().getTimeOfDay() % 24000;
+        boolean isNight = time >= 12541 && time <= 23458;
+
+        return isNight
                 && sleepComponent.getTargetBed() != null
                 && !sleepComponent.shouldWander();
     }
@@ -56,5 +75,8 @@ public class FindAndSleepGoal extends Goal {
     @Override
     public void stop() {
         // Component handles cleanup
+        if (!sleepComponent.isSleeping()) {
+            sleepComponent.cancelMovingToBed(npc);
+        }
     }
 }

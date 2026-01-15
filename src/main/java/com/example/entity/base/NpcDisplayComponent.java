@@ -171,4 +171,11 @@ public class NpcDisplayComponent {
             return;
         }
     }
+    public void eat(ItemStack food) {
+        if (!food.isFood()) return;
+        FoodComponent fc = food.getItem().getFoodComponent();
+        if (fc != null) {
+            hunger = Math.min(20, hunger + fc.getHunger());
+        }
+    }
 }
