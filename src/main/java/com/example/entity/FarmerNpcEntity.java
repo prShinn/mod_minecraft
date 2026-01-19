@@ -71,15 +71,15 @@ public class FarmerNpcEntity extends PathAwareEntity {
     }
 
     public boolean reserveChest(BlockPos pos) {
-        return reservationSystem.tryReserve(pos, this.getUuid(), "CHEST");
+        return reservationSystem.tryReserve(pos, this.getUuid(), "WORK_CHEST");
     }
 
     public void releaseChest(BlockPos pos) {
-        reservationSystem.release(pos, this.getUuid(), "CHEST");
+        reservationSystem.release(pos, this.getUuid(), "WORK_CHEST");
     }
 
     public boolean isChestReserved(BlockPos pos) {
-        return reservationSystem.isReservedByOthers(pos, this.getUuid(), "CHEST");
+        return reservationSystem.isReservedByOthers(pos, this.getUuid(), "WORK_CHEST");
     }
 
     private void cleanupAllReservations() {
@@ -127,6 +127,10 @@ public class FarmerNpcEntity extends PathAwareEntity {
         display.tick(this, foodInventory);
         if (farmlandSearchCooldown > 0) {
             farmlandSearchCooldown--;
+        }
+        // Trong tick() - cleanup sớm nếu HP thấp
+        if (this.getHealth() <= 2.0F) {
+            cleanupAllReservations();
         }
     }
 
@@ -187,7 +191,11 @@ public class FarmerNpcEntity extends PathAwareEntity {
 
     @Override
     public boolean damage(DamageSource source, float amount) {
-        return super.damage(source, amount);
+        boolean result = super.damage(source, amount);
+        if (!this.isAlive()) {
+            cleanupAllReservations();
+        }
+        return result;
     }
 
     @Override
@@ -401,18 +409,55 @@ public class FarmerNpcEntity extends PathAwareEntity {
     public Inventory findNearestChest() {
         BlockPos center = getBlockPos();
         World world = getWorld();
+        double closestDist = Double.MAX_VALUE;
+        Inventory closestChest = null;
+        BlockPos newChestPos = null;
 
-        for (BlockPos pos : BlockPos.iterate(center.add(-FIND_CHEST_DISTANCE, -2, -FIND_CHEST_DISTANCE), center.add(FIND_CHEST_DISTANCE, 2, FIND_CHEST_DISTANCE))) {
-            if (!world.isChunkLoaded(pos)) continue;
-            BlockEntity be = world.getBlockEntity(pos);
-            if (be instanceof Inventory inv) {
-                if (reservationSystem.isReservedByOthers(pos, this.getUuid(), "CHEST")) {
-                    continue;
+        for (int dx = -FIND_CHEST_DISTANCE; dx <= FIND_CHEST_DISTANCE; dx++) {
+            for (int dy = -2; dy <= 2; dy++) {
+                for (int dz = -FIND_CHEST_DISTANCE; dz <= FIND_CHEST_DISTANCE; dz++) {
+                    BlockPos pos = center.add(dx, dy, dz);
+                    if (!world.isChunkLoaded(pos)) continue;
+
+                    BlockEntity be = world.getBlockEntity(pos);
+                    if (be instanceof Inventory inv) {
+                        if (reservationSystem.isReservedByOthers(pos, this.getUuid(), "WORK_CHEST")) {
+                            continue;
+                        }
+                        double dist = this.squaredDistanceTo(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
+                        if (dist < closestDist) {
+                            closestDist = dist;
+                            closestChest = inv;
+                            newChestPos = pos;
+                        }
+                    }
                 }
-                return inv;
             }
         }
-        return null;
+
+        // 🔥 NẾU TÌM THẤY CHEST MỚI KHÁC CHEST CŨ → release chest cũ
+        if (newChestPos != null && !newChestPos.equals(memory.lastChestPos)) {
+            if (memory.lastChestPos != null) {
+                releaseChest(memory.lastChestPos); // Release chest cũ
+            }
+            memory.lastChestPos = newChestPos;
+        }
+
+        return closestChest;
+//        BlockPos center = getBlockPos();
+//        World world = getWorld();
+//
+//        for (BlockPos pos : BlockPos.iterate(center.add(-FIND_CHEST_DISTANCE, -2, -FIND_CHEST_DISTANCE), center.add(FIND_CHEST_DISTANCE, 2, FIND_CHEST_DISTANCE))) {
+//            if (!world.isChunkLoaded(pos)) continue;
+//            BlockEntity be = world.getBlockEntity(pos);
+//            if (be instanceof Inventory inv) {
+//                if (reservationSystem.isReservedByOthers(pos, this.getUuid(), "WORK_CHEST")) {
+//                    continue;
+//                }
+//                return inv;
+//            }
+//        }
+//        return null;
     }
 
     private boolean hasSpaceInInventory(Inventory inv) {
@@ -424,5 +469,10 @@ public class FarmerNpcEntity extends PathAwareEntity {
 
     public SimpleInventory getInventory() {
         return foodInventory;
+    }
+    @Override
+    public void onDeath(DamageSource damageSource) {
+        cleanupAllReservations();
+        super.onDeath(damageSource);
     }
 }
