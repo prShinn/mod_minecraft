@@ -12,8 +12,8 @@ public class ReturnToFarmGoal extends Goal {
     private final FarmerNpcEntity npc;
     private BlockPos targetPos;
     private int taskTicks;
-    private static final int MAX_TASK_TICKS = 100; //5s
-    private static final double REACH_DIST_SQ = 2.25;
+    private static final int MAX_TASK_TICKS = 200; //10s
+    private static final double REACH_DIST_SQ = 6.25;
     public ReturnToFarmGoal(FarmerNpcEntity npc) {
         this.npc = npc;
         this.setControls(EnumSet.of(Control.MOVE));

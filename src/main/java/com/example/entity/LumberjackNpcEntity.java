@@ -124,6 +124,11 @@ public class LumberjackNpcEntity extends PathAwareEntity {
         super.tick();
         if (this.getWorld() == null || this.getWorld().isClient) return;
         display.tick(this, inventory);
+        if (this.getNavigation().isIdle()) {
+            memory.tickIdle();
+        } else {
+            memory.resetIdle();
+        }
         if (treeSearchCooldown > 0) {
             treeSearchCooldown--;
         }
