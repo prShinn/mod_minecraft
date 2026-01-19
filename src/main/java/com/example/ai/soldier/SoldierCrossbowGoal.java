@@ -65,7 +65,7 @@ public class SoldierCrossbowGoal extends Goal {
         if (distSq > DETECTION_DISTANCE * DETECTION_DISTANCE) return false;
 
         this.target = e;
-        return npc.getMainHandStack().getItem() instanceof CrossbowItem;
+        return true;
     }
 
     @Override
@@ -178,7 +178,7 @@ public class SoldierCrossbowGoal extends Goal {
 
         // Tính toán vector
         double dx = target.getX() - npc.getX();
-        double dy = target.getBodyY(0.155D) - arrow.getY();
+        double dy = target.getBodyY(0.123D) - arrow.getY();
         double dz = target.getZ() - npc.getZ();
         double distance = Math.sqrt(dx * dx + dz * dz);
         float inaccuracy = calculateInaccuracy(distance);
@@ -227,7 +227,7 @@ public class SoldierCrossbowGoal extends Goal {
     private int getReloadTime() {
         ItemStack crossbow = npc.getMainHandStack();
         int quickChargeLevel = EnchantmentHelper.getLevel(Enchantments.QUICK_CHARGE, crossbow);
-        return Math.max(10, 40 - quickChargeLevel * 8);
+        return Math.max(10, 30 - quickChargeLevel * 8);
     }
 
     @Override

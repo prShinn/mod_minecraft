@@ -45,9 +45,6 @@ public class FindSightAttack {
                 npc.getNavigation().startMovingTo(rightPos.x, rightPos.y, rightPos.z, 1.2);
             }
         }
-
-
-
         // Nếu cả hai không đi được → đứng yên (fallback)
     }
 

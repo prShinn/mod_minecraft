@@ -99,7 +99,6 @@ public class FarmerNpcEntity extends PathAwareEntity {
 
         this.goalSelector.add(0, new SwimGoal(this)); // ko chet duoi
         this.goalSelector.add(1, new EscapeDangerGoal(this, 1.4)); // chay khi bi dame
-        // Sử dụng GenericSleepGoal
 //        this.goalSelector.add(2, new FindAndSleepGoal(this, sleeping));
         this.goalSelector.add(2, new FindAndEatFoodGoal(this, foodInventory,  // NPC inventory
                 24              // search radius
@@ -115,7 +114,6 @@ public class FarmerNpcEntity extends PathAwareEntity {
         ItemStack mainHand = this.getEquippedStack(EquipmentSlot.MAINHAND);
         if (mainHand.isEmpty()) {
             this.equipStack(EquipmentSlot.MAINHAND, new ItemStack(Items.IRON_HOE));
-
             // Không drop khi chết
             this.setEquipmentDropChance(EquipmentSlot.MAINHAND, 0.0F);
         }
