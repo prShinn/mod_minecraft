@@ -42,7 +42,7 @@ public class SoldierNPCEquipmentScreen extends Screen {
                 getModeText(),
                 b -> {
                     sendMoveMode();
-//                    this.close(); // đóng luôn
+                    this.close(); // đóng luôn
                 }
         ).dimensions(x, y, 200, 20).build();
 

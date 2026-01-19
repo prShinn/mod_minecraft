@@ -169,7 +169,7 @@ public class SoldierNPCEntity extends PathAwareEntity {
                 return false;
             }
         });
-        this.goalSelector.add(5, new FollowOwnerLikeGoal(this, 1.3D, followDistance, teleportDistance));
+        this.goalSelector.add(5, new FollowOwnerLikeGoal(this, 1.3D));
         this.goalSelector.add(6, new ReturnToPlayerGoal(this));
 // nhin player
         this.goalSelector.add(7, new LookAtEntityGoal(this, PlayerEntity.class, 8.0F));
