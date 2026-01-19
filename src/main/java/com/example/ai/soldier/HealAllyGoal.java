@@ -27,7 +27,7 @@ public class HealAllyGoal extends Goal {
     private LivingEntity target;
 
     private static final double SEARCH_RANGE = 15.0D;
-    private static final double HEAL_DISTANCE = 2.0D;
+    private static final double HEAL_DISTANCE = 3.0D;
     private static final int HEAL_COOLDOWN_TICKS = 60; // 3s
 
     private int healCooldown = 0;
@@ -48,9 +48,7 @@ public class HealAllyGoal extends Goal {
                 medic.getBoundingBox().expand(SEARCH_RANGE),
                 this::isValidHealTarget
         );
-
         if (targets.isEmpty()) return false;
-
         // Ưu tiên entity máu thấp nhất
         targets.sort((a, b) -> Float.compare(a.getHealth(), b.getHealth()));
         target = targets.get(0);
@@ -62,12 +60,12 @@ public class HealAllyGoal extends Goal {
     public boolean shouldContinue() {
         return target != null
                 && target.isAlive()
-                && target.getHealth() < target.getMaxHealth();
+                && target.getHealth() < target.getMaxHealth() * 0.7F;
     }
 
     @Override
     public void start() {
-        medic.getNavigation().startMovingTo(target, 1.1D);
+        medic.getNavigation().startMovingTo(target, 1.2D);
     }
 
     @Override
@@ -84,14 +82,12 @@ public class HealAllyGoal extends Goal {
         double distanceSq = medic.squaredDistanceTo(target);
 
         if (distanceSq <= HEAL_DISTANCE * HEAL_DISTANCE) {
-
             if (healCooldown <= 0) {
                 healTarget();
                 healCooldown = HEAL_COOLDOWN_TICKS;
             }
-
         } else {
-            medic.getNavigation().startMovingTo(target, 1.1D);
+            medic.getNavigation().startMovingTo(target, 1.2D);
         }
     }
 
@@ -143,7 +139,7 @@ public class HealAllyGoal extends Goal {
         float bonusHeal = getEnchantHealBonus(stack);
         float totalHeal = baseHeal + bonusHeal;
 
-        return Math.min(totalHeal, 10.0F); // 🔒 cap tối đa 5 tim
+        return Math.min(totalHeal, 8.0F); // 🔒 cap tối đa 4 tim
     }
 
     private float getEnchantHealBonus(ItemStack stack) {
@@ -179,10 +175,10 @@ public class HealAllyGoal extends Goal {
         ToolMaterial material = axe.getMaterial();
 
         if (material == ToolMaterials.WOOD) return 1.0F;
-        if (material == ToolMaterials.STONE) return 2.0F;
-        if (material == ToolMaterials.IRON) return 3.0F;
-        if (material == ToolMaterials.DIAMOND) return 4.0F;
-        if (material == ToolMaterials.NETHERITE) return 6.0F;
+        if (material == ToolMaterials.STONE) return 1.5F;
+        if (material == ToolMaterials.IRON) return 2.5F;
+        if (material == ToolMaterials.DIAMOND) return 3.0F;
+        if (material == ToolMaterials.NETHERITE) return 4.0F;
 
         return 0.5F;
     }

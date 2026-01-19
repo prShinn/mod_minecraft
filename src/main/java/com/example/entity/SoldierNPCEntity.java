@@ -228,7 +228,6 @@ public class SoldierNPCEntity extends PathAwareEntity {
     }
 
     private void npcEatFood() {
-        if (this.getWorld().isClient) return; // Chỉ server xử lý
         for (int i = 0; i < this.foodInventory.size(); i++) {
             ItemStack stack = this.foodInventory.getStack(i);
             if (stack.isEmpty() || !stack.isFood()) continue;

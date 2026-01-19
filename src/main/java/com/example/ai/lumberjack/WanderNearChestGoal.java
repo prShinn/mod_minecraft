@@ -16,7 +16,7 @@ public class WanderNearChestGoal extends Goal {
     private int wanderCooldown = 0;
     private BlockPos wanderTarget;
     private static final int WANDER_RADIUS = 12;
-    private static final int SEARCH_CHEST_INTERVAL = 40; // Tìm chest mỗi 2 giây
+    private static final int SEARCH_CHEST_INTERVAL = 100; // Tìm chest mỗi 5 giây
     private static final int WANDER_INTERVAL = 60; // Chọn điểm mới mỗi 3 giây
 
     public WanderNearChestGoal(LumberjackNpcEntity npc) {
@@ -27,7 +27,10 @@ public class WanderNearChestGoal extends Goal {
     @Override
     public boolean canStart() {
         // Chỉ lang thang khi không có việc gì khác (idle lâu)
-        return npc.memory.shouldWander();
+        if (!npc.memory.shouldWander()) return false;
+
+        // Nếu đang có việc rõ ràng thì KHÔNG wander
+        return npc.findNearestTree() == null;
     }
 
     @Override
@@ -50,7 +53,6 @@ public class WanderNearChestGoal extends Goal {
                 if (tree != null) {
                     // Có cây để chặt -> dừng lang thang, để ChopTreeGoal đảm nhiệm
                     npc.memory.resetIdle();
-                    stop();
                     return;
                 }
             }

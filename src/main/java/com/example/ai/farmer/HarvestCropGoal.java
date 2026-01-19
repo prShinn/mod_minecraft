@@ -24,7 +24,7 @@ public class HarvestCropGoal extends Goal {
     private int pickupDelay = 0;
     private BlockPos lastHarvestPos;
 
-    private static final int MAX_TASK_TICKS = 40;// Nếu làm việc quá lâu thì từ bỏ
+    private static final int MAX_TASK_TICKS = 100;// Nếu làm việc quá lâu thì từ bỏ
     private static final double HARVEST_DISTANCE_SQ = 2.25;
 
     public HarvestCropGoal(FarmerNpcEntity npc) {
@@ -34,7 +34,6 @@ public class HarvestCropGoal extends Goal {
 
     @Override
     public boolean canStart() {
-        if (npc.isSleeping()) return false;
         BlockPos found = npc.findNearestFarmland(); // trả về cropPos chín
         if (found == null) return false;
 
@@ -60,7 +59,7 @@ public class HarvestCropGoal extends Goal {
 
     @Override
     public void tick() {
-        taskTicks++;
+
         if (!npc.getWorld().isChunkLoaded(targetCrop)) {
             stop();
             return;
@@ -71,7 +70,6 @@ public class HarvestCropGoal extends Goal {
                 pickupNearbyDrops();
             }
         }
-
 
         if (npc.squaredDistanceTo(Vec3d.ofCenter(targetCrop)) < 2.5) {
             harvestCrop();
@@ -116,7 +114,10 @@ public class HarvestCropGoal extends Goal {
         var state = world.getBlockState(targetCrop);
 
         if (!(state.getBlock() instanceof CropBlock crop)) return;
-        if (!crop.isMature(state)) return;
+        if (!crop.isMature(state)) {
+            taskTicks++;
+            return;
+        }
 
         // ✅ Drop item CHẮC CHẮN spawn ItemEntity
         Block.dropStacks(
