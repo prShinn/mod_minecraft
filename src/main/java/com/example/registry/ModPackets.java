@@ -2,8 +2,10 @@ package com.example.registry;
 
 import com.example.ai.soldier.ModeNpc;
 import com.example.entity.SoldierNPCEntity;
+import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.entity.Entity;
+import net.minecraft.network.PacketByteBuf;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
@@ -42,7 +44,11 @@ public class ModPackets {
                                         .formatted(Formatting.GREEN),
                                 true
                         );
-                        ServerPlayNetworking.send(player, SYNC_MODE_PACKET, buf);
+                        PacketByteBuf syncBuf = PacketByteBufs.create();
+                        syncBuf.writeUuid(npcId);
+                        syncBuf.writeInt(newMode.ordinal()); // Gửi mode mới
+
+                        ServerPlayNetworking.send(player, SYNC_MODE_PACKET, syncBuf);
                     });
                 }
         );

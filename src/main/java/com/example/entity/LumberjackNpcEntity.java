@@ -36,10 +36,10 @@ import java.util.UUID;
 public class LumberjackNpcEntity extends PathAwareEntity {
     public final NpcDisplayComponent display = new NpcDisplayComponent();
     private final NpcEquipmentComponent equip = new NpcEquipmentComponent();
-    public final NpcSleepingComponent sleeping = new NpcSleepingComponent()
-            .withSearchRadius(16)
-            .withCooldown(120)
-            .withWanderDuration(100);
+    //    public final NpcSleepingComponent sleeping = new NpcSleepingComponent()
+//            .withSearchRadius(16)
+//            .withCooldown(120)
+//            .withWanderDuration(100);
     private UUID ownerUUID;
     public final SimpleInventory inventory = new SimpleInventory(9);
     public final LumberjackMemory memory = new LumberjackMemory();
@@ -88,57 +88,29 @@ public class LumberjackNpcEntity extends PathAwareEntity {
 
         this.goalSelector.add(0, new SwimGoal(this));
         this.goalSelector.add(1, new EscapeDangerGoal(this, 1.4));
-        this.goalSelector.add(2, new FindAndSleepGoal(this, sleeping));
+//        this.goalSelector.add(2, new FindAndSleepGoal(this, sleeping));
         this.goalSelector.add(2, new FindAndEatFoodGoal(
                 this,
                 inventory,  // NPC inventory
                 24              // search radius
-        ) {
-            @Override
-            public boolean canStart() {
-                super.canStart();
-                return !sleeping.isSleeping() && super.canStart();
-            }
-        });
+        ));
 
-        this.goalSelector.add(3, new WanderForBedGoal(this, 1.0, sleeping));
-        this.goalSelector.add(4, new ChopTreeGoal(this) {
-            @Override
-            public boolean canStart() {
-                super.canStart();
-                return !sleeping.isSleeping() && super.canStart();
-            }
-        }); // Chặt cây
-        this.goalSelector.add(5, new DepositWoodToChestGoal(this) {
-            @Override
-            public boolean canStart() {
-                super.canStart();
-                return !sleeping.isSleeping() && super.canStart();
-            }
-        }); // Cất vao chest
-        this.goalSelector.add(6, new PlantSaplingGoal(this) {
-            @Override
-            public boolean canStart() {
-                super.canStart();
-                return !sleeping.isSleeping() && super.canStart();
-            }
-        }); // Trồng mầm cây
+//        this.goalSelector.add(3, new WanderForBedGoal(this, 1.0));
+        this.goalSelector.add(4, new ChopTreeGoal(this)
+
+        ); // Chặt cây
+        this.goalSelector.add(5, new DepositWoodToChestGoal(this)
+
+        ); // Cất vao chest
+        this.goalSelector.add(6, new PlantSaplingGoal(this)
+
+        ); // Trồng mầm cây
         this.goalSelector.add(7, new LookAtEntityGoal(this, PlayerEntity.class, 8.0F));
-        this.goalSelector.add(8, new WanderNearChestGoal(this) {
-            @Override
-            public boolean canStart() {
-                super.canStart();
-                return !sleeping.isSleeping() && super.canStart();
-            }
-        }); // Lang thang và tìm chest
+        this.goalSelector.add(8, new WanderNearChestGoal(this)
+
+        ); // Lang thang và tìm chest
         this.goalSelector.add(8, new LookAroundGoal(this));
-        this.goalSelector.add(9, new WanderAroundFarGoal(this, 1.0D) {
-            @Override
-            public boolean canStart() {
-                super.canStart();
-                return !sleeping.isSleeping() && super.canStart();
-            }
-        }); // ✅ GIỮ - Wander NGÀY + ĐÊM (khi idle)
+//        this.goalSelector.add(9, new WanderAroundFarGoal(this, 1.0D)); // ✅ GIỮ - Wander NGÀY + ĐÊM (khi idle)
         // Trang bị rìu nếu chưa có
         ItemStack mainHand = this.getEquippedStack(EquipmentSlot.MAINHAND);
         if (mainHand.isEmpty()) {
@@ -152,11 +124,6 @@ public class LumberjackNpcEntity extends PathAwareEntity {
         super.tick();
         if (this.getWorld() == null || this.getWorld().isClient) return;
         display.tick(this, inventory);
-        sleeping.tick(this);
-        if (!sleeping.isSleeping()) {
-            memory.tickIdle();
-        }
-
         if (treeSearchCooldown > 0) {
             treeSearchCooldown--;
         }
@@ -204,16 +171,12 @@ public class LumberjackNpcEntity extends PathAwareEntity {
 
     @Override
     public boolean damage(DamageSource source, float amount) {
-        if (sleeping.isSleeping()) {
-            sleeping.wakeUp(this);
-        }
         return super.damage(source, amount);
     }
 
     @Override
     public void remove(RemovalReason reason) {
         // ✅ Fixed: Added proper cleanup
-        sleeping.wakeUp(this);
         cleanupAllReservations(); // 🔥 CLEANUP ALL (bed + trees + chests)
         super.remove(reason);
     }
