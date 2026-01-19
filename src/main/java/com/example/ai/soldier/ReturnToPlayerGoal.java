@@ -21,7 +21,7 @@ public class ReturnToPlayerGoal extends Goal {
     private static final int WANDER_TICKS = WANDER_TIME * 20;
 
     // Tốc độ di chuyển
-    private static final double RETURN_SPEED = 1.2; // Nhanh hơn bình thường
+    private static final double RETURN_SPEED = 1.5F; // Nhanh hơn bình thường
 
     public ReturnToPlayerGoal(SoldierNPCEntity soldier) {
         this.soldier = soldier;
@@ -100,7 +100,7 @@ public class ReturnToPlayerGoal extends Goal {
     public void start() {
         super.start();
         // Optional: Sound effect khi bắt đầu quay về
-        // soldier.playSound(SoundEvents.ENTITY_WOLF_WHINE, 0.5F, 1.0F);
+         soldier.playSound(SoundEvents.ENTITY_WOLF_WHINE, 0.5F, 1.0F);
     }
 
     @Override

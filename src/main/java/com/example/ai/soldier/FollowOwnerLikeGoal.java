@@ -88,7 +88,7 @@ public class FollowOwnerLikeGoal extends Goal {
     }
 
     private float getTeleportDistance() {
-        return npc.getMoveMode() == ModeNpc.ModeMove.FOLLOW ? 7F : SoldierNPCEntity.TELEPORT_DISTANCE;
+        return npc.getMoveMode() == ModeNpc.ModeMove.FOLLOW ? 8F : SoldierNPCEntity.TELEPORT_DISTANCE;
     }
     @Override
     public void stop() {

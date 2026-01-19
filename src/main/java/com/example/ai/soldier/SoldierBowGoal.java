@@ -24,7 +24,7 @@ public class SoldierBowGoal extends Goal {
     private static final double MAX_ATTACK_DISTANCE = 15.0;
     private static final double MIN_ATTACK_DISTANCE = 6.0;
     private static final float BASE_INACCURACY = 4.0F;      // Độ lệch cơ bản
-    private static final float MAX_INACCURACY = 14.0F;      // Độ lệch tối đa
+    private static final float MAX_INACCURACY = 10.0F;      // Độ lệch tối đa
     private static final float INACCURACY_PER_BLOCK = 0.5F;
 
     public SoldierBowGoal(SoldierNPCEntity npc) {
@@ -56,7 +56,7 @@ public class SoldierBowGoal extends Goal {
         if (distSq > DETECTION_DISTANCE * DETECTION_DISTANCE) return false;
 
         this.target = e;
-        return npc.getMainHandStack().getItem() instanceof BowItem;
+        return true;
     }
 
 
@@ -70,7 +70,7 @@ public class SoldierBowGoal extends Goal {
 
         if (distanceSq > maxDistSq) {
             // Xa hơn 15 → chạy lại gần
-            npc.getNavigation().startMovingTo(target, 1.1);
+            npc.getNavigation().startMovingTo(target, 1.3f);
         } else if (distanceSq < minDistSq) {
             // Quá gần → lùi
             moveAwayFromTarget();
@@ -186,7 +186,7 @@ public class SoldierBowGoal extends Goal {
             arrow.setPierceLevel((byte) piercingLevel);
         }
         double dx = target.getX() - npc.getX();
-        double dy = target.getBodyY(0.155D) - arrow.getY();
+        double dy = target.getBodyY(0.123D) - arrow.getY();
         double dz = target.getZ() - npc.getZ();
         double distance = Math.sqrt(dx * dx + dz * dz) * 0.2F;
         float inaccuracy = calculateInaccuracy(distance);
