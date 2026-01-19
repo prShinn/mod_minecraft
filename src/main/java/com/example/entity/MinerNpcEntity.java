@@ -66,16 +66,16 @@ public class MinerNpcEntity extends PathAwareEntity {
     }
 
     public boolean reserveChest(BlockPos pos) {
-        return reservationSystem.tryReserve(pos, this.getUuid(), "CHEST");
+        return reservationSystem.tryReserve(pos, this.getUuid(), "WORK_CHEST");
     }
 
     public void releaseChest(BlockPos pos) {
-        reservationSystem.release(pos, this.getUuid(), "CHEST");
+        reservationSystem.release(pos, this.getUuid(), "WORK_CHEST");
     }
 
 
     public boolean isChestReserved(BlockPos pos) {
-        return reservationSystem.isReservedByOthers(pos, this.getUuid(), "CHEST");
+        return reservationSystem.isReservedByOthers(pos, this.getUuid(), "WORK_CHEST");
     }
 
     /**
@@ -249,7 +249,7 @@ public class MinerNpcEntity extends PathAwareEntity {
                     BlockEntity be = world.getBlockEntity(pos);
                     if (be instanceof Inventory inv) {
                         // ✅ Check xem chest có bị reserve bởi NPC khác không
-                        if (reservationSystem.isReservedByOthers(pos, this.getUuid(), "CHEST")) {
+                        if (reservationSystem.isReservedByOthers(pos, this.getUuid(), "WORK_CHEST")) {
                             continue;
                         }
 
