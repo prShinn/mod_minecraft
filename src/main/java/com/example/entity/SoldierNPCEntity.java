@@ -1,6 +1,7 @@
 package com.example.entity;
 
 import com.example.ai.soldier.*;
+import com.example.entity.base.CombatExperienceComponent;
 import com.example.registry.ModItems;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.Enchantments;
@@ -21,6 +22,7 @@ import net.minecraft.inventory.Inventories;
 import net.minecraft.inventory.SimpleInventory;
 import net.minecraft.item.*;
 import net.minecraft.nbt.NbtCompound;
+import net.minecraft.particle.ParticleTypes;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
@@ -40,6 +42,9 @@ import java.util.List;
 import java.util.UUID;
 
 public class SoldierNPCEntity extends PathAwareEntity {
+    public final CombatExperienceComponent combat = new CombatExperienceComponent();
+    private double damageDealtThisAttack = 0;
+
     // ===== CONSTANTS =====
     private static final int MAX_HUNGER = 20;
     private static final int FOOD_TICK_INTERVAL = 1200; // 1p
@@ -47,14 +52,12 @@ public class SoldierNPCEntity extends PathAwareEntity {
     private static final double VIEW_DISTANCE = 6.0;
     public static final float FOLLOW_DISTANCE = 30f;
     public static final float TELEPORT_DISTANCE = 40f;
-    private float followDistance = FOLLOW_DISTANCE;
-    private float teleportDistance = TELEPORT_DISTANCE;
+    private final float teleportDistance = 0;
     private static final int PLAYER_SEARCH_INTERVAL = 30; // 1 giây
-    private static final int WEAPON_DURABILITY_CHANCE = 10; // 1/10 xác suất
+    // 1/10 xác suất
     private static final int ARMOR_DURABILITY_CHANCE = 20; // 1/20 xác suất
     private String nameNpc = "";
     public ModeNpc.ModeMove moveMode = ModeNpc.ModeMove.WANDER;
-    public FollowOwnerLikeGoal followGoal;
 
     // ===== OWNER & FOLLOW =====
     private UUID ownerUUID;
@@ -202,6 +205,19 @@ public class SoldierNPCEntity extends PathAwareEntity {
         if (owner != null && !owner.isAlive()) {
             this.ownerUUID = null;
         }
+
+        double currentMaxHealth = combat.getCurrentMaxHealth();
+        if (this.getAttributeInstance(EntityAttributes.GENERIC_MAX_HEALTH).getBaseValue()
+                != currentMaxHealth) {
+            this.getAttributeInstance(EntityAttributes.GENERIC_MAX_HEALTH)
+                    .setBaseValue(currentMaxHealth);
+
+            // Heal lên max khi level up
+            if (this.getHealth() < currentMaxHealth) {
+                this.setHealth((float) currentMaxHealth);
+            }
+        }
+
         // Display management
         updateNameDisplay();
         // Food system
@@ -321,7 +337,10 @@ public class SoldierNPCEntity extends PathAwareEntity {
         int hp = Math.round(this.getHealth());
         int maxHp = Math.round(this.getMaxHealth());
         int foodCount = getTotalFoodCount();
-        MutableText name = Text.literal(getNameNpc()).formatted(Formatting.WHITE).append(Text.literal(" [" + hp + "/" + maxHp + "] ").formatted(Formatting.GREEN)).append(Text.literal("🍖[" + hunger + "/" + MAX_HUNGER + "] x" + foodCount).formatted(Formatting.GOLD));
+        MutableText name = Text.literal(getNameNpc()).formatted(Formatting.WHITE)
+                .append(Text.literal(" [Lv." + combat.getLevel() + "] ").formatted(Formatting.AQUA))
+                .append(Text.literal(" [" + hp + "/" + maxHp + "] ").formatted(Formatting.GREEN))
+                .append(Text.literal("🍖[" + hunger + "/" + MAX_HUNGER + "] x" + foodCount).formatted(Formatting.GOLD));
 
         this.setCustomName(name);
     }
@@ -481,6 +500,7 @@ public class SoldierNPCEntity extends PathAwareEntity {
     @Override
     public boolean tryAttack(Entity target) {
         float damage = (float) this.getAttributeValue(EntityAttributes.GENERIC_ATTACK_DAMAGE);
+        damage += (float) combat.getCurrentDamage();
 
         ItemStack weapon = this.getMainHandStack();
         damage += getWeaponDamage(weapon);
@@ -518,7 +538,7 @@ public class SoldierNPCEntity extends PathAwareEntity {
                 1.6F);
         DamageSources sources = this.getWorld().getDamageSources();
         boolean success = target.damage(sources.mobAttack(this), damage);
-
+        damageDealtThisAttack = damage;
         // Weapon durability
         if (success && !weapon.isEmpty() && weapon.isDamageable()) {
             //không bao gio hỏng vu khi
@@ -554,6 +574,10 @@ public class SoldierNPCEntity extends PathAwareEntity {
                     livingTarget.addVelocity(0, 0.5 * knockbackLevel, 0);
                     livingTarget.velocityModified = true;
                 }
+                if (!livingTarget.isAlive()) {
+                    combat.addExperience(livingTarget, damageDealtThisAttack);
+                    spawnLevelUpParticles();
+                }
             }
             this.getWorld().playSound(null, // null = tất cả player gần đó đều nghe
                     target.getX(),
@@ -567,7 +591,23 @@ public class SoldierNPCEntity extends PathAwareEntity {
 
         return success;
     }
+    private void spawnLevelUpParticles() {
+        if (this.getWorld() == null) return;
 
+        for (int i = 0; i < 15; i++) {
+            double offsetX = (this.random.nextDouble() - 0.5) * 2;
+            double offsetY = (this.random.nextDouble() - 0.5) * 2 + 1;
+            double offsetZ = (this.random.nextDouble() - 0.5) * 2;
+
+            this.getWorld().addParticle(
+                    ParticleTypes.ENCHANT,
+                    this.getX() + offsetX,
+                    this.getY() + offsetY,
+                    this.getZ() + offsetZ,
+                    0, 0, 0
+            );
+        }
+    }
     @Override
     public boolean damage(DamageSource source, float amount) {
         boolean result = super.damage(source, amount);
@@ -640,6 +680,10 @@ public class SoldierNPCEntity extends PathAwareEntity {
         Inventories.writeNbt(nbt, foodInventory.stacks);
 
         nbt.putInt("MoveMode", this.dataTracker.get(MOVE_MODE));
+
+        NbtCompound combatNbt = new NbtCompound();
+        combat.writeToNbt(combatNbt);
+        nbt.put("CombatData", combatNbt);
     }
 
     @Override
@@ -667,6 +711,14 @@ public class SoldierNPCEntity extends PathAwareEntity {
         if (nbt.contains("MoveMode")) {
             this.dataTracker.set(MOVE_MODE, nbt.getInt("MoveMode"));
         }
+        if (nbt.contains("CombatData")) {
+            combat.readFromNbt(nbt.getCompound("CombatData"));
+        }
+
+        // Cập nhật MaxHealth theo level
+        this.getAttributeInstance(EntityAttributes.GENERIC_MAX_HEALTH)
+                .setBaseValue(combat.getCurrentMaxHealth());
+        this.setHealth((float) combat.getCurrentMaxHealth());
 
     }
 

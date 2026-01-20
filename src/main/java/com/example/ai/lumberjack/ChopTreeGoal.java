@@ -137,7 +137,12 @@ public class ChopTreeGoal extends Goal {
         for (int dx = -radius; dx <= radius; dx++) {
             for (int dz = -radius; dz <= radius; dz++) {
                 for (int dy = targetTree.getY() - 3; dy <= maxHeight; dy++) {
-                    BlockPos pos = start.add(dx, dy, dz);
+                    BlockPos pos = new BlockPos(
+                            start.getX() + dx,
+                            dy,
+                            start.getZ() + dz
+                    );
+
                     if (!world.isChunkLoaded(pos)) continue;
                     BlockState state = world.getBlockState(pos);
                     if (npc.isTreeBlock(state)) {  // ✅ Tái sử dụng hàm từ Entity
@@ -180,14 +185,20 @@ public class ChopTreeGoal extends Goal {
         double bestScore = Double.MAX_VALUE;
 
         for (BlockPos pos : treeBlocks) {
+            // ✅ Check block còn tồn tại không
             BlockState state = npc.getWorld().getBlockState(pos);
+            if (state.isAir()) continue;
+
             Block block = state.getBlock();
 
             double score;
 
             if (block instanceof PillarBlock) {
+                // ✅ Log: Ưu tiên từ dưới lên (Y thấp trước)
+                // Y * 500 = log dưới được ưu tiên
                 score = pos.getY() * 500 + npcPos.squaredDistanceTo(pos.toCenterPos());
             } else if (block instanceof LeavesBlock) {
+                // ✅ Leaves: Ưu tiên sau cùng
                 score = 1_000_000 + npcPos.squaredDistanceTo(pos.toCenterPos());
             } else {
                 continue;
@@ -199,7 +210,6 @@ public class ChopTreeGoal extends Goal {
             }
         }
         return best;
-
     }
 
     /**
@@ -208,12 +218,16 @@ public class ChopTreeGoal extends Goal {
     private void chopBlockAtPos(BlockPos pos) {
         npc.getLookControl().lookAt(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
 
-        var world = npc.getWorld();
+        World world = npc.getWorld();
+
+        // ✅ Phá block và drop items
         world.breakBlock(pos, true, npc);
+
         lastChopPos = pos.toImmutable();
-        pickupDelay = 5;
+        pickupDelay = 5; // ✅ Delay 5 ticks rồi nhặt items
         npc.memory.lastTreePos = pos;
         npc.memory.resetIdle();
+
     }
 
     /**
