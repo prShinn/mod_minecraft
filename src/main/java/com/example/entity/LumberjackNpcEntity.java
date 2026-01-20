@@ -282,40 +282,46 @@ public Inventory findNearestChest() {
 
         BlockPos chestPos = memory.lastChestPos;
         World world = getWorld();
-        double closestDist = Double.MAX_VALUE;
-        BlockPos closestTree = null;
 
-        for (int dx = -FIND_TREE_DISTANCE; dx <= FIND_TREE_DISTANCE; dx++) {
-            for (int dz = -FIND_TREE_DISTANCE; dz <= FIND_TREE_DISTANCE; dz++) {
-                for (int dy = 0; dy <= 40; dy++) { // Tìm từ độ cao chest đến 40 block
+        int radius = FIND_TREE_DISTANCE;
+        BlockPos found = null;
+        double bestDist = Double.MAX_VALUE;
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dz = -radius; dz <= radius; dz++) {
+                for (int dy = 0; dy <= 40; dy++) {
                     BlockPos pos = chestPos.add(dx, dy, dz);
                     if (!world.isChunkLoaded(pos)) continue;
 
                     BlockState state = world.getBlockState(pos);
+                    if (!isTreeBlock(state)) continue;
 
-                    // Kiểm tra xem có phải log hoặc leaves không
-                    if (isTreeBlock(state)) {
-                        if (reservationSystem.isReservedByOthers(pos, this.getUuid(), "TREE")) {
-                            continue;
-                        }
+                    if (reservationSystem.isReservedByOthers(pos, this.getUuid(), "TREE")) {
+                        continue;
+                    }
 
-                        double dist = this.squaredDistanceTo(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
-                        if (dist < closestDist) {
-                            closestDist = dist;
-                            closestTree = pos;
-                        }
+                    double dist = this.squaredDistanceTo(
+                            pos.getX() + 0.5,
+                            pos.getY() + 0.5,
+                            pos.getZ() + 0.5
+                    );
+
+                    if (dist < bestDist) {
+                        bestDist = dist;
+                        found = pos;
                     }
                 }
             }
         }
+
         treeSearchCooldown = TREE_SEARCH_COOLDOWN;
-        return closestTree;
+        return found;
+
     }
 
     /**
      * Kiểm tra xem block có phải là log hoặc leaves
      */
-    private boolean isTreeBlock(BlockState state) {
+    public boolean isTreeBlock(BlockState state) {
         Block block = state.getBlock();
         return block instanceof PillarBlock && (
                 block == Blocks.OAK_LOG ||
