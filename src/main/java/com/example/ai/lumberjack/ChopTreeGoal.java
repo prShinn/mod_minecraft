@@ -8,6 +8,7 @@ import net.minecraft.inventory.SimpleInventory;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
+import net.minecraft.util.math.Vec3d;
 
 import java.util.*;
 
@@ -19,9 +20,15 @@ public class ChopTreeGoal extends Goal {
     private BlockPos lastChopPos;
     private Set<BlockPos> treeBlocks = new HashSet<>();
     private int maxTaskTicks = 0;
-    private static final double CHOP_DISTANCE = 27.0;
+
+    // Tầm chặt
+    private static final double CHOP_RANGE_HORIZONTAL = 5.0; // Tầm ngang (horiz)
+    private static final double CHOP_RANGE_VERTICAL = 6.0; // Tầm dọc (vertical)
+    private static final double CHOP_RANGE_MAX = 8.0; // Tầm chặt tối đa khi nhìn thẳng
+
     private BlockPos basePos;
     private int treeHeight = 0;
+    private BlockPos currentTargetBlock;
 
     public ChopTreeGoal(LumberjackNpcEntity npc) {
         this.npc = npc;
@@ -42,29 +49,17 @@ public class ChopTreeGoal extends Goal {
             return false;
         }
 
-        // Tính chiều cao và thời gian chặt
         calculateTreeHeight();
         calculateChoppingTime();
 
         return true;
-
     }
 
     @Override
     public void start() {
         taskTicks = 0;
-
-        // Di chuyển đến gốc cây (tìm log thấp nhất)
         basePos = findLowestLog();
-        if (basePos != null) {
-            npc.getNavigation().startMovingTo(
-                    basePos.getX() + 0.5,
-                    basePos.getY(),
-                    basePos.getZ() + 0.5,
-                    1.2f
-            );
-        }
-
+        currentTargetBlock = null;
     }
 
     @Override
@@ -78,33 +73,32 @@ public class ChopTreeGoal extends Goal {
             }
             return;
         }
-        // Nếu chưa đến gốc cây thì chờ
-        if (basePos != null && npc.squaredDistanceTo(
-                basePos.getX() + 0.5,
-                basePos.getY() + 0.5,
-                basePos.getZ() + 0.5
-        ) > 2 * 2) {
-            return;
+
+        // Tìm block tiếp theo
+        BlockPos nextBlock = findBestBlockToChop();
+
+        if (nextBlock == null) {
+            return; // Chặt xong rồi
         }
-        // Tìm log trong tầm chặt
-        BlockPos nextLog = findLowestLogInTree();
 
-        if (nextLog != null) {
-            npc.getLookControl().lookAt(
-                    nextLog.getX() + 0.5,
-                    nextLog.getY() + 0.5,
-                    nextLog.getZ() + 0.5
-            );
+        Vec3d npcPos = npc.getPos();
 
-            chopBlock(nextLog);
-            treeBlocks.remove(nextLog);
+        // Tính khoảng cách thực tế (3D)
+        double dist3D = npcPos.distanceTo(nextBlock.toCenterPos());
+        double horizontalDist = Math.sqrt(
+                Math.pow(nextBlock.getX() - npcPos.x, 2) +
+                        Math.pow(nextBlock.getZ() - npcPos.z, 2)
+        );
+        double verticalDist = nextBlock.getY() - npcPos.y;
+
+        // Kiểm tra block có nằm trong tầm chặt không
+        if (isInChopRange(horizontalDist, verticalDist, dist3D)) {
+            // Có thể chặt luôn
+            chopBlockAtPos(nextBlock);
+            treeBlocks.remove(nextBlock);
         } else {
-            // Không còn log -> chặt leaves
-            BlockPos nextLeaf = findAnyLeafInTree();
-            if (nextLeaf != null) {
-                chopBlock(nextLeaf);
-                treeBlocks.remove(nextLeaf);
-            }
+            // Cần di chuyển gần lại
+            moveCloserToBlock(nextBlock);
         }
     }
 
@@ -112,8 +106,6 @@ public class ChopTreeGoal extends Goal {
     public boolean shouldContinue() {
         if (taskTicks > maxTaskTicks) return false;
         if (pickupDelay > 0) return true;
-
-        // Tiếp tục nếu còn block cây trong tầm
         return !treeBlocks.isEmpty();
     }
 
@@ -126,6 +118,7 @@ public class ChopTreeGoal extends Goal {
         targetTree = null;
         treeBlocks.clear();
         lastChopPos = null;
+        currentTargetBlock = null;
         pickupDelay = 0;
         taskTicks = 0;
         treeHeight = 0;
@@ -133,51 +126,9 @@ public class ChopTreeGoal extends Goal {
         maxTaskTicks = 0;
         npc.memory.resetIdle();
     }
+
     /**
-     * Tính chiều cao cây (từ log thấp nhất đến cao nhất)
-     */
-    private void calculateTreeHeight() {
-        int minY = Integer.MAX_VALUE;
-        int maxY = Integer.MIN_VALUE;
-
-        for (BlockPos pos : treeBlocks) {
-            BlockState state = npc.getWorld().getBlockState(pos);
-            if (state.getBlock() instanceof PillarBlock) {
-                minY = Math.min(minY, pos.getY());
-                maxY = Math.max(maxY, pos.getY());
-            }
-        }
-
-        treeHeight = maxY - minY + 1;
-    }
-    /**
-     * Tính thời gian chặt dựa trên chiều cao cây
-     * Công thức: chiều_cao × 25 ticks (1.25 giây/block cao)
-     * Cây càng cao càng lâu chặt
-     */
-    private void calculateChoppingTime() {
-        // Mỗi block chiều cao = 25 ticks (1.25 giây)
-        // Cộng thêm 60 ticks buffer và thời gian cho leaves
-        int logCount = 0;
-        int leafCount = 0;
-
-        for (BlockPos pos : treeBlocks) {
-            BlockState state = npc.getWorld().getBlockState(pos);
-            if (state.getBlock() instanceof PillarBlock) {
-                logCount++;
-            } else if (state.getBlock() instanceof LeavesBlock) {
-                leafCount++;
-            }
-        }
-
-        // Công thức: (chiều_cao × 20) + (số_lá × 3) + 60 buffer
-        maxTaskTicks = (treeHeight * 20) + (leafCount * 2) + 60;
-
-        // Giới hạn: tối thiểu 80 ticks (4s), tối đa 1500 ticks (300s)
-        maxTaskTicks = Math.max(80, Math.min(600, maxTaskTicks));
-    }
-    /**
-     * Quét tất cả blocks của cây (log + leaves)
+     * Quét tất cả blocks của cây (log + leaves) - quét rộng hơn
      */
     private void scanTree(BlockPos start) {
         treeBlocks.clear();
@@ -187,7 +138,7 @@ public class ChopTreeGoal extends Goal {
         queue.add(start);
         visited.add(start);
 
-        while (!queue.isEmpty() && treeBlocks.size() < 1500) { // Giới hạn 200 blocks
+        while (!queue.isEmpty() && treeBlocks.size() < 2000) {
             BlockPos pos = queue.poll();
             BlockState state = npc.getWorld().getBlockState(pos);
             Block block = state.getBlock();
@@ -196,97 +147,107 @@ public class ChopTreeGoal extends Goal {
             if (block instanceof PillarBlock || block instanceof LeavesBlock) {
                 treeBlocks.add(pos);
 
-                // Tìm các block liền kề
-                for (BlockPos neighbor : getNeighbors(pos, block instanceof PillarBlock)) {
-                    if (!visited.contains(neighbor)) {
-                        visited.add(neighbor);
-                        queue.add(neighbor);
+                // Tìm các block liền kề - quét rộng hơn cho lá rơi vãi
+                int range = 3; // Cả hai mở rộng
+                for (int dx = -range; dx <= range; dx++) {
+                    for (int dy = -1; dy <= 2; dy++) {
+                        for (int dz = -range; dz <= range; dz++) {
+                            if (dx == 0 && dy == 0 && dz == 0) continue;
+                            BlockPos neighbor = pos.add(dx, dy, dz);
+                            if (!visited.contains(neighbor)) {
+                                visited.add(neighbor);
+                                queue.add(neighbor);
+                            }
+                        }
                     }
                 }
             }
         }
     }
 
-    private List<BlockPos> getNeighbors(BlockPos pos, boolean isLog) {
-        List<BlockPos> neighbors = new ArrayList<>();
-        int range = isLog ? 2 : 1;
-        for (int dx = -range; dx <= range; dx++) {
-            for (int dy = -1; dy <= 1; dy++) {
-                for (int dz = -range; dz <= range; dz++) {
-                    if (dx == 0 && dy == 0 && dz == 0) continue;
-                    neighbors.add(pos.add(dx, dy, dz));
-                }
-            }
+    /**
+     * Kiểm tra block có nằm trong tầm chặt không
+     * - Ngang: 5 block
+     * - Dọc: 6 block (lên hoặc xuống)
+     * - Tối đa: 8 block (đường thẳng)
+     */
+    private boolean isInChopRange(double horizontalDist, double verticalDist, double dist3D) {
+        // Nếu trong tầm ngang + dọc
+        if (horizontalDist <= CHOP_RANGE_HORIZONTAL &&
+                Math.abs(verticalDist) <= CHOP_RANGE_VERTICAL) {
+            return true;
         }
-        return neighbors;
+
+        // Hoặc nếu trong tầm tối đa (đường thẳng)
+        if (dist3D <= CHOP_RANGE_MAX) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
-     * Tìm log thấp nhất (gốc cây)
+     * Tìm block tốt nhất để chặt
+     * Ưu tiên: log từ thấp lên cao -> lá
      */
-    private BlockPos findLowestLog() {
-        BlockPos lowest = null;
-        int lowestY = Integer.MAX_VALUE;
+    private BlockPos findBestBlockToChop() {
+        Vec3d npcPos = npc.getPos();
+        BlockPos bestBlock = null;
+        double bestScore = Double.MAX_VALUE;
 
         for (BlockPos pos : treeBlocks) {
             BlockState state = npc.getWorld().getBlockState(pos);
-            if (state.getBlock() instanceof PillarBlock) {
-                if (pos.getY() < lowestY) {
-                    lowestY = pos.getY();
-                    lowest = pos;
-                }
-            }
-        }
-        return lowest;
-    }
-    /**
-     * Tìm log thấp nhất còn lại (để chặt từ dưới lên)
-     */
-    private BlockPos findLowestLogInTree() {
-        BlockPos lowest = null;
-        int lowestY = Integer.MAX_VALUE;
+            Block block = state.getBlock();
 
-        for (BlockPos pos : treeBlocks) {
-            BlockState state = npc.getWorld().getBlockState(pos);
-            if (!(state.getBlock() instanceof PillarBlock)) continue;
+            // Tính điểm ưu tiên
+            double score = Double.MAX_VALUE;
 
-            if (pos.getY() < lowestY) {
-                lowestY = pos.getY();
-                lowest = pos;
+            if (block instanceof PillarBlock) {
+                // Ưu tiên log từ thấp lên cao
+                score = pos.getY() * 1000; // Thấp nhất = điểm cao nhất (cao nhất ở đầu)
+            } else if (block instanceof LeavesBlock) {
+                // Lá kém ưu tiên hơn log
+                score = 1000000 + pos.getY();
+            }
+
+            if (score < bestScore) {
+                bestScore = score;
+                bestBlock = pos;
             }
         }
-        return lowest;
-    }
-    /**
-     * Tìm lá bất kỳ còn lại
-     */
-    private BlockPos findAnyLeafInTree() {
-        for (BlockPos pos : treeBlocks) {
-            BlockState state = npc.getWorld().getBlockState(pos);
-            if (state.getBlock() instanceof LeavesBlock) {
-                return pos;
-            }
-        }
-        return null;
+
+        return bestBlock;
     }
 
     /**
-     * Chặt block
+     * Chặt block tại vị trí cụ thể
      */
-    private void chopBlock(BlockPos pos) {
+    private void chopBlockAtPos(BlockPos pos) {
+        npc.getLookControl().lookAt(
+                pos.getX() + 0.5,
+                pos.getY() + 0.5,
+                pos.getZ() + 0.5
+        );
+
         var world = npc.getWorld();
-        var state = world.getBlockState(pos);
-
-        // Drop items
-//        Block.dropStacks(state, world, pos, null, npc, ItemStack.EMPTY);
-        // Xóa block
-//        world.setBlockState(pos, Blocks.AIR.getDefaultState(), Block.NOTIFY_ALL);
-
         world.breakBlock(pos, true, npc);
         lastChopPos = pos.toImmutable();
         pickupDelay = 5;
         npc.memory.lastTreePos = pos;
         npc.memory.resetIdle();
+    }
+
+    /**
+     * Di chuyển NPC gần block
+     */
+    private void moveCloserToBlock(BlockPos block) {
+        // Fallback: di chuyển tới chính block
+        npc.getNavigation().startMovingTo(
+                block.getX() + 2.5,
+                block.getY(),
+                block.getZ() + 2.5,
+                1.2f
+        );
     }
 
     /**
@@ -328,5 +289,62 @@ public class ChopTreeGoal extends Goal {
             }
         }
         return stack.isEmpty();
+    }
+
+    /**
+     * Tính chiều cao cây
+     */
+    private void calculateTreeHeight() {
+        int minY = Integer.MAX_VALUE;
+        int maxY = Integer.MIN_VALUE;
+
+        for (BlockPos pos : treeBlocks) {
+            BlockState state = npc.getWorld().getBlockState(pos);
+            if (state.getBlock() instanceof PillarBlock) {
+                minY = Math.min(minY, pos.getY());
+                maxY = Math.max(maxY, pos.getY());
+            }
+        }
+
+        treeHeight = (minY == Integer.MAX_VALUE) ? 1 : (maxY - minY + 1);
+    }
+
+    /**
+     * Tính thời gian chặt
+     */
+    private void calculateChoppingTime() {
+        int logCount = 0;
+        int leafCount = 0;
+
+        for (BlockPos pos : treeBlocks) {
+            BlockState state = npc.getWorld().getBlockState(pos);
+            if (state.getBlock() instanceof PillarBlock) {
+                logCount++;
+            } else if (state.getBlock() instanceof LeavesBlock) {
+                leafCount++;
+            }
+        }
+
+        maxTaskTicks = (logCount * 15) + (leafCount * 2) + 60;
+        maxTaskTicks = Math.max(80, Math.min(1200, maxTaskTicks));
+    }
+
+    /**
+     * Tìm log thấp nhất
+     */
+    private BlockPos findLowestLog() {
+        BlockPos lowest = null;
+        int lowestY = Integer.MAX_VALUE;
+
+        for (BlockPos pos : treeBlocks) {
+            BlockState state = npc.getWorld().getBlockState(pos);
+            if (state.getBlock() instanceof PillarBlock) {
+                if (pos.getY() < lowestY) {
+                    lowestY = pos.getY();
+                    lowest = pos;
+                }
+            }
+        }
+        return lowest;
     }
 }
