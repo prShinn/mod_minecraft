@@ -25,7 +25,7 @@ public class ChopTreeGoal extends Goal {
     // Tầm chặt
     private static final double CHOP_RANGE_HORIZONTAL = 5.0; // Tầm ngang (horiz)
     private static final double CHOP_RANGE_VERTICAL = 6.0; // Tầm dọc (vertical)
-    private static final double CHOP_RANGE_MAX = 8.0; // Tầm chặt tối đa khi nhìn thẳng
+    private static final double CHOP_RANGE_MAX = 30.0; // Tầm chặt tối đa khi nhìn thẳng
 
     private BlockPos basePos;
     private int treeHeight = 0;

@@ -19,7 +19,7 @@ public class PlantSaplingGoal extends Goal {
     private final LumberjackNpcEntity npc;
     private BlockPos plantPos;
     private int taskTicks = 0;
-    private static final int MAX_TASK_TICKS = 80;
+    private static final int MAX_TASK_TICKS = 160;
     private static final double PLANT_DIST_SQ = 2.25;
     private static final int PLANT_DISTANCE = 2;
     private int searchCooldown = 0;
@@ -46,9 +46,9 @@ public class PlantSaplingGoal extends Goal {
     public void start() {
         taskTicks = 0;
         npc.getNavigation().startMovingTo(
-                plantPos.getX() + 0.5,
+                plantPos.getX() + 1.5,
                 plantPos.getY(),
-                plantPos.getZ() + 0.5,
+                plantPos.getZ() + 1.5,
                 1.2
         );
     }
@@ -199,7 +199,7 @@ public class PlantSaplingGoal extends Goal {
                     // Phải là đất và không có gì ở trên
                     if (isValidGround(ground.getBlock()) && above.isAir()) {
                         // Kiểm tra có đủ ánh sáng không (mầm cây cần ánh sáng)
-                        if (world.getLightLevel(pos.up()) >= 6) {
+                        if (world.getLightLevel(pos.up()) >= 0) {
                             double dist = npc.squaredDistanceTo(
                                     pos.getX() + 0.5,
                                     pos.getY() + 0.5,
