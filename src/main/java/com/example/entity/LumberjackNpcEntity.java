@@ -94,21 +94,12 @@ public class LumberjackNpcEntity extends PathAwareEntity {
                 inventory,  // NPC inventory
                 24              // search radius
         ));
-
 //        this.goalSelector.add(3, new WanderForBedGoal(this, 1.0));
-        this.goalSelector.add(4, new ChopTreeGoal(this)
-
-        ); // Chặt cây
-        this.goalSelector.add(5, new DepositWoodToChestGoal(this)
-
-        ); // Cất vao chest
-        this.goalSelector.add(6, new PlantSaplingGoal(this)
-
-        ); // Trồng mầm cây
+        this.goalSelector.add(4, new ChopTreeGoal(this)); // Chặt cây
+        this.goalSelector.add(5, new DepositWoodToChestGoal(this)); // Cất vao chest
+        this.goalSelector.add(6, new PlantSaplingGoal(this)); // Trồng mầm cây
         this.goalSelector.add(7, new LookAtEntityGoal(this, PlayerEntity.class, 8.0F));
-        this.goalSelector.add(8, new WanderNearChestGoal(this)
-
-        ); // Lang thang và tìm chest
+        this.goalSelector.add(8, new WanderNearChestGoal(this)); // Lang thang và tìm chest
         this.goalSelector.add(8, new LookAroundGoal(this));
 //        this.goalSelector.add(9, new WanderAroundFarGoal(this, 1.0D)); // ✅ GIỮ - Wander NGÀY + ĐÊM (khi idle)
         // Trang bị rìu nếu chưa có
