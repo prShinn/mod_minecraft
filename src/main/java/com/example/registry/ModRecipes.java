@@ -19,6 +19,8 @@ public class ModRecipes {
     public static RecipeSerializer<ProfessionChestRecipe.MinerChestRecipe> MINER_CHEST_RECIPE;
     public static RecipeSerializer<ProfessionChestRecipe.LumberjackChestRecipe> LUMBERJACK_CHEST_RECIPE;
     public static RecipeSerializer<ProfessionChestRecipe.FishermanChestRecipe> FISHERMAN_CHEST_RECIPE;
+    public static RecipeSerializer<ProfessionChestRecipe.RancherChestRecipe> RANCHER_CHEST_RECIPE;
+    public static RecipeSerializer<ProfessionChestRecipe.CookChestRecipe> COOK_CHEST_RECIPE;
 
     public static void register() {
         FARMER_CHEST_RECIPE = Registry.register(
@@ -43,6 +45,18 @@ public class ModRecipes {
                 Registries.RECIPE_SERIALIZER,
                 new Identifier(ExampleMod.MODID, "fisherman_chest"),
                 new SpecialRecipeSerializer<>(ProfessionChestRecipe.FishermanChestRecipe::new)
+        );
+
+        RANCHER_CHEST_RECIPE = Registry.register(
+                Registries.RECIPE_SERIALIZER,
+                new Identifier(ExampleMod.MODID, "rancher_chest"),
+                new SpecialRecipeSerializer<>(ProfessionChestRecipe.RancherChestRecipe::new)
+        );
+
+        COOK_CHEST_RECIPE = Registry.register(
+                Registries.RECIPE_SERIALIZER,
+                new Identifier(ExampleMod.MODID, "cook_chest"),
+                new SpecialRecipeSerializer<>(ProfessionChestRecipe.CookChestRecipe::new)
         );
     }
 }

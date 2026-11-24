@@ -34,7 +34,7 @@ public class PlantSeedGoal extends Goal {
             return true;
         }
         if (npc.findNearestChest() == null) return false;
-        chest = npc.memory.lastChestPos;
+        chest = npc.getChestPos();
         return chest != null && (!npc.plantingSeeds.isEmpty()
                 || (npc.cachedEmptyFarmland != null && npc.isNearFarmChest(npc.cachedEmptyFarmland)
                     && isPlantable(npc.cachedEmptyFarmland) && npc.hasSeeds()));

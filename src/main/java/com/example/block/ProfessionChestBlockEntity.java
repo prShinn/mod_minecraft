@@ -36,6 +36,11 @@ public class ProfessionChestBlockEntity extends BlockEntity
         return ownerId == null || ownerId.equals(player.getUuid());
     }
 
+    /** NPC thuộc chủ ownerUuid có được dùng rương này không (rương chưa có chủ thì ai cũng dùng được). */
+    public boolean isAccessibleBy(@Nullable java.util.UUID ownerUuid) {
+        return ownerId == null || ownerId.equals(ownerUuid);
+    }
+
     public void setOwner(PlayerEntity player) {
         ownerId = player.getUuid();
         markDirty();

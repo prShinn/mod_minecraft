@@ -41,7 +41,7 @@ public class FishermanFishGoal extends Goal {
     public boolean canStart() {
         if (npc.sleeping.isSleeping()) return false;
         if (isInventoryFull() || (catchCount > 0 && npc.getWorld().getTime() >= depositAt)) requestDeposit();
-        if (npc.memory.needsToDeposit || npc.findNearestChest() == null) return false;
+        if (npc.needsToDeposit() || npc.findNearestChest() == null) return false;
         if (npc.memory.fishingSpot == null) return false;
 
         // Kểm tra đang đứng ở spot chưa
@@ -138,10 +138,10 @@ public class FishermanFishGoal extends Goal {
         if (loot.isEmpty()) return;
         for (ItemStack stack : loot) {
             boolean added = false;
-            for (int i = 0; i < npc.getInventory().size(); i++) {
-                ItemStack slot = npc.getInventory().getStack(i);
+            for (int i = 0; i < npc.getCargo().size(); i++) {
+                ItemStack slot = npc.getCargo().getStack(i);
                 if (slot.isEmpty()) {
-                    npc.getInventory().setStack(i, stack.copy());
+                    npc.getCargo().setStack(i, stack.copy());
                     stack.setCount(0);
                     added = true;
                     break;
@@ -177,14 +177,14 @@ public class FishermanFishGoal extends Goal {
     }
 
     private void requestDeposit() {
-        npc.memory.needsToDeposit = true;
+        npc.setNeedsToDeposit(true);
         npc.memory.fishingSpot = null;
         catchCount = 0;
     }
     
     private boolean isInventoryFull() {
-        for (int i = 0; i < npc.getInventory().size(); i++) {
-            if (npc.getInventory().getStack(i).isEmpty()) return false;
+        for (int i = 0; i < npc.getCargo().size(); i++) {
+            if (npc.getCargo().getStack(i).isEmpty()) return false;
         }
         return true;
     }
@@ -192,7 +192,7 @@ public class FishermanFishGoal extends Goal {
     @Override
     public boolean shouldContinue() {
         if (npc.sleeping.isSleeping()) return false;
-        if (npc.memory.needsToDeposit) return false;
+        if (npc.needsToDeposit()) return false;
         if (npc.memory.fishingSpot == null) return false;
         return true;
     }

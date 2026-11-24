@@ -140,10 +140,10 @@ public class HarvestCropGoal extends Goal {
             
             for (ItemStack stack : drops) {
                 boolean added = false;
-                for (int i = 0; i < npc.getInventory().size(); i++) {
-                    ItemStack slot = npc.getInventory().getStack(i);
+                for (int i = 0; i < npc.getCargo().size(); i++) {
+                    ItemStack slot = npc.getCargo().getStack(i);
                     if (slot.isEmpty()) {
-                        npc.getInventory().setStack(i, stack.copy());
+                        npc.getCargo().setStack(i, stack.copy());
                         stack.setCount(0);
                         added = true;
                         break;
@@ -211,7 +211,7 @@ public class HarvestCropGoal extends Goal {
         for (ItemEntity item : drops) {
             ItemStack stack = item.getStack();
 
-            boolean addedAll = addToInventory(npc.getInventory(), stack);
+            boolean addedAll = addToInventory(npc.getCargo(), stack);
 
             if (addedAll) {
                 item.discard();

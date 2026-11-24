@@ -6,6 +6,7 @@ import com.example.item.LumberJackTokenItem;
 import com.example.item.FishermanTokenItem;
 import com.example.item.MinerTokenItem;
 import com.example.item.SoldierTokenItem;
+import com.example.item.WorkerTokenItem;
 import net.minecraft.item.Item;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
@@ -17,6 +18,8 @@ public class ModItems {
     public static Item LUMBERJACK_TOKEN;
     public static Item MINER_TOKEN;
     public static Item FISHERMAN_TOKEN;
+    public static Item RANCHER_TOKEN;
+    public static Item COOK_TOKEN;
 
     public static void register() {
         SOLDIER_TOKEN = Registry.register(Registries.ITEM,
@@ -40,5 +43,14 @@ public class ModItems {
         FISHERMAN_TOKEN = Registry.register(Registries.ITEM,
                 new Identifier(ExampleMod.MODID, "fisherman_token"),
                 new FishermanTokenItem(new Item.Settings().maxCount(1)));
+
+        // ===== RANCHER & COOK TOKEN =====
+        RANCHER_TOKEN = Registry.register(Registries.ITEM,
+                new Identifier(ExampleMod.MODID, "rancher_token"),
+                new WorkerTokenItem(new Item.Settings().maxCount(1), () -> ModEntities.RANCHER_NPC));
+
+        COOK_TOKEN = Registry.register(Registries.ITEM,
+                new Identifier(ExampleMod.MODID, "cook_token"),
+                new WorkerTokenItem(new Item.Settings().maxCount(1), () -> ModEntities.COOK_NPC));
     }
 }

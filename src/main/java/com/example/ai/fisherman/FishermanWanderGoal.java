@@ -20,7 +20,7 @@ public class FishermanWanderGoal extends Goal {
     @Override
     public boolean canStart() {
         if (npc.sleeping.isSleeping()) return false;
-        if (npc.memory.needsToDeposit) return false;
+        if (npc.needsToDeposit()) return false;
         if (npc.memory.fishingSpot != null) return false; // Nếu có hồ cá thì không lang thang
 
         if (!npc.memory.shouldWander()) return false;

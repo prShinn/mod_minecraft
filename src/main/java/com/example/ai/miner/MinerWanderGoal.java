@@ -46,7 +46,7 @@ public class MinerWanderGoal extends Goal {
         // Chỉ lang thang khi đã idle lâu
         if (!npc.memory.shouldWander()) return false;
         // The higher priority mining goal owns ore discovery.
-        return !npc.memory.needsToDeposit;
+        return !npc.needsToDeposit();
     }
 
     @Override

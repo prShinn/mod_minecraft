@@ -43,15 +43,15 @@ public class DepositOreToChestGoal extends Goal {
         if (npc.sleeping.isSleeping() || npc.getWorld().getTime() < retryAt) return false;
 
         // Không chạy nếu inventory trống (không có gì để cất)
-        if (isInventoryEmpty(npc.getInventory())) return false;
+        if (isInventoryEmpty(npc.getCargo())) return false;
 
         // CHỈ chạy khi có cờ báo hiệu cần cất đồ (do MineOreVeinGoal bật)
-        if (!npc.memory.needsToDeposit) return false;
+        if (!npc.needsToDeposit()) return false;
 
         // Tìm chest gần nhất
         npc.findNearestChest();
-        targetChestPos = delivery.find(npc, npc.memory.lastChestPos, com.example.block.MinerChestBlockEntity.class,
-                npc.getInventory(), stack -> !stack.isFood(), 24, 5, npc.display);
+        targetChestPos = delivery.find(npc, npc.getChestPos(), com.example.block.MinerChestBlockEntity.class,
+                npc.getCargo(), stack -> !stack.isFood(), 24, 5, npc.display);
         if (targetChestPos == null) return false;
 
         deposited = false;
@@ -74,11 +74,12 @@ public class DepositOreToChestGoal extends Goal {
                 || !(world.getBlockEntity(targetChestPos) instanceof com.example.block.MinerChestBlockEntity chest)) {
             npc.display.report(npc, "Rương nghề không còn dùng được");
             deposited = true;
-        } else if (!com.example.ai.DeliveryTarget.hasSpace(chest, npc.getInventory(), stack -> !stack.isFood())) {
+        } else if (!com.example.ai.DeliveryTarget.hasSpace(chest, npc.getCargo(), stack -> !stack.isFood())) {
             npc.display.report(npc, "Rương nghề đã đầy");
             deposited = true;
         } else if (com.example.ai.DeliveryTarget.canReach(npc, targetChestPos)) {
             dumpInventoryToChest();
+            com.example.helper.NpcFeedback.success(npc);
             deposited = true;
         } else if (npc.getNavigation().isIdle() || taskTicks >= MAX_TASK_TICKS) {
             delivery.markBlocked(npc, targetChestPos);
@@ -109,7 +110,7 @@ public class DepositOreToChestGoal extends Goal {
      * Dump toàn bộ inventory NPC vào chest
      */
     private void dumpInventoryToChest() {
-        SimpleInventory npcInv = npc.getInventory();
+        SimpleInventory npcInv = npc.getCargo();
         if (!npc.getWorld().isChunkLoaded(targetChestPos)
                 || !(npc.getWorld().getBlockEntity(targetChestPos) instanceof com.example.block.MinerChestBlockEntity targetChest)) return;
 
@@ -127,7 +128,7 @@ public class DepositOreToChestGoal extends Goal {
                 npcInv.setStack(i, remaining);
             }
         }
-        npc.memory.needsToDeposit = !isInventoryEmpty(npcInv);
+        npc.setNeedsToDeposit(!isInventoryEmpty(npcInv));
         npc.memory.resetIdle();
     }
 

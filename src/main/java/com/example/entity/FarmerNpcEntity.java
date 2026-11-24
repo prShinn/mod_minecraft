@@ -1,394 +1,244 @@
 package com.example.entity;
 
-import com.example.ai.FindAndSleepGoal;
-import com.example.ai.GlobalReservationSystem;
-import com.example.ai.WanderForBedGoal;
-import com.example.ai.farmer.*;
-import com.example.ai.foodChest.FindAndEatFoodGoal;
-import com.example.entity.base.NpcDisplayComponent;
-import com.example.entity.base.NpcEquipmentComponent;
-import com.example.entity.base.NpcSleepingComponent;
+import com.example.ai.farmer.DepositToChestGoal;
+import com.example.ai.farmer.FarmerMemory;
+import com.example.ai.farmer.HarvestCropGoal;
+import com.example.ai.farmer.PlantSeedGoal;
+import com.example.ai.farmer.ReturnToFarmGoal;
+import com.example.block.FarmerChestBlockEntity;
+import com.example.block.ProfessionChestBlockEntity;
+import com.example.entity.base.WorkerNpcEntity;
 import com.example.registry.ModItems;
-import net.minecraft.block.*;
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.entity.*;
-import net.minecraft.entity.ai.goal.*;
-import net.minecraft.entity.damage.DamageSource;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.Blocks;
+import net.minecraft.block.CropBlock;
+import net.minecraft.block.FarmlandBlock;
+import net.minecraft.entity.EntityType;
+import net.minecraft.entity.ai.goal.WanderAroundFarGoal;
 import net.minecraft.entity.mob.PathAwareEntity;
-import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.inventory.Inventory;
-import net.minecraft.inventory.SimpleInventory;
-import net.minecraft.item.ArmorItem;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.nbt.NbtCompound;
-import net.minecraft.text.Text;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Hand;
+import net.minecraft.nbt.NbtList;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
 
-public class FarmerNpcEntity extends PathAwareEntity {
-    public final NpcDisplayComponent display = new NpcDisplayComponent();
-    private final NpcEquipmentComponent equip = new NpcEquipmentComponent();
-    public final com.example.entity.base.NpcSleepingComponent sleeping = new com.example.entity.base.NpcSleepingComponent();
-    private final GlobalReservationSystem reservationSystem = GlobalReservationSystem.getInstance(getWorld());
-    private BlockPos currentFarmPos;
-    private UUID ownerUUID;
+/** Nông dân: thu hoạch và gieo lại ruộng quanh Rương Nông dân, nộp nông sản về rương. */
+public class FarmerNpcEntity extends WorkerNpcEntity {
+    private static final int FIND_CHEST_DISTANCE = 16;
+    private static final int FARM_RADIUS = 12;
+    private static final int FARMLAND_SEARCH_COOLDOWN = 40; // rải việc quét ruộng trong 2 giây
 
-    public void setOwnerUUID(UUID ownerUUID) {
-        this.ownerUUID = ownerUUID;
-    }
-    private UUID followPlayerUUID;
-    public final SimpleInventory foodInventory = new SimpleInventory(9);
-    private final SimpleInventory supplies = new SimpleInventory(9);
     public final FarmerMemory memory = new FarmerMemory();
-    private static final int FIND_CHEST_DISTANCE = 16; // 1 second
-
-
-    // Thay vì static Set
-
-    // ===== COOLDOWN VARIABLES =====
-    private int farmlandSearchCooldown = getRandom().nextInt(40);
-    private static final int FARMLAND_SEARCH_COOLDOWN = 40; // Spread farmland scans over two seconds
-    private int chestSearchCooldown = 60;
-    private static final int CHEST_SEARCH_COOLDOWN = 100;
 
     public BlockPos cachedMatureCrop = null;
     public BlockPos cachedEmptyFarmland = null;
+    public BlockPos activeFarmPlot;
+    public final List<ItemStack> plantingSeeds = new ArrayList<>();
+    public BlockPos seedChestPos;
+    public boolean returningSeeds;
 
-    // ===== HELPER METHODS FOR RESERVATION MAPS =====
-    public boolean reserveCrop(BlockPos pos) {
-        return reservationSystem.tryReserve(pos, this.getUuid(), "CROP");
-    }
-
-    public void releaseCrop(BlockPos pos) {
-        reservationSystem.release(pos, this.getUuid(), "CROP");
-    }
-
-    public boolean reserveFarmland(BlockPos pos) {
-        return reservationSystem.tryReserve(pos, this.getUuid(), "FARMLAND");
-    }
-
-    public void releaseFarmland(BlockPos pos) {
-        reservationSystem.release(pos, this.getUuid(), "FARMLAND");
-    }
-
-    public boolean reserveChest(BlockPos pos) {
-        return reservationSystem.tryReserve(pos, this.getUuid(), "WORK_CHEST");
-    }
-
-    public void releaseChest(BlockPos pos) {
-        reservationSystem.release(pos, this.getUuid(), "WORK_CHEST");
-    }
-
-    public boolean isChestReserved(BlockPos pos) {
-        return reservationSystem.isReservedByOthers(pos, this.getUuid(), "WORK_CHEST");
-    }
-
-    private void cleanupAllReservations() {
-        reservationSystem.releaseAll(this.getUuid());
-    }
+    private BlockPos currentFarmPos;
+    private UUID followPlayerUUID;
+    private int farmlandSearchCooldown = getRandom().nextInt(40);
 
     public FarmerNpcEntity(EntityType<? extends PathAwareEntity> entityType, World world) {
-        super(entityType, world);
+        super(entityType, world, 9);
     }
 
     @Override
-    public boolean cannotDespawn() {
-        return true;
+    protected void addWorkGoals() {
+        this.goalSelector.add(5, new HarvestCropGoal(this));
+        this.goalSelector.add(6, new DepositToChestGoal(this));
+        this.goalSelector.add(7, new PlantSeedGoal(this));
+        this.goalSelector.add(8, new ReturnToFarmGoal(this));
+        this.goalSelector.add(9, new WanderAroundFarGoal(this, 1.0D));
     }
 
-    // ===== AI GOALS =====
     @Override
-    protected void initGoals() {
-        super.initGoals();
-        this.goalSelector.clear(goal -> true);
-        this.targetSelector.clear(goal -> true);
-
-        this.goalSelector.add(0, new SwimGoal(this)); // ko chet duoi
-        this.goalSelector.add(1, new EscapeDangerGoal(this, 1.4)); // chay khi bi dame
-        this.goalSelector.add(2, new com.example.ai.FindAndSleepGoal(this, () -> sleeping));
-        this.goalSelector.add(3, new FindAndEatFoodGoal(this, () -> supplies, 24, () -> display.shouldEat(), amount -> display.feed(amount)));
-//        this.goalSelector.add(3, new WanderForBedGoal(this, 1.0, sleeping));
-        this.goalSelector.add(4, new HarvestCropGoal(this)); // thu hoach
-        this.goalSelector.add(5, new DepositToChestGoal(this)); // cât đô
-        this.goalSelector.add(6, new PlantSeedGoal(this)); // trồng cây
-        this.goalSelector.add(7, new ReturnToFarmGoal(this)); // quay lại farm
-        this.goalSelector.add(8, new LookAtEntityGoal(this, PlayerEntity.class, 8.0F)); // nhin player
-        this.goalSelector.add(9, new WanderAroundFarGoal(this, 1.0D)); // đi lang thang xa
-        this.goalSelector.add(9, new LookAroundGoal(this));//nhin xunh quanh
-        ItemStack mainHand = this.getEquippedStack(EquipmentSlot.MAINHAND);
-        if (mainHand.isEmpty()) {
-            this.equipStack(EquipmentSlot.MAINHAND, new ItemStack(Items.IRON_HOE));
-            // Không drop khi chết
-            this.setEquipmentDropChance(EquipmentSlot.MAINHAND, 0.0F);
-        }
+    protected Class<? extends ProfessionChestBlockEntity> chestType() {
+        return FarmerChestBlockEntity.class;
     }
 
+    @Override
+    public Item tokenItem() {
+        return ModItems.FARMER_TOKEN;
+    }
+
+    @Override
+    public String professionName() {
+        return "Nông dân";
+    }
+
+    @Override
+    protected ItemStack workTool() {
+        return new ItemStack(Items.IRON_HOE);
+    }
+
+    @Override
+    protected int chestSearchRadius() {
+        return FIND_CHEST_DISTANCE;
+    }
+
+    @Override
+    protected int chestSearchHeight() {
+        return 2;
+    }
+
+    @Override
+    protected String legacyCargoKey() {
+        return "FoodInventory";
+    }
 
     @Override
     public void tick() {
         super.tick();
-        if (this.getWorld() == null || this.getWorld().isClient) return;
-        sleeping.setSearchCenter(memory.lastChestPos);
-        sleeping.tick(this);
-        display.tick(this, supplies, goalSelector);
-        if (farmlandSearchCooldown > 0) {
-            farmlandSearchCooldown--;
-        } else {
-            scanFarmland();
-        }
-        if (chestSearchCooldown > 0) {
-            chestSearchCooldown--;
-        }
-
-        // Update idle ticks
-        if (this.getNavigation().isIdle()) {
-            memory.tickIdle();
-        } else {
-            memory.resetIdle();
-        }
-
-        // Trong tick() - cleanup sớm nếu HP thấp
-        if (this.getHealth() <= 2.0F) {
-            cleanupAllReservations();
-        }
+        if (getWorld().isClient) return;
+        if (farmlandSearchCooldown > 0) farmlandSearchCooldown--;
+        else scanFarmland();
+        if (getNavigation().isIdle()) memory.tickIdle();
+        else memory.resetIdle();
     }
 
-    @Override
-    public ActionResult interactMob(PlayerEntity player, Hand hand) {
-        // Nếu player đang cố gắng lấy cuốc từ NPC
-        ItemStack held = player.getStackInHand(hand);
-        // Nếu đang cầm armor hoặc food → ignore
-        if (player.isSneaking() || held.getItem() instanceof ArmorItem || held.isFood()) {
+    // ===== NBT =====
 
-        } else {
-            return ActionResult.FAIL;
-        }
-        ActionResult handled = equip.interactMob(this, player, ownerUUID, hand, supplies, ModItems.FARMER_TOKEN);
-        if (!handled.equals(ActionResult.FAIL)) {
-            return handled;
-        }
-        return super.interactMob(player, hand);
-    }
-
-    // ===== NBT SAVE/LOAD =====
     @Override
-    public void writeCustomDataToNbt(NbtCompound nbt) {
-        super.writeCustomDataToNbt(nbt);
-        display.writeNbt(nbt);
-        nbt.put("FoodInventory", foodInventory.toNbtList());
-        nbt.put("Supplies", supplies.toNbtList());
-        net.minecraft.nbt.NbtList seeds = new net.minecraft.nbt.NbtList();
+    protected void writeWorkerNbt(NbtCompound nbt) {
+        NbtList seeds = new NbtList();
         for (ItemStack stack : plantingSeeds) seeds.add(stack.writeNbt(new NbtCompound()));
         nbt.put("PlantingSeeds", seeds);
         if (seedChestPos != null) nbt.putLong("SeedChestPos", seedChestPos.asLong());
         nbt.putBoolean("ReturningSeeds", returningSeeds);
-        if (ownerUUID != null) {
-            nbt.putUuid("OwnerUUID", ownerUUID);
-        }
-        if (followPlayerUUID != null) {
-            nbt.putUuid("FollowPlayer", followPlayerUUID);
-        }
-        if (currentFarmPos != null) {
-            nbt.putLong("CurrentFarmPos", currentFarmPos.asLong());
-        }
+        if (followPlayerUUID != null) nbt.putUuid("FollowPlayer", followPlayerUUID);
+        if (currentFarmPos != null) nbt.putLong("CurrentFarmPos", currentFarmPos.asLong());
         nbt.putBoolean("IsFarmerNpc", true);
     }
 
     @Override
-    public void readCustomDataFromNbt(NbtCompound nbt) {
-        super.readCustomDataFromNbt(nbt);
-        display.readNbt(nbt);
-        if (nbt.contains("Supplies")) supplies.readNbtList(nbt.getList("Supplies", 10));
+    protected void readWorkerNbt(NbtCompound nbt) {
         plantingSeeds.clear();
         for (var entry : nbt.getList("PlantingSeeds", 10)) {
             ItemStack stack = ItemStack.fromNbt((NbtCompound) entry);
             if (!stack.isEmpty() && isSeedItem(stack.getItem())) plantingSeeds.add(stack);
         }
+        // Dữ liệu kiểu cũ: chỉ một túi hạt
         if (nbt.contains("PlantingSeed")) {
             ItemStack oldSeed = ItemStack.fromNbt(nbt.getCompound("PlantingSeed"));
             if (!oldSeed.isEmpty() && isSeedItem(oldSeed.getItem())) plantingSeeds.add(oldSeed);
         }
         seedChestPos = nbt.contains("SeedChestPos") ? BlockPos.fromLong(nbt.getLong("SeedChestPos")) : null;
         returningSeeds = nbt.getBoolean("ReturningSeeds");
-        if (nbt.contains("FoodInventory")) foodInventory.readNbtList(nbt.getList("FoodInventory", 10));
-        if (nbt.containsUuid("OwnerUUID")) {
-            ownerUUID = nbt.getUuid("OwnerUUID");
-        }
-        if (nbt.containsUuid("FollowPlayer")) {
-            followPlayerUUID = nbt.getUuid("FollowPlayer");
-        }
-        if (nbt.contains("CurrentFarmPos")) {
-            currentFarmPos = BlockPos.fromLong(nbt.getLong("CurrentFarmPos"));
-        }
-        ItemStack mainHand = this.getEquippedStack(EquipmentSlot.MAINHAND);
-        if (mainHand.isEmpty()) {
-            this.equipStack(EquipmentSlot.MAINHAND, new ItemStack(Items.IRON_HOE));
-
-            // Không drop khi chết
-            this.setEquipmentDropChance(EquipmentSlot.MAINHAND, 0.0F);
-        }
-
+        if (nbt.containsUuid("FollowPlayer")) followPlayerUUID = nbt.getUuid("FollowPlayer");
+        if (nbt.contains("CurrentFarmPos")) currentFarmPos = BlockPos.fromLong(nbt.getLong("CurrentFarmPos"));
     }
 
     @Override
-    public boolean damage(DamageSource source, float amount) {
-        boolean result = super.damage(source, amount);
-        if (!this.isAlive()) {
-            cleanupAllReservations();
-        }
-        return result;
+    protected void dropWorkerItems() {
+        for (ItemStack seed : plantingSeeds) dropStack(seed);
+        plantingSeeds.clear();
     }
 
-    @Override
-    public void remove(RemovalReason reason) {
-        if (!getWorld().isClient) {
-            sleeping.cancelMovingToBed(this);
-            sleeping.wakeUp(this);
-        }
-        cleanupAllReservations();
-        super.remove(reason);
+    // ===== Đặt chỗ ruộng =====
+
+    public boolean reserveCrop(BlockPos pos) {
+        return reservations().tryReserve(pos, getUuid(), "CROP");
     }
 
+    public void releaseCrop(BlockPos pos) {
+        reservations().release(pos, getUuid(), "CROP");
+    }
 
-    /**
-     * Tìm farm (farmland) gần nhất trong bán kính 24 block
-     * Ưu tiên: cây chín > đất trống > farmland bất kỳ
-     */
-//    public BlockPos findNearestFarmland() {
-//        BlockPos center = getBlockPos();
-//        World world = getWorld();
-//        BlockPos matureCrop = null;
-//        BlockPos emptyFarmland = null;
-//
-//        for (BlockPos pos : BlockPos.iterate(center.add(-24, -2, -24), center.add(24, 2, 24))) {
-//            BlockPos farmlandPos = pos;
-//            BlockPos cropPos = pos.up();
-//
-//            // Check xem vị trí này có farmland không
-//            if (!(world.getBlockState(farmlandPos).getBlock() instanceof FarmlandBlock)) {
-//                continue;
-//            }
-//
-//            // Ưu tiên cây chín
-//            if (world.getBlockState(cropPos).getBlock() instanceof CropBlock crop) {
-//                if (crop.isMature(world.getBlockState(cropPos))) {
-//                    if (matureCrop == null ||
-//                            squaredDistanceTo(Vec3d.ofCenter(cropPos)) < squaredDistanceTo(Vec3d.ofCenter(matureCrop))) {
-//                        matureCrop = cropPos;
-//                    }
-//                }
-//            }
-//            // Thứ 2 là đất trống
-//            else if (world.getBlockState(cropPos).isAir() && emptyFarmland == null) {
-//                emptyFarmland = farmlandPos;
-//            }
-//        }
-//
-//        if (matureCrop != null) return matureCrop;
-//        if (emptyFarmland != null) return emptyFarmland;
-//        return null;
-//    }
-    public BlockPos activeFarmPlot;
-    public final java.util.List<ItemStack> plantingSeeds = new java.util.ArrayList<>();
-    public BlockPos seedChestPos;
-    public boolean returningSeeds;
+    public boolean reserveFarmland(BlockPos pos) {
+        return reservations().tryReserve(pos, getUuid(), "FARMLAND");
+    }
+
+    public void releaseFarmland(BlockPos pos) {
+        reservations().release(pos, getUuid(), "FARMLAND");
+    }
+
+    // ===== Ruộng =====
 
     public boolean isNearFarmChest(BlockPos pos) {
-        BlockPos chest = memory.lastChestPos;
-        return chest != null && Math.abs(pos.getX() - chest.getX()) <= 12
-                && Math.abs(pos.getZ() - chest.getZ()) <= 12
+        BlockPos chest = getChestPos();
+        return chest != null && Math.abs(pos.getX() - chest.getX()) <= FARM_RADIUS
+                && Math.abs(pos.getZ() - chest.getZ()) <= FARM_RADIUS
                 && Math.abs(pos.getY() - chest.getY()) <= 2;
     }
 
     public boolean isWorkedByAnother(BlockPos plot) {
-        return !getWorld().getEntitiesByClass(FarmerNpcEntity.class,
-                new net.minecraft.util.math.Box(plot).expand(3),
+        return !getWorld().getEntitiesByClass(FarmerNpcEntity.class, new Box(plot).expand(3),
                 other -> other != this && plot.equals(other.activeFarmPlot)).isEmpty();
     }
 
+    /** Quét ruộng quanh rương: ưu tiên cây chín gần nhất, sau đó đất trống gần nhất. */
     public void scanFarmland() {
         World world = getWorld();
-        if (world == null) return;
-
         farmlandSearchCooldown = FARMLAND_SEARCH_COOLDOWN;
-        if (findNearestChest() == null || memory.lastChestPos == null) {
+        BlockPos center = findWorkChest();
+        if (center == null) {
             cachedMatureCrop = null;
             cachedEmptyFarmland = null;
             return;
         }
-        BlockPos center = memory.lastChestPos;
         BlockPos nearestMatureCrop = null;
         double nearestCropDist = Double.MAX_VALUE;
         BlockPos nearestEmptyFarmland = null;
         double nearestFarmlandDist = Double.MAX_VALUE;
-
         BlockPos.Mutable mutable = new BlockPos.Mutable();
 
-        for (int dx = -12; dx <= 12; dx++) {
-            for (int dz = -12; dz <= 12; dz++) {
+        for (int dx = -FARM_RADIUS; dx <= FARM_RADIUS; dx++) {
+            for (int dz = -FARM_RADIUS; dz <= FARM_RADIUS; dz++) {
                 for (int dy = -2; dy <= 2; dy++) {
                     mutable.set(center.getX() + dx, center.getY() + dy, center.getZ() + dz);
                     if (!world.isChunkLoaded(mutable)) continue;
-
-                    BlockState state = world.getBlockState(mutable);
-                    if (!(state.getBlock() instanceof FarmlandBlock)) continue;
+                    if (!(world.getBlockState(mutable).getBlock() instanceof FarmlandBlock)) continue;
 
                     BlockPos farmlandPos = mutable.toImmutable();
                     BlockPos cropPos = farmlandPos.up();
                     BlockState cropState = world.getBlockState(cropPos);
-
-                    double dist = this.squaredDistanceTo(cropPos.getX() + 0.5, cropPos.getY() + 0.5, cropPos.getZ() + 0.5);
-                    // 🌾 Ưu tiên cây chín
+                    double dist = squaredDistanceTo(cropPos.getX() + 0.5, cropPos.getY() + 0.5, cropPos.getZ() + 0.5);
                     if (cropState.getBlock() instanceof CropBlock crop && crop.isMature(cropState)) {
-                        if (isWorkedByAnother(cropPos.down())) continue;
+                        if (isWorkedByAnother(farmlandPos)) continue;
                         if (dist < nearestCropDist) {
                             nearestCropDist = dist;
-                            nearestMatureCrop = cropPos.toImmutable();
+                            nearestMatureCrop = cropPos;
                         }
-                    }
-                    // 🌱 Farmland trống
-                    else if (cropState.isAir()) {
+                    } else if (cropState.isAir()) {
                         if (isWorkedByAnother(farmlandPos)) continue;
                         if (dist < nearestFarmlandDist) {
                             nearestFarmlandDist = dist;
-                            nearestEmptyFarmland = farmlandPos.toImmutable();
+                            nearestEmptyFarmland = farmlandPos;
                         }
                     }
                 }
             }
         }
-        farmlandSearchCooldown = FARMLAND_SEARCH_COOLDOWN;
         cachedMatureCrop = nearestMatureCrop;
         cachedEmptyFarmland = nearestEmptyFarmland;
     }
 
-    /**
-     * Check xem có hạt giống trong inventory không
-     */
+    // ===== Hạt giống =====
+
+    /** Rương nông dân còn hạt giống không. */
     public boolean hasSeeds() {
         Inventory chest = findNearestChest();
         if (chest == null) return false;
-
         for (int i = 0; i < chest.size(); i++) {
-            ItemStack stack = chest.getStack(i);
-            if (isSeedItem(stack.getItem())) {
-                return true;
-            }
+            if (isSeedItem(chest.getStack(i).getItem())) return true;
         }
-
         return false;
     }
 
-    /**
-     * Lấy hạt giống từ inventory
-     */
+    /** Lấy một phần hạt giống từ rương, chia đều cho các nông dân dùng chung rương. */
     public boolean takeSeedBatch(BlockPos chestPos) {
         if (!plantingSeeds.isEmpty() || squaredDistanceTo(Vec3d.ofCenter(chestPos)) > 6.25) return false;
         var chest = getSeedChest(chestPos);
@@ -402,10 +252,10 @@ public class FarmerNpcEntity extends PathAwareEntity {
 
         int farmers = 1;
         boolean unknownAssignment = false;
-        var nearby = new net.minecraft.util.math.Box(chestPos).expand(FIND_CHEST_DISTANCE, 4, FIND_CHEST_DISTANCE);
+        var nearby = new Box(chestPos).expand(FIND_CHEST_DISTANCE, 4, FIND_CHEST_DISTANCE);
         for (FarmerNpcEntity other : getWorld().getEntitiesByClass(FarmerNpcEntity.class, nearby,
                 farmer -> farmer != this && farmer.isAlive())) {
-            BlockPos otherChest = other.memory.lastChestPos;
+            BlockPos otherChest = other.getChestPos();
             if (chestPos.equals(otherChest)) farmers++;
             else if (otherChest == null) unknownAssignment = true;
         }
@@ -427,9 +277,9 @@ public class FarmerNpcEntity extends PathAwareEntity {
         return true;
     }
 
-    public com.example.block.FarmerChestBlockEntity getSeedChest(BlockPos pos) {
+    public FarmerChestBlockEntity getSeedChest(BlockPos pos) {
         if (pos == null || !getWorld().isChunkLoaded(pos)) return null;
-        return getWorld().getBlockEntity(pos) instanceof com.example.block.FarmerChestBlockEntity chest ? chest : null;
+        return getWorld().getBlockEntity(pos) instanceof FarmerChestBlockEntity chest ? chest : null;
     }
 
     public void returnSeedBatch(BlockPos pos) {
@@ -457,16 +307,12 @@ public class FarmerNpcEntity extends PathAwareEntity {
         }
     }
 
-    /**
-     * Check xem item có phải hạt giống không
-     */
     private boolean isSeedItem(Item item) {
-        return item == Items.WHEAT_SEEDS || item == Items.BEETROOT_SEEDS || item == Items.CARROT || item == Items.POTATO || item == Items.PUMPKIN_SEEDS || item == Items.MELON_SEEDS;
+        return item == Items.WHEAT_SEEDS || item == Items.BEETROOT_SEEDS || item == Items.CARROT
+                || item == Items.POTATO || item == Items.PUMPKIN_SEEDS || item == Items.MELON_SEEDS;
     }
 
-    /**
-     * Trồng hạt giống tại vị trí farmland
-     */
+    /** Trồng hạt giống lên ô đất cày. */
     public boolean plantSeedAt(BlockPos farmlandPos, ItemStack seed) {
         World world = getWorld();
         BlockPos cropPos = farmlandPos.up();
@@ -485,99 +331,14 @@ public class FarmerNpcEntity extends PathAwareEntity {
         return world.setBlockState(cropPos, crop.getDefaultState());
     }
 
-    /**
-     * Kiểm tra xem NPC có tài nguyên để làm việc (hạt giống hoặc rương)
-     */
+    /** Có việc để làm không: còn hạt giống, hoặc rương còn chỗ chứa nông sản. */
     public boolean hasFarmItems() {
-        // Check inventory
         if (hasSeeds()) return true;
-
-        // Check rương gần
         Inventory chest = findNearestChest();
-        return chest != null && hasSpaceInInventory(chest);
-    }
-
-    /**
-     * Tìm Rương Nông dân (FarmerChestBlockEntity) gần nhất trong bán kính FIND_CHEST_DISTANCE.
-     * Chỉ nhận ra rương đúng loại (craft bằng Chest + Cuốc full độ bền).
-     * Không cần khóa (reservation) vì mỗi loại rương chỉ dành cho 1 loại NPC.
-     */
-    public Inventory findNearestChest() {
-        World world = getWorld();
-        if (world == null) return null;
-
-        // Dùng cache nếu còn hiệu lực
-        if (memory.lastChestPos != null && chestSearchCooldown > 0) {
-            BlockPos cached = memory.lastChestPos;
-            if (world.isChunkLoaded(cached)) {
-                BlockEntity be = world.getBlockEntity(cached);
-                if (be instanceof com.example.block.FarmerChestBlockEntity inv) {
-                    return inv;
-                }
-            }
-            memory.lastChestPos = null;
-        }
-
-        if (chestSearchCooldown > 0) return null;
-
-        BlockPos center = getBlockPos();
-        double closestDist = Double.MAX_VALUE;
-        Inventory closestChest = null;
-        BlockPos newChestPos = null;
-
-        for (int dx = -FIND_CHEST_DISTANCE; dx <= FIND_CHEST_DISTANCE; dx++) {
-            for (int dy = -2; dy <= 2; dy++) {
-                for (int dz = -FIND_CHEST_DISTANCE; dz <= FIND_CHEST_DISTANCE; dz++) {
-                    BlockPos pos = center.add(dx, dy, dz);
-                    if (!world.isChunkLoaded(pos)) continue;
-
-                    BlockEntity be = world.getBlockEntity(pos);
-                    if (be instanceof com.example.block.FarmerChestBlockEntity farmerChest) {
-                        double dist = this.squaredDistanceTo(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
-                        if (dist < closestDist) {
-                            closestDist = dist;
-                            closestChest = farmerChest;
-                            newChestPos = pos;
-                        }
-                    }
-                }
-            }
-        }
-        chestSearchCooldown = CHEST_SEARCH_COOLDOWN;
-
-        if (newChestPos != null) {
-            memory.lastChestPos = newChestPos;
-        }
-
-        return closestChest;
-    }
-
-
-    private boolean hasSpaceInInventory(Inventory inv) {
-        for (int i = 0; i < inv.size(); i++) {
-            if (inv.getStack(i).isEmpty()) return true;
+        if (chest == null) return false;
+        for (int i = 0; i < chest.size(); i++) {
+            if (chest.getStack(i).isEmpty()) return true;
         }
         return false;
-    }
-
-    public SimpleInventory getInventory() {
-        return foodInventory;
-    }
-
-    public boolean isInventoryFull() {
-        for (int i = 0; i < foodInventory.size(); i++) {
-            if (foodInventory.getStack(i).isEmpty()) return false;
-        }
-        return true;
-    }
-
-    @Override
-    public void onDeath(DamageSource damageSource) {
-        if (!getWorld().isClient) {
-            for (ItemStack seed : plantingSeeds) dropStack(seed);
-            plantingSeeds.clear();
-        }
-        cleanupAllReservations();
-        super.onDeath(damageSource);
     }
 }

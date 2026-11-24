@@ -1,7 +1,5 @@
 package com.example.entity.base;
 
-import com.example.entity.FarmerNpcEntity;
-import com.example.entity.LumberjackNpcEntity;
 import net.minecraft.entity.mob.PathAwareEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.inventory.SimpleInventory;
@@ -14,7 +12,6 @@ import net.minecraft.world.World;
 
 public class NpcDisplayComponent {
     private static final int SHOW_NAME_DURATION = 20;
-    private static final double VIEW_DISTANCE = 6.0;
     private static final int MAX_HUNGER = 20;
     private static final int FOOD_TICK_INTERVAL = 1200; // 1p
 
@@ -44,15 +41,16 @@ public class NpcDisplayComponent {
     private long issueUntil;
 
     public void report(PathAwareEntity npc, String message) {
+        // Sự cố mới (khác sự cố đang hiển thị) → hạt giận dữ trên đầu
+        if (!message.equals(issue) || npc.getWorld().getTime() >= issueUntil) {
+            com.example.helper.NpcFeedback.problem(npc);
+        }
         issue = message;
         issueUntil = npc.getWorld().getTime() + 120;
     }
 
     public static void reportWorker(PathAwareEntity npc, String message) {
-        if (npc instanceof FarmerNpcEntity farmer) farmer.display.report(npc, message);
-        else if (npc instanceof LumberjackNpcEntity lumberjack) lumberjack.display.report(npc, message);
-        else if (npc instanceof com.example.entity.MinerNpcEntity miner) miner.display.report(npc, message);
-        else if (npc instanceof com.example.entity.FishermanNpcEntity fisherman) fisherman.display.report(npc, message);
+        if (npc instanceof WorkerNpcEntity worker) worker.display.report(npc, message);
     }
 
     public void clearReport() {
@@ -65,7 +63,7 @@ public class NpcDisplayComponent {
         handleFoodSystem(npc, inventory);
         handleGradualHeal(npc);
         PlayerEntity player =
-                world.getClosestPlayer(npc, VIEW_DISTANCE);
+                world.getClosestPlayer(npc, com.example.config.ModConfig.get().statusViewDistance);
 
 
         if (player != null) {
@@ -132,9 +130,7 @@ public class NpcDisplayComponent {
         int maxHp = Math.round(npc.getMaxHealth());
         int foodCount = getTotalFoodCount(inventory);
         // Build name text
-        String _nameNpc = npc instanceof FarmerNpcEntity ? "Nông dân"
-                : npc instanceof LumberjackNpcEntity ? "Tiều phu"
-                : npc instanceof com.example.entity.MinerNpcEntity ? "Thợ mỏ" : "Ngư dân";
+        String _nameNpc = npc instanceof WorkerNpcEntity worker ? worker.professionName() : "NPC";
         displayStr = _nameNpc + " [" + hp + "/" + maxHp + "] 🍖[" + hunger + "/" + MAX_HUNGER + "] x" + foodCount;
 
         MutableText displayName = Text.literal(_nameNpc)
@@ -146,9 +142,32 @@ public class NpcDisplayComponent {
                 .append(Text.literal(" x" + foodCount)
                         .formatted(Formatting.GOLD));
         String currentIssue = npc.getWorld().getTime() < issueUntil ? issue : null;
-        npc.setCustomName(displayName.append(Text.literal(" • " + workLabel(npc, goals, currentIssue))
-                .formatted(Formatting.YELLOW)));
+        String label = workLabel(npc, goals, currentIssue);
+        npc.setCustomName(displayName.append(statusText(npc, label, currentIssue)));
 
+    }
+
+    /** Biểu tượng + màu theo trạng thái: ⚠ sự cố (đỏ), ☾ ngủ, ⚔ chiến đấu, … chờ việc, ⚒ đang làm. */
+    private static MutableText statusText(PathAwareEntity npc, String label, String currentIssue) {
+        String icon;
+        Formatting color;
+        if (label.equals(currentIssue)) {
+            icon = "⚠";
+            color = Formatting.RED;
+        } else if (npc.getPose() == net.minecraft.entity.EntityPose.SLEEPING || label.equals("Đang đi ngủ")) {
+            icon = "☾";
+            color = Formatting.AQUA;
+        } else if (npc.getTarget() != null) {
+            icon = "⚔";
+            color = Formatting.RED;
+        } else if (label.equals("Đang chờ việc")) {
+            icon = "…";
+            color = Formatting.GRAY;
+        } else {
+            icon = "⚒";
+            color = Formatting.YELLOW;
+        }
+        return Text.literal(" " + icon + " " + label).formatted(color);
     }
 
     public static String workLabel(PathAwareEntity npc, net.minecraft.entity.ai.goal.GoalSelector goals, String issue) {
@@ -174,6 +193,11 @@ public class NpcDisplayComponent {
         if (goal instanceof com.example.ai.miner.MineOreVeinGoal) return "Đang đào quặng";
         if (goal instanceof com.example.ai.fisherman.FindFishingSpotGoal) return "Đang đi tới bờ câu";
         if (goal instanceof com.example.ai.fisherman.FishermanFishGoal) return "Đang câu cá";
+        if (goal instanceof com.example.ai.worker.DepositCargoGoal) return "Đang mang đồ về rương";
+        if (goal instanceof com.example.ai.rancher.ShearSheepGoal) return "Đang xén lông cừu";
+        if (goal instanceof com.example.ai.rancher.BreedAnimalsGoal) return "Đang cho vật nuôi ăn";
+        if (goal instanceof com.example.ai.rancher.CollectAnimalDropsGoal) return "Đang nhặt sản phẩm";
+        if (goal instanceof com.example.ai.cook.CookFoodGoal) return "Đang nấu ăn";
         if (goal instanceof com.example.ai.soldier.FollowOwnerLikeGoal
                 || goal instanceof com.example.ai.soldier.ReturnToPlayerGoal) return "Đang đi theo chủ";
         return null;

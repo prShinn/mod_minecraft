@@ -14,6 +14,9 @@ public class ExampleMod implements ModInitializer {
 	@Override
 	public void onInitialize() {
 		// 1. Register blocks (phải trước items vì BlockItem phụ thuộc vào Block)
+		// 0. Đọc cấu hình config/datnc_mod.json
+		com.example.config.ModConfig.load();
+
 		ModBlocks.register();
 		ModBlockEntities.register();
 
@@ -36,6 +39,8 @@ public class ExampleMod implements ModInitializer {
 			entries.add(ModItems.LUMBERJACK_TOKEN);
 			entries.add(ModItems.MINER_TOKEN);
 			entries.add(ModItems.FISHERMAN_TOKEN);
+			entries.add(ModItems.RANCHER_TOKEN);
+			entries.add(ModItems.COOK_TOKEN);
 		});
 
 		// 7. Thêm block vào Creative Tab (BUILDING_BLOCKS)
@@ -47,6 +52,8 @@ public class ExampleMod implements ModInitializer {
 			entries.add(ModBlocks.MINER_CHEST.asItem());
 			entries.add(ModBlocks.LUMBERJACK_CHEST.asItem());
 			entries.add(ModBlocks.FISHERMAN_CHEST.asItem());
+			entries.add(ModBlocks.RANCHER_CHEST.asItem());
+			entries.add(ModBlocks.COOK_CHEST.asItem());
 		});
 
 		// 8. Register packets

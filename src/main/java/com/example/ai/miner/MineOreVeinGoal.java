@@ -61,7 +61,7 @@ public class MineOreVeinGoal extends Goal {
         // Không bắt đầu khi đang ngủ
         if (npc.sleeping.isSleeping()) return false;
         if (!npc.hasEmptyOreSlot()) {
-            npc.memory.needsToDeposit = true;
+            npc.setNeedsToDeposit(true);
             return false;
         }
 
@@ -166,9 +166,9 @@ public class MineOreVeinGoal extends Goal {
         inMiningPosition = false;
         
         // Báo hiệu đã xong đợt đào, có thể đi cất đồ nếu có đồ trong inventory
-        npc.memory.needsToDeposit = java.util.stream.IntStream.range(0, npc.getInventory().size())
-                .mapToObj(npc.getInventory()::getStack)
-                .anyMatch(stack -> !stack.isEmpty() && !stack.isFood());
+        npc.setNeedsToDeposit(java.util.stream.IntStream.range(0, npc.getCargo().size())
+                .mapToObj(npc.getCargo()::getStack)
+                .anyMatch(stack -> !stack.isEmpty() && !stack.isFood()));
         
         npc.memory.resetIdle();
     }
@@ -194,7 +194,7 @@ public class MineOreVeinGoal extends Goal {
         }
         if (!(be instanceof OreVeinBlockEntity oreVein) || !isOreVein(pos)) return;
         for (ItemStack stack : oreVein.mine((net.minecraft.server.world.ServerWorld) world, pos, npc)) {
-            ItemStack remaining = npc.getInventory().addStack(stack);
+            ItemStack remaining = npc.getCargo().addStack(stack);
             if (!remaining.isEmpty()) npc.dropStack(remaining);
         }
 

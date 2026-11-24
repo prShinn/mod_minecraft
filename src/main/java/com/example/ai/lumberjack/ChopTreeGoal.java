@@ -50,7 +50,7 @@ public class ChopTreeGoal extends Goal {
         BlockPos root = npc.findNearestTree();
         if (root == null || npc.isWorkedByAnother(root)) return false;
 
-        zoneChest = npc.memory.lastChestPos;
+        zoneChest = npc.getChestPos();
         logType = npc.getWorld().getBlockState(root).getBlock();
         List<BlockPos> tree = findConnectedLogs(root);
         if (tree.isEmpty()) return false;
@@ -128,7 +128,7 @@ public class ChopTreeGoal extends Goal {
         npc.memory.lastTreePos = base;
         swingDelay = 4;
         for (ItemStack stack : drops) {
-            ItemStack remaining = npc.getInventory().addStack(stack);
+            ItemStack remaining = npc.getCargo().addStack(stack);
             if (!remaining.isEmpty()) npc.dropStack(remaining);
         }
     }

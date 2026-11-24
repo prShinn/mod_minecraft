@@ -29,8 +29,8 @@ public class DepositWoodToChestGoal extends Goal {
         this.setControls(EnumSet.of(Control.MOVE));
     }
     private boolean hasItems() {
-        for (int i = 0; i < npc.inventory.size(); i++) {
-            if (!npc.inventory.getStack(i).isEmpty()) return true;
+        for (int i = 0; i < npc.getCargo().size(); i++) {
+            if (!npc.getCargo().getStack(i).isEmpty()) return true;
         }
         return false;
     }
@@ -50,8 +50,8 @@ public class DepositWoodToChestGoal extends Goal {
         }
 
         npc.findNearestChest();
-        chestPos = delivery.find(npc, npc.memory.lastChestPos, com.example.block.LumberjackChestBlockEntity.class,
-                npc.inventory, stack -> true, 16, 2, npc.display);
+        chestPos = delivery.find(npc, npc.getChestPos(), com.example.block.LumberjackChestBlockEntity.class,
+                npc.getCargo(), stack -> true, 16, 2, npc.display);
         if (chestPos == null) return false;
         return true;
     }
@@ -71,11 +71,12 @@ public class DepositWoodToChestGoal extends Goal {
                 || !(world.getBlockEntity(chestPos) instanceof com.example.block.LumberjackChestBlockEntity chest)) {
             npc.display.report(npc, "Rương nghề không còn dùng được");
             stop();
-        } else if (!com.example.ai.DeliveryTarget.hasSpace(chest, npc.inventory, stack -> true)) {
+        } else if (!com.example.ai.DeliveryTarget.hasSpace(chest, npc.getCargo(), stack -> true)) {
             npc.display.report(npc, "Rương nghề đã đầy");
             stop();
         } else if (com.example.ai.DeliveryTarget.canReach(npc, chestPos)) {
             depositItems();
+            com.example.helper.NpcFeedback.success(npc);
             stop();
         } else if (npc.getNavigation().isIdle() || taskTicks >= MAX_TASK_TICKS) {
             delivery.markBlocked(npc, chestPos);
@@ -101,8 +102,8 @@ public class DepositWoodToChestGoal extends Goal {
                 instanceof com.example.block.LumberjackChestBlockEntity chestInv)) return;
 
         // Transfer items từ NPC vào chest
-        for (int i = 0; i < npc.inventory.size(); i++) {
-            ItemStack npcStack = npc.inventory.getStack(i);
+        for (int i = 0; i < npc.getCargo().size(); i++) {
+            ItemStack npcStack = npc.getCargo().getStack(i);
             if (npcStack.isEmpty()) continue;
 
             for (int j = 0; j < chestInv.size(); j++) {
@@ -110,7 +111,7 @@ public class DepositWoodToChestGoal extends Goal {
 
                 if (chestStack.isEmpty()) {
                     chestInv.setStack(j, npcStack.copy());
-                    npc.inventory.setStack(i, ItemStack.EMPTY);
+                    npc.getCargo().setStack(i, ItemStack.EMPTY);
                     break;
                 } else if (ItemStack.canCombine(chestStack, npcStack) &&
                         chestStack.getCount() < chestStack.getMaxCount()) {
@@ -120,14 +121,14 @@ public class DepositWoodToChestGoal extends Goal {
                     npcStack.decrement(toAdd);
 
                     if (npcStack.isEmpty()) {
-                        npc.inventory.setStack(i, ItemStack.EMPTY);
+                        npc.getCargo().setStack(i, ItemStack.EMPTY);
                         break;
                     }
                 }
             }
 
             if (!npcStack.isEmpty()) {
-                npc.inventory.setStack(i, npcStack);
+                npc.getCargo().setStack(i, npcStack);
             }
         }
 

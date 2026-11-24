@@ -77,6 +77,8 @@ public abstract class ProfessionChestBlock extends BlockWithEntity {
                 || state.isOf(com.example.registry.ModBlocks.LUMBERJACK_CHEST) && held.isOf(com.example.registry.ModItems.LUMBERJACK_TOKEN)
                 || state.isOf(com.example.registry.ModBlocks.MINER_CHEST) && held.isOf(com.example.registry.ModItems.MINER_TOKEN)
                 || state.isOf(com.example.registry.ModBlocks.FISHERMAN_CHEST) && held.isOf(com.example.registry.ModItems.FISHERMAN_TOKEN)
+                || state.isOf(com.example.registry.ModBlocks.RANCHER_CHEST) && held.isOf(com.example.registry.ModItems.RANCHER_TOKEN)
+                || state.isOf(com.example.registry.ModBlocks.COOK_CHEST) && held.isOf(com.example.registry.ModItems.COOK_TOKEN)
                 || state.isOf(com.example.registry.ModBlocks.SOLDIER_CHEST) && held.isOf(com.example.registry.ModItems.SOLDIER_TOKEN);
     }
 

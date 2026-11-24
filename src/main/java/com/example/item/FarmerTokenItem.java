@@ -56,6 +56,7 @@ public class FarmerTokenItem extends Item implements WorkChestToken {
         npc.refreshPositionAndAngles(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5, player.getYaw(), 0);
         // Spawn
         if (!WorkChestToken.spawn(sw, npc, player, chestPos)) return TypedActionResult.fail(stack);
+        npc.relocateWorkChest(); // token có thể mang vị trí rương cũ ở xa
         // Trừ item nếu không phải creative
         if (!player.isCreative()) stack.decrement(1);
         return TypedActionResult.consume(stack);

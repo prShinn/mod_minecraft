@@ -5,6 +5,8 @@ import com.example.entity.LumberjackNpcEntity;
 import com.example.entity.FishermanNpcEntity;
 import com.example.entity.MinerNpcEntity;
 import com.example.entity.SoldierNPCEntity;
+import com.example.entity.base.WorkerNpcEntity;
+import net.minecraft.entity.EntityType;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
 import net.minecraft.client.render.entity.BipedEntityRenderer;
 import net.minecraft.client.render.entity.feature.ArmorFeatureRenderer;
@@ -174,6 +176,10 @@ public class ModEntityRenderers {
                 }
         );
 
+        // ===== RANCHER & COOK NPC =====
+        registerWorker(ModEntities.RANCHER_NPC);
+        registerWorker(ModEntities.COOK_NPC);
+
 //        EntityRendererRegistry.register(
 //                ModEntities.SOLDIER_NPC,
 //                ctx -> new BipedEntityRenderer<>(
@@ -193,5 +199,29 @@ public class ModEntityRenderers {
 
     }
 
+    /** Renderer dân làng + giáp dùng chung cho các NPC kế thừa WorkerNpcEntity. */
+    private static <T extends WorkerNpcEntity> void registerWorker(EntityType<T> type) {
+        EntityRendererRegistry.register(
+                type,
+                ctx -> new BipedEntityRenderer<T, BipedEntityModel<T>>(
+                        ctx,
+                        new BipedEntityModel<>(ctx.getPart(EntityModelLayers.ZOMBIE_VILLAGER)),
+                        0.5f
+                ) {
+                    @Override
+                    public Identifier getTexture(T entity) {
+                        return new Identifier("minecraft", "textures/entity/villager/villager.png");
+                    }
 
+                    {
+                        this.addFeature(new ArmorFeatureRenderer<>(
+                                this,
+                                new BipedEntityModel<>(ctx.getPart(EntityModelLayers.ZOMBIE_VILLAGER_INNER_ARMOR)),
+                                new BipedEntityModel<>(ctx.getPart(EntityModelLayers.ZOMBIE_VILLAGER_OUTER_ARMOR)),
+                                ctx.getModelManager()
+                        ));
+                    }
+                }
+        );
+    }
 }

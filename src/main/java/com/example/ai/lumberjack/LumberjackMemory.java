@@ -4,7 +4,6 @@ import net.minecraft.util.math.BlockPos;
 
 public class LumberjackMemory {
 
-    public BlockPos lastChestPos;
     public BlockPos lastTreePos;
     public int idleTicks = 0;
 

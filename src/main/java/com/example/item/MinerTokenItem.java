@@ -76,9 +76,7 @@ public class MinerTokenItem extends Item implements WorkChestToken {
 
         // Spawn vào world
         if (!WorkChestToken.spawn(sw, npc, player, chestPos)) return TypedActionResult.fail(stack);
-
-        npc.memory.lastChestPos = null;
-        npc.findNearestChest();
+        npc.relocateWorkChest(); // token có thể mang vị trí rương cũ ở xa
 
         // Tiêu thụ 1 item nếu không ở Creative mode
         if (!player.isCreative()) stack.decrement(1);

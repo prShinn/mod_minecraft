@@ -24,11 +24,20 @@ public class ModBlocks {
     public static Block MINER_CHEST;
     public static Block LUMBERJACK_CHEST;
     public static Block FISHERMAN_CHEST;
+    public static Block RANCHER_CHEST;
+    public static Block COOK_CHEST;
 
     private static Block registerUtilityChest(String name) {
         Identifier id = new Identifier(ExampleMod.MODID, name);
         Block block = Registry.register(Registries.BLOCK, id,
                 new UtilityChestBlock(FabricBlockSettings.copyOf(Blocks.CHEST)));
+        Registry.register(Registries.ITEM, id, new BlockItem(block, new FabricItemSettings()));
+        return block;
+    }
+
+    private static Block registerProfessionChest(String name, Block block) {
+        Identifier id = new Identifier(ExampleMod.MODID, name);
+        Registry.register(Registries.BLOCK, id, block);
         Registry.register(Registries.ITEM, id, new BlockItem(block, new FabricItemSettings()));
         return block;
     }
@@ -103,5 +112,9 @@ public class ModBlocks {
                 new Identifier(ExampleMod.MODID, "fisherman_chest"),
                 new BlockItem(FISHERMAN_CHEST, new FabricItemSettings())
         );
+
+        // ===== RANCHER & COOK CHEST =====
+        RANCHER_CHEST = registerProfessionChest("rancher_chest", new RancherChestBlock(FabricBlockSettings.copyOf(Blocks.CHEST)));
+        COOK_CHEST = registerProfessionChest("cook_chest", new CookChestBlock(FabricBlockSettings.copyOf(Blocks.CHEST)));
     }
 }

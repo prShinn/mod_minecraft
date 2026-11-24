@@ -3,9 +3,7 @@ package com.example.ai.miner;
 import net.minecraft.util.math.BlockPos;
 
 public class MinerMemory {
-    public BlockPos lastChestPos;
     public BlockPos lastOrePos;   // Vị trí ore vein gần nhất đã đào
-    public boolean needsToDeposit = false;
     public int idleTicks = 0;
 
     public void resetIdle() {

@@ -1,0 +1,22 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    { "item": "minecraft:bread" },
+    { "item": "minecraft:apple" },
+    {
+      "fabric:type": "fabric:nbt",
+      "base": { "item": "minecraft:potion" },
+      "nbt": { "Potion": "minecraft:water" }
+    },
+    [
+      { "item": "minecraft:cooked_porkchop" },
+      { "item": "minecraft:cooked_beef" },
+      { "item": "minecraft:cooked_chicken" }
+    ],
+    { "item": "minecraft:smoker" }
+  ],
+  "result": {
+    "item": "datnc_mod:cook_token",
+    "count": 1
+  }
+}

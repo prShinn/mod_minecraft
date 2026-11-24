@@ -5,7 +5,6 @@ import net.minecraft.world.World;
 
 public class FarmerMemory {
 
-    public BlockPos lastChestPos;
     public BlockPos lastFarmPos;
     public BlockPos bedPos;
 

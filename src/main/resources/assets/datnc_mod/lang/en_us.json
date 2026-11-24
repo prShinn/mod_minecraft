@@ -13,6 +13,12 @@
   "block.datnc_mod.fisherman_chest": "Rương Ngư Dân",
   "block.datnc_mod.food_chest": "Shared Food Chest",
   "block.datnc_mod.soldier_chest": "Soldier Chest",
+  "item.datnc_mod.rancher_token": "Thợ chăn nuôi",
+  "entity.datnc_mod.rancher_npc": "Thợ chăn nuôi",
+  "block.datnc_mod.rancher_chest": "Rương Thợ Chăn Nuôi",
+  "item.datnc_mod.cook_token": "Đầu bếp",
+  "entity.datnc_mod.cook_npc": "Đầu bếp",
+  "block.datnc_mod.cook_chest": "Rương Đầu Bếp",
   "message.datnc_mod.chest_unavailable": "Use a token matching this profession chest.",
   "message.datnc_mod.chest_spawn_failed": "Leave space above the chest to summon the NPC."
 }

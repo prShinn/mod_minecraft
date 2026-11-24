@@ -30,8 +30,8 @@ public class DepositToChestGoal extends Goal {
 
     }
     private boolean hasItems() {
-        for (int i = 0; i < npc.foodInventory.size(); i++) {
-            ItemStack stack = npc.foodInventory.getStack(i);
+        for (int i = 0; i < npc.getCargo().size(); i++) {
+            ItemStack stack = npc.getCargo().getStack(i);
             if (!stack.isEmpty() && !isMeat(stack)) return true;
         }
         return false;
@@ -46,8 +46,8 @@ public class DepositToChestGoal extends Goal {
         }
 
         npc.findNearestChest();
-        chestPos = delivery.find(npc, npc.memory.lastChestPos, com.example.block.FarmerChestBlockEntity.class,
-                npc.foodInventory, stack -> !isMeat(stack), 16, 2, npc.display);
+        chestPos = delivery.find(npc, npc.getChestPos(), com.example.block.FarmerChestBlockEntity.class,
+                npc.getCargo(), stack -> !isMeat(stack), 16, 2, npc.display);
         if (chestPos == null) return false;
         return true;
     }
@@ -67,11 +67,12 @@ public class DepositToChestGoal extends Goal {
                 || !(world.getBlockEntity(chestPos) instanceof com.example.block.FarmerChestBlockEntity chest)) {
             npc.display.report(npc, "Rương nghề không còn dùng được");
             stop();
-        } else if (!com.example.ai.DeliveryTarget.hasSpace(chest, npc.foodInventory, stack -> !isMeat(stack))) {
+        } else if (!com.example.ai.DeliveryTarget.hasSpace(chest, npc.getCargo(), stack -> !isMeat(stack))) {
             npc.display.report(npc, "Rương nghề đã đầy");
             stop();
         } else if (com.example.ai.DeliveryTarget.canReach(npc, chestPos)) {
             depositItems();
+            com.example.helper.NpcFeedback.success(npc);
             stop();
         } else if (npc.getNavigation().isIdle() || taskTicks >= MAX_TASK_TICKS) {
             delivery.markBlocked(npc, chestPos);
@@ -105,8 +106,8 @@ public class DepositToChestGoal extends Goal {
                 instanceof com.example.block.FarmerChestBlockEntity chestInv)) return;
 
         // Transfer tất cả items từ NPC inventory vào rương
-        for (int i = 0; i < npc.foodInventory.size(); i++) {
-            ItemStack npcStack = npc.foodInventory.getStack(i);
+        for (int i = 0; i < npc.getCargo().size(); i++) {
+            ItemStack npcStack = npc.getCargo().getStack(i);
             if (npcStack.isEmpty() || isMeat(npcStack)) continue;
 
             // Tìm slot trống trong rương
@@ -116,7 +117,7 @@ public class DepositToChestGoal extends Goal {
                 if (chestStack.isEmpty()) {
                     // Slot trống, cất vào
                     chestInv.setStack(j, npcStack.copy());
-                    npc.foodInventory.setStack(i, ItemStack.EMPTY);
+                    npc.getCargo().setStack(i, ItemStack.EMPTY);
                     break;
                 } else if (ItemStack.canCombine(chestStack, npcStack) &&
                         chestStack.getCount() < chestStack.getMaxCount()) {
@@ -127,7 +128,7 @@ public class DepositToChestGoal extends Goal {
                     npcStack.decrement(toAdd);
 
                     if (npcStack.isEmpty()) {
-                        npc.foodInventory.setStack(i, ItemStack.EMPTY);
+                        npc.getCargo().setStack(i, ItemStack.EMPTY);
                         break;
                     }
                 }
@@ -135,7 +136,7 @@ public class DepositToChestGoal extends Goal {
 
             // Nếu rương đầy, cập nhật lại stack
             if (!npcStack.isEmpty()) {
-                npc.foodInventory.setStack(i, npcStack);
+                npc.getCargo().setStack(i, npcStack);
             }
         }
 

@@ -5,6 +5,7 @@ import com.example.entity.LumberjackNpcEntity;
 import com.example.entity.FishermanNpcEntity;
 import com.example.entity.MinerNpcEntity;
 import com.example.entity.SoldierNPCEntity;
+import com.example.entity.base.WorkerNpcEntity;
 import net.fabricmc.fabric.api.object.builder.v1.entity.FabricDefaultAttributeRegistry;
 
 public class ModEntityAttributes {
@@ -24,12 +25,14 @@ public class ModEntityAttributes {
         // ===== MINER NPC — dùng attributes riêng của MinerNpcEntity =====
         FabricDefaultAttributeRegistry.register(
                 ModEntities.MINER_NPC,
-                MinerNpcEntity.createAttributes()
+                WorkerNpcEntity.createWorkerAttributes()
         );
 
         FabricDefaultAttributeRegistry.register(
                 ModEntities.FISHERMAN_NPC,
-                FishermanNpcEntity.createAttributes()
+                WorkerNpcEntity.createWorkerAttributes()
         );
+        FabricDefaultAttributeRegistry.register(ModEntities.RANCHER_NPC, WorkerNpcEntity.createWorkerAttributes());
+        FabricDefaultAttributeRegistry.register(ModEntities.COOK_NPC, WorkerNpcEntity.createWorkerAttributes());
     }
 }

@@ -17,6 +17,8 @@ public class ModBlockEntities {
     public static BlockEntityType<MinerChestBlockEntity> MINER_CHEST_BE;
     public static BlockEntityType<LumberjackChestBlockEntity> LUMBERJACK_CHEST_BE;
     public static BlockEntityType<FishermanChestBlockEntity> FISHERMAN_CHEST_BE;
+    public static BlockEntityType<RancherChestBlockEntity> RANCHER_CHEST_BE;
+    public static BlockEntityType<CookChestBlockEntity> COOK_CHEST_BE;
 
     public static BlockEntityType<ProfessionChestBlockEntity> UTILITY_CHEST;
 
@@ -54,5 +56,13 @@ public class ModBlockEntities {
                 new Identifier(ExampleMod.MODID, "fisherman_chest_be"),
                 FabricBlockEntityTypeBuilder.create(FishermanChestBlockEntity::new, ModBlocks.FISHERMAN_CHEST).build()
         );
+
+        RANCHER_CHEST_BE = Registry.register(Registries.BLOCK_ENTITY_TYPE,
+                new Identifier(ExampleMod.MODID, "rancher_chest_be"),
+                FabricBlockEntityTypeBuilder.create(RancherChestBlockEntity::new, ModBlocks.RANCHER_CHEST).build());
+
+        COOK_CHEST_BE = Registry.register(Registries.BLOCK_ENTITY_TYPE,
+                new Identifier(ExampleMod.MODID, "cook_chest_be"),
+                FabricBlockEntityTypeBuilder.create(CookChestBlockEntity::new, ModBlocks.COOK_CHEST).build());
     }
 }

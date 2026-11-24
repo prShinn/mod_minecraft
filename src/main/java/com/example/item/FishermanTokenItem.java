@@ -35,6 +35,7 @@ public class FishermanTokenItem extends Item implements WorkChestToken {
                 npc.refreshPositionAndAngles(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5, user.getYaw(), 0.0F);
                 npc.setOwnerUUID(user.getUuid());
                 if (!WorkChestToken.spawn(sw, npc, user, chestPos)) return TypedActionResult.fail(itemStack);
+                npc.relocateWorkChest(); // token có thể mang vị trí rương cũ ở xa
                 
                 if (!user.isCreative()) {
                     itemStack.decrement(1);

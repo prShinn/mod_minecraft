@@ -55,7 +55,7 @@ public class PlantSaplingGoal extends Goal {
         Inventory source = getChest();
         if (source == null) {
             source = npc.findNearestChest();
-            chest = npc.memory.lastChestPos;
+            chest = npc.getChestPos();
         }
         if (source == null || chest == null) return false;
         if (npc.returningSaplings && !npc.plantingSaplings.isEmpty()) return true;
@@ -66,7 +66,7 @@ public class PlantSaplingGoal extends Goal {
             if (isPlantable(pos) && !blockedPlots.containsKey(pos)) plots.add(pos.toImmutable());
         }
         if (!npc.plantingSaplings.isEmpty()) return true;
-        return !plots.isEmpty() && (countSaplings(source) > 0 || countSaplings(npc.inventory) > 0);
+        return !plots.isEmpty() && (countSaplings(source) > 0 || countSaplings(npc.getCargo()) > 0);
     }
 
     @Override
@@ -218,7 +218,7 @@ public class PlantSaplingGoal extends Goal {
 
     private void takeBatch(Inventory source) {
         // Saplings carried by NPCs from an older save can still be planted.
-        Inventory stock = countSaplings(npc.inventory) > 0 ? npc.inventory : source;
+        Inventory stock = countSaplings(npc.getCargo()) > 0 ? npc.getCargo() : source;
         int remaining = Math.min(plots.size(), stock == source ? shareOf(source) : countSaplings(stock));
         for (int slot = 0, batchSlot = 0; slot < stock.size() && remaining > 0; slot++) {
             ItemStack stack = stock.getStack(slot);
@@ -238,7 +238,7 @@ public class PlantSaplingGoal extends Goal {
         int radius = LumberjackNpcEntity.FIND_CHEST_DISTANCE;
         for (LumberjackNpcEntity other : npc.getWorld().getEntitiesByClass(LumberjackNpcEntity.class,
                 new Box(chest).expand(radius, 4, radius), worker -> worker != npc && worker.isAlive())) {
-            BlockPos otherChest = other.memory.lastChestPos;
+            BlockPos otherChest = other.getChestPos();
             if (chest.equals(otherChest)) workers++;
             else if (otherChest == null) unknownAssignment = true;
         }

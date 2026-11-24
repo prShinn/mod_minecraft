@@ -28,15 +28,15 @@ public class DepositFishToChestGoal extends Goal {
     @Override
     public boolean canStart() {
         if (npc.sleeping.isSleeping() || npc.getWorld().getTime() < retryAt) return false;
-        if (isInventoryEmpty(npc.getInventory())) {
-            npc.memory.needsToDeposit = false;
+        if (isInventoryEmpty(npc.getCargo())) {
+            npc.setNeedsToDeposit(false);
             return false;
         }
-        if (!npc.memory.needsToDeposit) return false;
+        if (!npc.needsToDeposit()) return false;
 
         npc.findNearestChest();
-        targetChestPos = delivery.find(npc, npc.memory.lastChestPos, com.example.block.FishermanChestBlockEntity.class,
-                npc.getInventory(), stack -> true, 16, 4, npc.display);
+        targetChestPos = delivery.find(npc, npc.getChestPos(), com.example.block.FishermanChestBlockEntity.class,
+                npc.getCargo(), stack -> true, 16, 4, npc.display);
         if (targetChestPos == null) return false;
 
         deposited = false;
@@ -59,11 +59,12 @@ public class DepositFishToChestGoal extends Goal {
                 || !(world.getBlockEntity(targetChestPos) instanceof com.example.block.FishermanChestBlockEntity chest)) {
             npc.display.report(npc, "Rương nghề không còn dùng được");
             deposited = true;
-        } else if (!com.example.ai.DeliveryTarget.hasSpace(chest, npc.getInventory(), stack -> true)) {
+        } else if (!com.example.ai.DeliveryTarget.hasSpace(chest, npc.getCargo(), stack -> true)) {
             npc.display.report(npc, "Rương nghề đã đầy");
             deposited = true;
         } else if (com.example.ai.DeliveryTarget.canReach(npc, targetChestPos)) {
             dumpInventoryToChest();
+            com.example.helper.NpcFeedback.success(npc);
             deposited = true;
         } else if (npc.getNavigation().isIdle() || taskTicks >= MAX_TASK_TICKS) {
             delivery.markBlocked(npc, targetChestPos);
@@ -89,7 +90,7 @@ public class DepositFishToChestGoal extends Goal {
     }
 
     private void dumpInventoryToChest() {
-        SimpleInventory npcInv = npc.getInventory();
+        SimpleInventory npcInv = npc.getCargo();
         if (!npc.getWorld().isChunkLoaded(targetChestPos)
                 || !(npc.getWorld().getBlockEntity(targetChestPos) instanceof com.example.block.FishermanChestBlockEntity targetChest)) return;
 
@@ -103,7 +104,7 @@ public class DepositFishToChestGoal extends Goal {
                 npcInv.setStack(i, remaining);
             }
         }
-        npc.memory.needsToDeposit = !isInventoryEmpty(npcInv);
+        npc.setNeedsToDeposit(!isInventoryEmpty(npcInv));
         npc.memory.resetIdle();
     }
 

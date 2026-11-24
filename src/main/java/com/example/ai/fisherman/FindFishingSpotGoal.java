@@ -21,7 +21,7 @@ public class FindFishingSpotGoal extends Goal {
     @Override
     public boolean canStart() {
         if (npc.sleeping.isSleeping()) return false;
-        if (npc.memory.needsToDeposit) return false;
+        if (npc.needsToDeposit()) return false;
         if (npc.memory.fishingSpot != null) return false; // Đã có spot thì ko tìm nữa
         
         BlockPos spot = npc.findFishingSpot();

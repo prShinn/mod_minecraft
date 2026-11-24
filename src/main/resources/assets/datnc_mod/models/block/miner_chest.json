@@ -1,4 +1,4 @@
-﻿{
+{
   "parent": "minecraft:block/cube",
   "textures": {
     "down":     "minecraft:block/stone",

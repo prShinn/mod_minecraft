@@ -218,4 +218,62 @@ public abstract class ProfessionChestRecipe extends SpecialCraftingRecipe {
             return ModRecipes.FISHERMAN_CHEST_RECIPE;
         }
     }
+
+    /**
+     * Rương Thợ chăn nuôi: Chest + Kéo (Shears), full độ bền.
+     */
+    public static class RancherChestRecipe extends ProfessionChestRecipe {
+        public RancherChestRecipe(Identifier id, CraftingRecipeCategory category) {
+            super(id, category);
+        }
+
+        @Override
+        protected boolean isMatchingTool(ItemStack stack) {
+            return stack.isOf(Items.SHEARS);
+        }
+
+        @Override
+        protected ItemStack createOutput() {
+            return new ItemStack(ModBlocks.RANCHER_CHEST);
+        }
+
+        @Override
+        protected Ingredient getToolIngredient() {
+            return Ingredient.ofItems(Items.SHEARS);
+        }
+
+        @Override
+        public RecipeSerializer<?> getSerializer() {
+            return ModRecipes.RANCHER_CHEST_RECIPE;
+        }
+    }
+
+    /**
+     * Rương Đầu bếp: Chest + Lò hun khói (Smoker).
+     */
+    public static class CookChestRecipe extends ProfessionChestRecipe {
+        public CookChestRecipe(Identifier id, CraftingRecipeCategory category) {
+            super(id, category);
+        }
+
+        @Override
+        protected boolean isMatchingTool(ItemStack stack) {
+            return stack.isOf(Items.SMOKER);
+        }
+
+        @Override
+        protected ItemStack createOutput() {
+            return new ItemStack(ModBlocks.COOK_CHEST);
+        }
+
+        @Override
+        protected Ingredient getToolIngredient() {
+            return Ingredient.ofItems(Items.SMOKER);
+        }
+
+        @Override
+        public RecipeSerializer<?> getSerializer() {
+            return ModRecipes.COOK_CHEST_RECIPE;
+        }
+    }
 }

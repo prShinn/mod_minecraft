@@ -24,7 +24,7 @@ public class ReturnToFarmGoal extends Goal {
         if (!npc.memory.shouldReturnToFarm()) return false;
 
         BlockPos lastFarm = npc.memory.lastFarmPos;
-        BlockPos lastChest = npc.memory.lastChestPos;
+        BlockPos lastChest = npc.getChestPos();
 
         if (lastFarm == null && lastChest == null) return false;
 
