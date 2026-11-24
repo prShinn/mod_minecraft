@@ -8,17 +8,18 @@ import java.util.EnumSet;
 
 public class FindAndSleepGoal extends Goal {
     private final PathAwareEntity npc;
-    private final NpcSleepingComponent sleepComponent;
+    private final java.util.function.Supplier<NpcSleepingComponent> sleeping;
 
-    public FindAndSleepGoal(PathAwareEntity npc, NpcSleepingComponent sleepComponent) {
+    public FindAndSleepGoal(PathAwareEntity npc, java.util.function.Supplier<NpcSleepingComponent> sleeping) {
         this.npc = npc;
-        this.sleepComponent = sleepComponent;
-        this.setControls(EnumSet.of(Control.MOVE, Goal.Control.LOOK));
+        this.sleeping = sleeping;
+        this.setControls(EnumSet.of(Control.MOVE, Control.LOOK, Control.JUMP));
     }
 
     @Override
     public boolean canStart() {
-        if(sleepComponent == null) return false;
+        NpcSleepingComponent sleepComponent = sleeping.get();
+        if (sleepComponent == null || npc.getTarget() != null) return false;
         if (!npc.getWorld().isNight() || sleepComponent.isSleeping()) {
             return false;
         }
@@ -37,24 +38,28 @@ public class FindAndSleepGoal extends Goal {
 
     @Override
     public void start() {
+        NpcSleepingComponent sleepComponent = sleeping.get();
         sleepComponent.startMovingToBed(npc);
     }
 
     @Override
     public void tick() {
+        NpcSleepingComponent sleepComponent = sleeping.get();
         sleepComponent.tickMovingToBed(npc);
     }
 
     @Override
     public boolean shouldContinue() {
-        return !sleepComponent.isSleeping()
-                && npc.getWorld().isNight()
-                && sleepComponent.getTargetBed() != null
-                && !sleepComponent.shouldWander();
+        NpcSleepingComponent sleepComponent = sleeping.get();
+        return npc.getWorld().isNight() && npc.getTarget() == null
+                && (sleepComponent.isSleeping()
+                    || sleepComponent.getTargetBed() != null && !sleepComponent.shouldWander());
     }
 
     @Override
     public void stop() {
-        // Component handles cleanup
+        NpcSleepingComponent sleepComponent = sleeping.get();
+        if (sleepComponent.isSleeping()) sleepComponent.wakeUp(npc);
+        else sleepComponent.cancelMovingToBed(npc);
     }
 }

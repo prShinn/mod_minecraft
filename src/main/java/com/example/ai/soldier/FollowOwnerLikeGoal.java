@@ -17,6 +17,7 @@ public class FollowOwnerLikeGoal extends Goal {
             double speed) {
         this.npc = npc;
         this.speed = speed;
+        this.setControls(java.util.EnumSet.of(Control.MOVE));
     }
 
     @Override
@@ -24,7 +25,7 @@ public class FollowOwnerLikeGoal extends Goal {
         owner = npc.getOwner();
         if (owner == null) return false;
         // Đang combat thì không follow
-        if (npc.getFollowPlayerUUID() != null && npc.getTarget() != null) return false;
+        if (npc.getTarget() != null) return false;
 
         // CHỈ CHECK OWNER
         double distSq = npc.squaredDistanceTo(owner);
@@ -44,7 +45,7 @@ public class FollowOwnerLikeGoal extends Goal {
             return distSq > followDist * followDist;
         }
         return npc.squaredDistanceTo(owner)
-                > this.followDistance * this.followDistance;
+                > getFollowDistance() * getFollowDistance();
     }
 
     @Override
@@ -64,13 +65,31 @@ public class FollowOwnerLikeGoal extends Goal {
         float teleportDist = getTeleportDistance();
         // TELEPORT nếu quá xa
         if (distSq > teleportDist * teleportDist) {
-            npc.refreshPositionAndAngles(
-                    owner.getX() + npc.getRandom().nextInt(3) - 1,
-                    owner.getY(),
-                    owner.getZ() + npc.getRandom().nextInt(3) - 1,
-                    npc.getYaw(),
-                    npc.getPitch()
-            );
+            boolean teleported = false;
+            for (int i = 0; i < 10; i++) {
+                int dx = npc.getRandom().nextInt(7) - 3; // -3 to 3
+                int dy = npc.getRandom().nextInt(3) - 1; // -1 to 1
+                int dz = npc.getRandom().nextInt(7) - 3; // -3 to 3
+                
+                int targetX = (int)Math.floor(owner.getX()) + dx;
+                int targetY = (int)Math.floor(owner.getY()) + dy;
+                int targetZ = (int)Math.floor(owner.getZ()) + dz;
+                
+                net.minecraft.util.math.BlockPos targetPos = new net.minecraft.util.math.BlockPos(targetX, targetY, targetZ);
+                
+                // Safe check
+                if (npc.getWorld().getBlockState(targetPos.down()).isOpaque() &&
+                    npc.getWorld().isAir(targetPos) &&
+                    npc.getWorld().isAir(targetPos.up())) {
+                    
+                    npc.refreshPositionAndAngles(targetX + 0.5, targetY, targetZ + 0.5, npc.getYaw(), npc.getPitch());
+                    teleported = true;
+                    break;
+                }
+            }
+            if (teleported) {
+                npc.getNavigation().stop();
+            }
             distSq = npc.squaredDistanceTo(owner);
         }
 

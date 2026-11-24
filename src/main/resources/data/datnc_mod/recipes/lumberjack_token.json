@@ -1,24 +1,20 @@
 {
-  "type": "minecraft:crafting_shaped",
-  "pattern": [
-    "AI ",
-    "GE ",
-    "   "
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    { "item": "minecraft:bread" },
+    { "item": "minecraft:apple" },
+    {
+      "fabric:type": "fabric:nbt",
+      "base": { "item": "minecraft:potion" },
+      "nbt": { "Potion": "minecraft:water" }
+    },
+    [
+      { "item": "minecraft:cooked_porkchop" },
+      { "item": "minecraft:cooked_beef" },
+      { "item": "minecraft:cooked_chicken" }
+    ],
+    { "item": "minecraft:wooden_axe" }
   ],
-  "key": {
-    "A": {
-      "item": "minecraft:wooden_axe"
-    },
-    "E": {
-      "item": "minecraft:emerald"
-    },
-    "I": {
-      "item": "minecraft:iron_ingot"
-    },
-    "G": {
-      "item": "minecraft:gold_ingot"
-    }
-  },
   "result": {
     "item": "datnc_mod:lumberjack_token",
     "count": 1

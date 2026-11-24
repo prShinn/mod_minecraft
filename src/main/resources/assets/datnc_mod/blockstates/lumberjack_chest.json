@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "datnc_mod:block/lumberjack_chest" },
+    "facing=east": { "model": "datnc_mod:block/lumberjack_chest", "y": 90 },
+    "facing=south": { "model": "datnc_mod:block/lumberjack_chest", "y": 180 },
+    "facing=west": { "model": "datnc_mod:block/lumberjack_chest", "y": 270 }
+  }
+}

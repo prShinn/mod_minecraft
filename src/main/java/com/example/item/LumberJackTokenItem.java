@@ -14,12 +14,17 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 
-public class LumberJackTokenItem extends Item {
+public class LumberJackTokenItem extends Item implements WorkChestToken {
     public LumberJackTokenItem(Settings settings) {
         super(settings);
     }
     @Override
     public TypedActionResult<ItemStack> use(World world, PlayerEntity player, Hand hand) {
+        return summon(world, player, hand, null);
+    }
+
+    @Override
+    public TypedActionResult<ItemStack> summon(World world, PlayerEntity player, Hand hand, BlockPos chestPos) {
         if (world.isClient) return TypedActionResult.success(player.getStackInHand(hand));
         ServerWorld sw = (ServerWorld) world;
         HitResult hitResult = player.raycast(5.0, 0.0F, false);
@@ -33,7 +38,7 @@ public class LumberJackTokenItem extends Item {
             spawnPos = player.getPos().add(player.getRotationVec(1.0F).multiply(2));
         }
 
-        BlockPos pos = BlockPos.ofFloored(spawnPos);
+        BlockPos pos = chestPos == null ? BlockPos.ofFloored(spawnPos) : chestPos.up();
         LumberjackNpcEntity npc = ModEntities.LUMBERJACK_NPC.create(sw);
         if (npc == null) return TypedActionResult.fail(player.getStackInHand(hand));
         ItemStack stack = player.getStackInHand(hand);
@@ -45,9 +50,11 @@ public class LumberJackTokenItem extends Item {
             }
         }
         // Set vị trí, owner, equipment
+        WorkChestToken.restore(npc, stack);
+        npc.setOwnerUUID(player.getUuid());
         npc.refreshPositionAndAngles(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5, player.getYaw(), 0);
         // Spawn
-        sw.spawnEntity(npc);
+        if (!WorkChestToken.spawn(sw, npc, player, chestPos)) return TypedActionResult.fail(stack);
         // Trừ item nếu không phải creative
         if (!player.isCreative()) stack.decrement(1);
         return TypedActionResult.consume(stack);

@@ -1,24 +1,20 @@
 {
-  "type": "minecraft:crafting_shaped",
-  "pattern": [
-    "HI ",
-    "GE ",
-    "   "
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    { "item": "minecraft:bread" },
+    { "item": "minecraft:apple" },
+    {
+      "fabric:type": "fabric:nbt",
+      "base": { "item": "minecraft:potion" },
+      "nbt": { "Potion": "minecraft:water" }
+    },
+    [
+      { "item": "minecraft:cooked_porkchop" },
+      { "item": "minecraft:cooked_beef" },
+      { "item": "minecraft:cooked_chicken" }
+    ],
+    { "item": "minecraft:wooden_hoe" }
   ],
-  "key": {
-    "H": {
-      "item": "minecraft:wooden_hoe"
-    },
-    "E": {
-      "item": "minecraft:emerald"
-    },
-    "I": {
-      "item": "minecraft:iron_ingot"
-    },
-    "G": {
-      "item": "minecraft:gold_ingot"
-    }
-  },
   "result": {
     "item": "datnc_mod:farmer_token",
     "count": 1

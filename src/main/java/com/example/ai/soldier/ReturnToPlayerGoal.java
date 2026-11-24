@@ -12,10 +12,6 @@ public class ReturnToPlayerGoal extends Goal {
     private PlayerEntity owner;
     private int wanderTimer = 0;
 
-    // Khoảng cách mục tiêu (6-8 blocks)
-    private static final double MIN_DISTANCE = 4.0;
-    private static final double MAX_DISTANCE = 6.0;
-
     // Thời gian lang thang trước khi quay về (giây)
     private static final int WANDER_TIME = 30; // 30 giây = 600 ticks
     private static final int WANDER_TICKS = WANDER_TIME * 20;
@@ -26,6 +22,14 @@ public class ReturnToPlayerGoal extends Goal {
     public ReturnToPlayerGoal(SoldierNPCEntity soldier) {
         this.soldier = soldier;
         this.setControls(EnumSet.of(Control.MOVE));
+    }
+
+    private double getMinDist() {
+        return soldier.getMoveMode() == com.example.ai.soldier.ModeNpc.ModeMove.FOLLOW ? 4.0 : SoldierNPCEntity.FOLLOW_DISTANCE * 0.5;
+    }
+
+    private double getMaxDist() {
+        return soldier.getMoveMode() == com.example.ai.soldier.ModeNpc.ModeMove.FOLLOW ? 6.0 : SoldierNPCEntity.FOLLOW_DISTANCE * 0.8;
     }
 
     @Override
@@ -44,16 +48,16 @@ public class ReturnToPlayerGoal extends Goal {
 
         // Kiểm tra khoảng cách
         double distanceSq = soldier.squaredDistanceTo(owner);
-        double minDistSq = MIN_DISTANCE * MIN_DISTANCE;
-        double maxDistSq = MAX_DISTANCE * MAX_DISTANCE;
+        double minDistSq = getMinDist() * getMinDist();
+        double maxDistSq = getMaxDist() * getMaxDist();
 
-        // Đã ở gần player (6-8 blocks) → reset timer
+        // Đã ở gần player → reset timer
         if (distanceSq >= minDistSq && distanceSq <= maxDistSq) {
             wanderTimer = 0;
             return false;
         }
 
-        // Quá gần (< 6 blocks) → không cần về
+        // Quá gần → không cần về
         if (distanceSq < minDistSq) {
             wanderTimer = 0;
             return false;
@@ -79,10 +83,10 @@ public class ReturnToPlayerGoal extends Goal {
 
         // Kiểm tra đã về đến chưa
         double distanceSq = soldier.squaredDistanceTo(owner);
-        double minDistSq = MIN_DISTANCE * MIN_DISTANCE;
-        double maxDistSq = MAX_DISTANCE * MAX_DISTANCE;
+        double minDistSq = getMinDist() * getMinDist();
+        double maxDistSq = getMaxDist() * getMaxDist();
 
-        // Đã về đến vùng 6-8 blocks → dừng
+        // Đã về đến vùng mục tiêu → dừng
         if (distanceSq >= minDistSq && distanceSq <= maxDistSq) {
             return false;
         }

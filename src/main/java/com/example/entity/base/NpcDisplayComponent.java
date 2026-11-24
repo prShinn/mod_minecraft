@@ -30,7 +30,36 @@ public class NpcDisplayComponent {
     public String lastDisplayName = "";
     public String displayStr = "";
 
-    public void tick(PathAwareEntity npc, SimpleInventory inventory) {
+    public void writeNbt(net.minecraft.nbt.NbtCompound nbt) {
+        nbt.putInt("NpcHunger", hunger);
+        nbt.putInt("NpcFoodTickCooldown", foodTickCooldown);
+    }
+
+    public void readNbt(net.minecraft.nbt.NbtCompound nbt) {
+        if (nbt.contains("NpcHunger")) hunger = Math.max(0, Math.min(MAX_HUNGER, nbt.getInt("NpcHunger")));
+        foodTickCooldown = Math.max(0, Math.min(FOOD_TICK_INTERVAL, nbt.getInt("NpcFoodTickCooldown")));
+    }
+
+    private String issue;
+    private long issueUntil;
+
+    public void report(PathAwareEntity npc, String message) {
+        issue = message;
+        issueUntil = npc.getWorld().getTime() + 120;
+    }
+
+    public static void reportWorker(PathAwareEntity npc, String message) {
+        if (npc instanceof FarmerNpcEntity farmer) farmer.display.report(npc, message);
+        else if (npc instanceof LumberjackNpcEntity lumberjack) lumberjack.display.report(npc, message);
+        else if (npc instanceof com.example.entity.MinerNpcEntity miner) miner.display.report(npc, message);
+        else if (npc instanceof com.example.entity.FishermanNpcEntity fisherman) fisherman.display.report(npc, message);
+    }
+
+    public void clearReport() {
+        issue = null;
+    }
+
+    public void tick(PathAwareEntity npc, SimpleInventory inventory, net.minecraft.entity.ai.goal.GoalSelector goals) {
         World world = npc.getWorld();
         if (world.isClient) return;
         handleFoodSystem(npc, inventory);
@@ -42,7 +71,7 @@ public class NpcDisplayComponent {
         if (player != null) {
             npc.setCustomNameVisible(true);
             visibleTicks = SHOW_NAME_DURATION;
-            updateName(npc, inventory);
+            updateName(npc, inventory, goals);
         } else if (visibleTicks-- <= 0) {
             npc.setCustomNameVisible(false);
         }
@@ -97,18 +126,15 @@ public class NpcDisplayComponent {
         }
     }
 
-    public void updateName(PathAwareEntity npc, SimpleInventory inventory) {
+    private void updateName(PathAwareEntity npc, SimpleInventory inventory, net.minecraft.entity.ai.goal.GoalSelector goals) {
 
         int hp = Math.round(npc.getHealth());
         int maxHp = Math.round(npc.getMaxHealth());
         int foodCount = getTotalFoodCount(inventory);
         // Build name text
-        String _nameNpc = "";
-        if(npc instanceof FarmerNpcEntity){
-            _nameNpc = "Nông dân";
-        }else if(npc instanceof LumberjackNpcEntity){
-            _nameNpc = "Tiều phu";
-        }
+        String _nameNpc = npc instanceof FarmerNpcEntity ? "Nông dân"
+                : npc instanceof LumberjackNpcEntity ? "Tiều phu"
+                : npc instanceof com.example.entity.MinerNpcEntity ? "Thợ mỏ" : "Ngư dân";
         displayStr = _nameNpc + " [" + hp + "/" + maxHp + "] 🍖[" + hunger + "/" + MAX_HUNGER + "] x" + foodCount;
 
         MutableText displayName = Text.literal(_nameNpc)
@@ -119,8 +145,38 @@ public class NpcDisplayComponent {
                         .formatted(Formatting.GOLD))
                 .append(Text.literal(" x" + foodCount)
                         .formatted(Formatting.GOLD));
-        npc.setCustomName(displayName);
+        String currentIssue = npc.getWorld().getTime() < issueUntil ? issue : null;
+        npc.setCustomName(displayName.append(Text.literal(" • " + workLabel(npc, goals, currentIssue))
+                .formatted(Formatting.YELLOW)));
 
+    }
+
+    public static String workLabel(PathAwareEntity npc, net.minecraft.entity.ai.goal.GoalSelector goals, String issue) {
+        if (npc.getPose() == net.minecraft.entity.EntityPose.SLEEPING) return "Đang ngủ";
+        if (npc.getTarget() != null) return "Đang chiến đấu";
+        return goals.getRunningGoals().map(entry -> describeGoal(entry.getGoal()))
+                .filter(java.util.Objects::nonNull).findFirst()
+                .orElseGet(() -> issue != null ? issue : "Đang chờ việc");
+    }
+
+    private static String describeGoal(net.minecraft.entity.ai.goal.Goal goal) {
+        if (goal instanceof com.example.ai.FindAndSleepGoal) return "Đang đi ngủ";
+        if (goal instanceof net.minecraft.entity.ai.goal.EscapeDangerGoal) return "Đang tránh nguy hiểm";
+        if (goal instanceof com.example.ai.foodChest.FindAndEatFoodGoal) return "Đang đi lấy thức ăn";
+        if (goal instanceof com.example.ai.farmer.DepositToChestGoal
+                || goal instanceof com.example.ai.lumberjack.DepositWoodToChestGoal
+                || goal instanceof com.example.ai.miner.DepositOreToChestGoal
+                || goal instanceof com.example.ai.fisherman.DepositFishToChestGoal) return "Đang mang đồ về rương";
+        if (goal instanceof com.example.ai.farmer.HarvestCropGoal) return "Đang thu hoạch";
+        if (goal instanceof com.example.ai.farmer.PlantSeedGoal) return "Đang gieo hạt";
+        if (goal instanceof com.example.ai.lumberjack.ChopTreeGoal) return "Đang chặt cây";
+        if (goal instanceof com.example.ai.lumberjack.PlantSaplingGoal) return "Đang trồng mầm";
+        if (goal instanceof com.example.ai.miner.MineOreVeinGoal) return "Đang đào quặng";
+        if (goal instanceof com.example.ai.fisherman.FindFishingSpotGoal) return "Đang đi tới bờ câu";
+        if (goal instanceof com.example.ai.fisherman.FishermanFishGoal) return "Đang câu cá";
+        if (goal instanceof com.example.ai.soldier.FollowOwnerLikeGoal
+                || goal instanceof com.example.ai.soldier.ReturnToPlayerGoal) return "Đang đi theo chủ";
+        return null;
     }
 
     public int getTotalFoodCount(SimpleInventory foodInventory) {
@@ -133,7 +189,12 @@ public class NpcDisplayComponent {
         }
         return total;
     }
-    private boolean shouldEat() {
+    public void feed(int nutrition) {
+        hunger = Math.min(MAX_HUNGER, hunger + nutrition);
+        eatCooldown = 100;
+    }
+
+    public boolean shouldEat() {
         // Chỉ ăn khi food thấp hơn 50%
         return eatCooldown <= 0 && hunger <= MAX_HUNGER * 0.5f;
     }

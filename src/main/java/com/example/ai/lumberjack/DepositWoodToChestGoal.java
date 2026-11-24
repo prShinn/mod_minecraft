@@ -18,8 +18,10 @@ import java.util.EnumSet;
 public class DepositWoodToChestGoal extends Goal {
     private final LumberjackNpcEntity npc;
     private BlockPos chestPos;
+    private final com.example.ai.DeliveryTarget delivery = new com.example.ai.DeliveryTarget();
     private int taskTicks = 0;
-    private static final int MAX_TASK_TICKS = 60;
+    private static final int MAX_TASK_TICKS = 240;
+    private long retryAt;
     private static final int SEARCH_RADIUS = 7;
 
     public DepositWoodToChestGoal(LumberjackNpcEntity npc) {
@@ -35,83 +37,73 @@ public class DepositWoodToChestGoal extends Goal {
 
     @Override
     public boolean canStart() {
-        if (!hasItems()) return false;
+        if (npc.activeTree != null) return false;
+        if (!hasItems()) {
+            npc.needsWoodDelivery = false;
+            return false;
+        }
+        if (npc.getWorld().getTime() < retryAt) return false;
 
-        chestPos = findNearestChest();
-        return chestPos != null;
+        // Chỉ cất đồ khi túi đầy hoặc đã rảnh rỗi (idle > 40 ticks = 2s)
+        if (!npc.needsWoodDelivery && !npc.isInventoryFull() && npc.memory.idleTicks < 40) {
+            return false;
+        }
+
+        npc.findNearestChest();
+        chestPos = delivery.find(npc, npc.memory.lastChestPos, com.example.block.LumberjackChestBlockEntity.class,
+                npc.inventory, stack -> true, 16, 2, npc.display);
+        if (chestPos == null) return false;
+        return true;
     }
 
     @Override
     public void start() {
         taskTicks = 0;
-        npc.getNavigation().startMovingTo(
-                chestPos.getX() + 0.5,
-                chestPos.getY(),
-                chestPos.getZ() + 0.5,
-                1.3
-        );
-        npc.reserveChest(chestPos);
+        delivery.start(npc);
     }
 
     @Override
     public void tick() {
+        if (chestPos == null) return;
         taskTicks++;
-
-        if (taskTicks > MAX_TASK_TICKS || !npc.getWorld().isChunkLoaded(chestPos)) {
+        var world = npc.getWorld();
+        if (!world.isChunkLoaded(chestPos)
+                || !(world.getBlockEntity(chestPos) instanceof com.example.block.LumberjackChestBlockEntity chest)) {
+            npc.display.report(npc, "Rương nghề không còn dùng được");
             stop();
-            return;
-        }
-
-        if (npc.squaredDistanceTo(Vec3d.ofCenter(chestPos)) < 2.5) {
+        } else if (!com.example.ai.DeliveryTarget.hasSpace(chest, npc.inventory, stack -> true)) {
+            npc.display.report(npc, "Rương nghề đã đầy");
+            stop();
+        } else if (com.example.ai.DeliveryTarget.canReach(npc, chestPos)) {
             depositItems();
+            stop();
+        } else if (npc.getNavigation().isIdle() || taskTicks >= MAX_TASK_TICKS) {
+            delivery.markBlocked(npc, chestPos);
+            npc.display.report(npc, "Không có đường tới rương nghề");
             stop();
         }
     }
 
     @Override
     public boolean shouldContinue() {
-        return chestPos != null && taskTicks < MAX_TASK_TICKS;
+        return chestPos != null;
     }
 
     @Override
     public void stop() {
         npc.getNavigation().stop();
-        if (chestPos != null) {
-            npc.releaseChest(chestPos);
-        }
+        retryAt = npc.getWorld().getTime() + 40;
         chestPos = null;
         taskTicks = 0;
     }
     private void depositItems() {
-        BlockEntity be = npc.getWorld().getBlockEntity(chestPos);
-        Inventory chestInv = null;
-
-        if (be instanceof ChestBlockEntity) {
-            BlockState state = npc.getWorld().getBlockState(chestPos);
-
-            if (state.getBlock() instanceof ChestBlock chestBlock) {
-                chestInv = ChestBlock.getInventory(
-                        chestBlock,
-                        state,
-                        npc.getWorld(),
-                        chestPos,
-                        true
-                );
-            }
-        }
-
-        if (chestInv == null) {
-            if (be instanceof Inventory) {
-                chestInv = (Inventory) be;
-            } else {
-                return;
-            }
-        }
+        if (!(npc.getWorld().getBlockEntity(chestPos)
+                instanceof com.example.block.LumberjackChestBlockEntity chestInv)) return;
 
         // Transfer items từ NPC vào chest
         for (int i = 0; i < npc.inventory.size(); i++) {
             ItemStack npcStack = npc.inventory.getStack(i);
-            if (npcStack.isEmpty() || !isTreeItem(npcStack)) continue;
+            if (npcStack.isEmpty()) continue;
 
             for (int j = 0; j < chestInv.size(); j++) {
                 ItemStack chestStack = chestInv.getStack(j);
@@ -139,46 +131,12 @@ public class DepositWoodToChestGoal extends Goal {
             }
         }
 
-        npc.memory.lastChestPos = chestPos;
+        chestInv.markDirty();
+        npc.needsWoodDelivery = hasItems();
         npc.memory.resetIdle();
     }
 
-    private BlockPos findNearestChest() {
-        BlockPos center = npc.getBlockPos();
-        double closestDist = Double.MAX_VALUE;
-        BlockPos closestChest = null;
-        World world = npc.getWorld();
 
-        for (int dx = -SEARCH_RADIUS; dx <= SEARCH_RADIUS; dx++) {
-            for (int dy = -2; dy <= 2; dy++) {
-                for (int dz = -SEARCH_RADIUS; dz <= SEARCH_RADIUS; dz++) {
-                    BlockPos pos = center.add(dx, dy, dz);
-                    if (!world.isChunkLoaded(pos)) continue;
 
-                    BlockEntity be = world.getBlockEntity(pos);
-
-                    if (be instanceof ChestBlockEntity || be instanceof net.minecraft.block.entity.BarrelBlockEntity) {
-                        if (npc.isChestReserved(pos)) continue;
-
-                        double dist = npc.squaredDistanceTo(Vec3d.ofCenter(pos));
-                        if (dist < closestDist) {
-                            closestDist = dist;
-                            closestChest = pos;
-                        }
-                    }
-                }
-            }
-        }
-        return closestChest;
-    }
-    private boolean isTreeItem(ItemStack stack) {
-        Item item = stack.getItem();
-
-        return item instanceof net.minecraft.item.BlockItem blockItem &&
-                (blockItem.getBlock() instanceof net.minecraft.block.PillarBlock ||   // log, wood
-                        blockItem.getBlock() instanceof net.minecraft.block.LeavesBlock ||   // leaves
-                        blockItem.getBlock() instanceof net.minecraft.block.SaplingBlock)    // sapling
-                || item == net.minecraft.item.Items.APPLE;
-    }
 
 }

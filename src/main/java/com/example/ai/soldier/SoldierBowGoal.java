@@ -198,7 +198,7 @@ public class SoldierBowGoal extends Goal {
             arrow.setCritical(true);
         }
         npc.getWorld().spawnEntity(arrow);
-        npc.swingHand(Hand.MAIN_HAND);
+        npc.swingHand(Hand.MAIN_HAND, true);
         // Sound effect (optional)
         npc.playSound(
                 net.minecraft.sound.SoundEvents.ENTITY_ARROW_SHOOT,
