@@ -1,5 +1,9 @@
 package com.example.registry;
 
+import com.example.entity.FarmerNpcEntity;
+import com.example.entity.LumberjackNpcEntity;
+import com.example.entity.FishermanNpcEntity;
+import com.example.entity.MinerNpcEntity;
 import com.example.entity.SoldierNPCEntity;
 import net.fabricmc.fabric.api.object.builder.v1.entity.FabricDefaultAttributeRegistry;
 
@@ -17,6 +21,15 @@ public class ModEntityAttributes {
                 ModEntities.LUMBERJACK_NPC,
                 SoldierNPCEntity.createAttributes()
         );
-    }
+        // ===== MINER NPC — dùng attributes riêng của MinerNpcEntity =====
+        FabricDefaultAttributeRegistry.register(
+                ModEntities.MINER_NPC,
+                MinerNpcEntity.createAttributes()
+        );
 
+        FabricDefaultAttributeRegistry.register(
+                ModEntities.FISHERMAN_NPC,
+                FishermanNpcEntity.createAttributes()
+        );
+    }
 }

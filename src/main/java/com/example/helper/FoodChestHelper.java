@@ -17,6 +17,7 @@ public class FoodChestHelper {
         if (world == null || world.isClient) return false;
 
         BlockState state = world.getBlockState(pos);
+        if (state.isOf(com.example.registry.ModBlocks.FOOD_CHEST)) return true;
         if (!(state.getBlock() instanceof ChestBlock)) return false;
 
         BlockEntity be = world.getBlockEntity(pos);
@@ -73,6 +74,8 @@ public class FoodChestHelper {
      */
     public static Inventory getFoodChestInventory(BlockPos pos, World world) {
         BlockEntity be = world.getBlockEntity(pos);
+        if (world.getBlockState(pos).isOf(com.example.registry.ModBlocks.FOOD_CHEST)
+                && be instanceof com.example.block.ProfessionChestBlockEntity foodChest) return foodChest;
         if (be instanceof ChestBlockEntity chest) {
             return chest;
         }
@@ -86,7 +89,7 @@ public class FoodChestHelper {
         Inventory inv = getFoodChestInventory(pos, world);
         if (inv == null) return false;
 
-        for (int i = 1; i < inv.size(); i++) {
+        for (int i = inv instanceof ChestBlockEntity ? 1 : 0; i < inv.size(); i++) {
             ItemStack stack = inv.getStack(i);
             if (!stack.isEmpty() && stack.isFood()) {
                 return true;
@@ -102,7 +105,7 @@ public class FoodChestHelper {
         Inventory inv = getFoodChestInventory(pos, world);
         if (inv == null) return ItemStack.EMPTY;
 
-        for (int i = 1; i < inv.size(); i++) {
+        for (int i = inv instanceof ChestBlockEntity ? 1 : 0; i < inv.size(); i++) {
             ItemStack stack = inv.getStack(i);
             if (!stack.isEmpty() && stack.isFood()) {
                 return inv.removeStack(i, 1);
@@ -119,6 +122,7 @@ public class FoodChestHelper {
         if (!world.isChunkLoaded(pos)) return false;
 
         BlockState state = world.getBlockState(pos);
+        if (state.isOf(com.example.registry.ModBlocks.FOOD_CHEST)) return true;
         if (!(state.getBlock() instanceof ChestBlock)) return false;
 
         return isFoodChest(pos, world);
@@ -132,7 +136,7 @@ public class FoodChestHelper {
         if (inv == null) return 0;
 
         int total = 0;
-        for (int i = 1; i < inv.size(); i++) {
+        for (int i = inv instanceof ChestBlockEntity ? 1 : 0; i < inv.size(); i++) {
             ItemStack stack = inv.getStack(i);
             if (!stack.isEmpty() && stack.isFood()) {
                 total += stack.getCount();

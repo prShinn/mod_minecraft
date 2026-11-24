@@ -1,5 +1,18 @@
 {
   "item.datnc_mod.soldier_token": "Binh lính",
   "item.datnc_mod.farmer_token": "Nông dân",
-  "item.datnc_mod.lumberjack_token": "Tiều phu"
+  "item.datnc_mod.lumberjack_token": "Tiều phu",
+  "item.datnc_mod.miner_token": "Thợ mỏ",
+  "block.datnc_mod.ore_vein": "Mỏ Quặng",
+  "entity.datnc_mod.miner_npc": "Thợ mỏ",
+  "item.datnc_mod.fisherman_token": "Ngư dân",
+  "entity.datnc_mod.fisherman_npc": "Ngư dân",
+  "block.datnc_mod.farmer_chest": "Rương Nông Dân",
+  "block.datnc_mod.miner_chest": "Rương Thợ Mỏ",
+  "block.datnc_mod.lumberjack_chest": "Rương Tiều Phu",
+  "block.datnc_mod.fisherman_chest": "Rương Ngư Dân",
+  "block.datnc_mod.food_chest": "Shared Food Chest",
+  "block.datnc_mod.soldier_chest": "Soldier Chest",
+  "message.datnc_mod.chest_unavailable": "Use a token matching this profession chest.",
+  "message.datnc_mod.chest_spawn_failed": "Leave space above the chest to summon the NPC."
 }

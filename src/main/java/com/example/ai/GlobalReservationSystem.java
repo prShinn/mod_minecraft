@@ -7,14 +7,10 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class GlobalReservationSystem {
 
-    // Singleton instance
-    private static GlobalReservationSystem INSTANCE;
+    private static final Map<net.minecraft.world.World, GlobalReservationSystem> BY_WORLD = new WeakHashMap<>();
 
-    public static synchronized GlobalReservationSystem getInstance() {
-        if (INSTANCE == null) {
-            INSTANCE = new GlobalReservationSystem();
-        }
-        return INSTANCE;
+    public static synchronized GlobalReservationSystem getInstance(net.minecraft.world.World world) {
+        return BY_WORLD.computeIfAbsent(world, ignored -> new GlobalReservationSystem());
     }
 
     // ========== RESERVATION STORAGE ==========
@@ -40,7 +36,7 @@ public class GlobalReservationSystem {
     }
 
     private enum ReservationType {
-        WORK_CHEST, CROP, FARMLAND, BED, TREE
+        WORK_CHEST, CROP, FARMLAND, BED, TREE, ORE
     }
 
     // ========== PUBLIC API ==========
@@ -134,7 +130,7 @@ public class GlobalReservationSystem {
     public synchronized boolean isReservedByOthers(BlockPos pos, UUID npcId, String type) {
         String key = createKey(pos, type);
         ReservationEntry existing = reservations.get(key);
-        return existing != null && !existing.npcId.equals(npcId);
+        return existing != null && !existing.isExpired() && !existing.npcId.equals(npcId);
     }
 
     /**

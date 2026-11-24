@@ -1,6 +1,5 @@
 package com.example.entity.base;
 
-import com.example.registry.ModItems;
 import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.mob.PathAwareEntity;
 import net.minecraft.entity.player.PlayerEntity;
@@ -15,7 +14,6 @@ import net.minecraft.util.Hand;
 
 import java.util.UUID;
 
-import static com.example.registry.ModItems.SOLDIER_TOKEN;
 
 public class NpcEquipmentComponent {
 
@@ -69,15 +67,7 @@ public class NpcEquipmentComponent {
             }
             ItemStack token = new ItemStack(npc_token);
 
-            NbtCompound entityNbt = new NbtCompound();
-            this.writeCustomDataToNbt(entityNbt, npc);
-            entityNbt.putFloat("Health", npc.getHealth());
-            if(npc_token == ModItems.FARMER_TOKEN){
-                token.getOrCreateNbt().put("FarmerEntityTag", entityNbt);
-            }else if(npc_token == SOLDIER_TOKEN)
-            {
-                token.getOrCreateNbt().put("SoldierEntityTag", entityNbt);
-            }
+            com.example.item.WorkChestToken.save(npc, token);
 
             if (!player.getInventory().insertStack(token)) {
                 npc.dropStack(token);
@@ -92,7 +82,7 @@ public class NpcEquipmentComponent {
 
     private ActionResult tryHandleItems(PathAwareEntity npc, PlayerEntity player, ItemStack held) {
         // Equip weapon
-        if (!held.isEmpty()) {
+        if (held.getItem() instanceof ToolItem || held.getItem() instanceof SwordItem) {
             ItemStack oldWeapon = npc.getMainHandStack();
             if (!oldWeapon.isEmpty()) {
                 npc.dropStack(oldWeapon);

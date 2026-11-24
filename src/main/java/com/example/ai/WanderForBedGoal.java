@@ -5,27 +5,20 @@ import net.minecraft.entity.ai.goal.WanderAroundFarGoal;
 import net.minecraft.entity.mob.PathAwareEntity;
 
 public class WanderForBedGoal extends WanderAroundFarGoal {
-    private final NpcSleepingComponent sleepComponent;
+    private final java.util.function.Supplier<NpcSleepingComponent> sleeping;
 
-    public WanderForBedGoal(PathAwareEntity npc, double speed, NpcSleepingComponent sleepComponent) {
+    public WanderForBedGoal(PathAwareEntity npc, double speed, java.util.function.Supplier<NpcSleepingComponent> sleeping) {
         super(npc, speed);
-        this.sleepComponent = sleepComponent;
+        this.sleeping = sleeping;
     }
 
     @Override
     public boolean canStart() {
-        if(sleepComponent == null) return false;
-        return sleepComponent.shouldWander() && super.canStart();
-    }
-
-    @Override
-    public void tick() {
-        super.tick();
-        sleepComponent.tickWandering();
+        return sleeping.get().shouldWander() && super.canStart();
     }
 
     @Override
     public boolean shouldContinue() {
-        return sleepComponent.shouldWander() && super.shouldContinue();
+        return sleeping.get().shouldWander() && super.shouldContinue();
     }
 }

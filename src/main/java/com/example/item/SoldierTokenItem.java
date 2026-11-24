@@ -29,7 +29,7 @@ import net.minecraft.entity.player.PlayerEntity;
 //        Vec3d look = player.getRotationVec(1.0F);
 //        Vec3d spawnPos = player.getPos().add(look.multiply(2));
 //
-//        BlockPos pos = BlockPos.ofFloored(spawnPos);
+//        BlockPos pos = chestPos == null ? BlockPos.ofFloored(spawnPos) : chestPos.up();
 //
 //        SoldierNPCEntity npc = ModEntities.SOLDIER_NPC.create(sw);
 //        if (npc == null) {
@@ -94,7 +94,7 @@ import net.minecraft.entity.player.PlayerEntity;
 //    }
 //
 //}
-public class SoldierTokenItem extends Item {
+public class SoldierTokenItem extends Item implements WorkChestToken {
 
     public SoldierTokenItem(Settings settings) {
         super(settings);
@@ -102,6 +102,11 @@ public class SoldierTokenItem extends Item {
 
     @Override
     public TypedActionResult<ItemStack> use(World world, PlayerEntity player, Hand hand) {
+        return summon(world, player, hand, null);
+    }
+
+    @Override
+    public TypedActionResult<ItemStack> summon(World world, PlayerEntity player, Hand hand, net.minecraft.util.math.BlockPos chestPos) {
         if (world.isClient) return TypedActionResult.success(player.getStackInHand(hand));
 
         ServerWorld sw = (ServerWorld) world;
@@ -116,7 +121,7 @@ public class SoldierTokenItem extends Item {
             spawnPos = player.getPos().add(player.getRotationVec(1.0F).multiply(2));
         }
 
-        BlockPos pos = BlockPos.ofFloored(spawnPos);
+        BlockPos pos = chestPos == null ? BlockPos.ofFloored(spawnPos) : chestPos.up();
 
         // Tạo NPC
         SoldierNPCEntity npc = ModEntities.SOLDIER_NPC.create(sw);
@@ -132,6 +137,7 @@ public class SoldierTokenItem extends Item {
         }
 
         // Set vị trí, owner, equipment
+        WorkChestToken.restore(npc, stack);
         npc.refreshPositionAndAngles(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5, player.getYaw(), 0);
         npc.setOwner(player);
         NbtCompound nbt = new NbtCompound();
@@ -144,7 +150,7 @@ public class SoldierTokenItem extends Item {
 
 
         // Spawn
-        sw.spawnEntity(npc);
+        if (!WorkChestToken.spawn(sw, npc, player, chestPos)) return TypedActionResult.fail(stack);
 
         // Trừ item nếu không phải creative
         if (!player.isCreative()) stack.decrement(1);

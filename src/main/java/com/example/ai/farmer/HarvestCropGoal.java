@@ -20,6 +20,7 @@ public class HarvestCropGoal extends Goal {
 
     private final FarmerNpcEntity npc;
     private BlockPos targetCrop;
+    private long retryAt;
     private int taskTicks = 0;
     private int pickupDelay = 0;
     private BlockPos lastHarvestPos;
@@ -34,20 +35,20 @@ public class HarvestCropGoal extends Goal {
 
     @Override
     public boolean canStart() {
-        BlockPos found = npc.findNearestFarmland(); // trả về cropPos chín
-        if (found == null) return false;
+        if (npc.getWorld().getTime() < retryAt) return false;
+        BlockPos found = npc.cachedMatureCrop;
+        if (found == null || npc.isInventoryFull() || npc.findNearestChest() == null
+                || !npc.isNearFarmChest(found.down()) || !npc.getWorld().isChunkLoaded(found)) return false;
 
         var state = npc.getWorld().getBlockState(found);
         if (!(state.getBlock() instanceof CropBlock crop)) return false;
         if (!crop.isMature(state)) return false;
 
-        // lock crop để NPC khác không giành
-        if (!npc.reserveCrop(found)) return false;
+        // Chỉ bỏ qua ô mà nông dân khác đang thao tác.
+        if (npc.isWorkedByAnother(found.down())) return false;
 
         targetCrop = found;
         return true;
-
-
     }
 
     @Override
@@ -59,6 +60,7 @@ public class HarvestCropGoal extends Goal {
 
     @Override
     public void tick() {
+        taskTicks++;
 
         if (!npc.getWorld().isChunkLoaded(targetCrop)) {
             stop();
@@ -71,7 +73,12 @@ public class HarvestCropGoal extends Goal {
             }
         }
 
+        if (npc.isWorkedByAnother(targetCrop.down())) {
+            stop();
+            return;
+        }
         if (npc.squaredDistanceTo(Vec3d.ofCenter(targetCrop)) < 2.5) {
+            npc.activeFarmPlot = targetCrop.down();
             harvestCrop();
         }
     }
@@ -80,7 +87,7 @@ public class HarvestCropGoal extends Goal {
     public boolean shouldContinue() {
 // Dừng nếu quá lâu hoặc cây không chín nữa
 //        if (taskTicks > MAX_TASK_TICKS) return false;
-//        if (targetCrop == null) return false;
+//        if (targetCrop == null || !npc.getWorld().isChunkLoaded(targetCrop)) return false;
 //        var state = npc.getWorld().getBlockState(targetCrop);
 //        return state.getBlock() instanceof CropBlock crop
 //                && crop.isMature(state);
@@ -99,9 +106,8 @@ public class HarvestCropGoal extends Goal {
     @Override
     public void stop() {
         npc.getNavigation().stop();
-        if (targetCrop != null) {
-            npc.releaseCrop(targetCrop);
-        }
+        npc.activeFarmPlot = null;
+        retryAt = npc.getWorld().getTime() + 10;
 
         targetCrop = null;
         lastHarvestPos = null;
@@ -119,15 +125,45 @@ public class HarvestCropGoal extends Goal {
             return;
         }
 
-        // ✅ Drop item CHẮC CHẮN spawn ItemEntity
-        Block.dropStacks(
-                state,
-                world,
-                targetCrop,
-                null,
-                npc,
-                ItemStack.EMPTY
-        );
+        npc.swingHand(net.minecraft.util.Hand.MAIN_HAND, true);
+
+        // ✅ Lấy item thay vì vứt ra đất
+        if (world instanceof net.minecraft.server.world.ServerWorld serverWorld) {
+            java.util.List<ItemStack> drops = Block.getDroppedStacks(
+                    state,
+                    serverWorld,
+                    targetCrop,
+                    null,
+                    npc,
+                    ItemStack.EMPTY
+            );
+            
+            for (ItemStack stack : drops) {
+                boolean added = false;
+                for (int i = 0; i < npc.getInventory().size(); i++) {
+                    ItemStack slot = npc.getInventory().getStack(i);
+                    if (slot.isEmpty()) {
+                        npc.getInventory().setStack(i, stack.copy());
+                        stack.setCount(0);
+                        added = true;
+                        break;
+                    }
+                    if (ItemStack.canCombine(slot, stack) && slot.getCount() < slot.getMaxCount()) {
+                        int canMove = Math.min(stack.getCount(), slot.getMaxCount() - slot.getCount());
+                        slot.increment(canMove);
+                        stack.decrement(canMove);
+                        if (stack.isEmpty()) {
+                            added = true;
+                            break;
+                        }
+                    }
+                }
+                if (!added && !stack.isEmpty()) {
+                    // Nếu túi đầy thì vứt ra đất
+                    Block.dropStack(world, targetCrop, stack);
+                }
+            }
+        }
 
         // ✅ Reset crop (để PlantSeedGoal trồng lại)
         world.setBlockState(
@@ -137,7 +173,16 @@ public class HarvestCropGoal extends Goal {
         );
 
         lastHarvestPos = targetCrop.toImmutable();
-        pickupDelay = 2;
+        pickupDelay = 0; // Không cần chờ nhặt nữa
+
+        // ✅ Cập nhật ngay lập tức bộ nhớ để PlantSeedGoal trồng ngay
+        npc.cachedEmptyFarmland = targetCrop.down().toImmutable();
+        npc.cachedMatureCrop = null;
+        
+        // Scan ngay lập tức ở tick tiếp theo
+        // Ta cần gọi 1 hàm hoặc reset field. Vì cooldown bị ẩn trong entity, 
+        // tốt nhất là ép scanFarmland chạy luôn.
+        npc.scanFarmland();
 
 //        var world = npc.getWorld();
 //        var state = world.getBlockState(targetCrop);

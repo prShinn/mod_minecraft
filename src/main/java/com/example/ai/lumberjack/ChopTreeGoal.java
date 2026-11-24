@@ -1,334 +1,210 @@
 package com.example.ai.lumberjack;
 
 import com.example.entity.LumberjackNpcEntity;
-import net.minecraft.block.*;
-import net.minecraft.entity.ItemEntity;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.LeavesBlock;
+import net.minecraft.util.math.Direction;
 import net.minecraft.entity.ai.goal.Goal;
-import net.minecraft.inventory.SimpleInventory;
 import net.minecraft.item.ItemStack;
+import net.minecraft.registry.tag.BlockTags;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.util.Hand;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
 
-import java.util.*;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.EnumSet;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 public class ChopTreeGoal extends Goal {
+    private static final int MAX_LOGS = 2048;
+    private static final int MAX_LEAVES = 1024;
+    private static final int APPROACH_TIMEOUT = 240;
+    private static final double BASE_REACH_SQUARED = 25;
+
     private final LumberjackNpcEntity npc;
-    private BlockPos targetTree;
-    private int taskTicks = 0;
-    private int pickupDelay = 0;
-    private BlockPos lastChopPos;
-    private Set<BlockPos> treeBlocks = new HashSet<>();
-    private int maxTaskTicks = 0;
-
-    // Tầm chặt
-    private static final double CHOP_RANGE_HORIZONTAL = 5.0; // Tầm ngang (horiz)
-    private static final double CHOP_RANGE_VERTICAL = 6.0; // Tầm dọc (vertical)
-    private static final double CHOP_RANGE_MAX = 30.0; // Tầm chặt tối đa khi nhìn thẳng
-
-    private BlockPos basePos;
-    private int treeHeight = 0;
-    private BlockPos currentTargetBlock;
+    private final ArrayDeque<BlockPos> logs = new ArrayDeque<>();
+    private final Set<BlockPos> canopy = new HashSet<>();
+    private BlockPos base;
+    private BlockPos zoneChest;
+    private Block logType;
+    private boolean atBase;
+    private int approachTicks;
+    private int swingDelay;
+    private long retryAt;
 
     public ChopTreeGoal(LumberjackNpcEntity npc) {
         this.npc = npc;
-        this.setControls(EnumSet.of(Control.MOVE, Control.LOOK));
+        setControls(EnumSet.of(Control.MOVE, Control.LOOK));
     }
 
     @Override
     public boolean canStart() {
-        BlockPos tree = npc.findNearestTree();
-        if (tree == null) return false;
+        if (npc.needsWoodDelivery || npc.isInventoryFull() || npc.getWorld().getTime() < retryAt) return false;
+        BlockPos root = npc.findNearestTree();
+        if (root == null || npc.isWorkedByAnother(root)) return false;
 
-        if (!npc.reserveTree(tree)) return false;
+        zoneChest = npc.memory.lastChestPos;
+        logType = npc.getWorld().getBlockState(root).getBlock();
+        List<BlockPos> tree = findConnectedLogs(root);
+        if (tree.isEmpty()) return false;
 
-        targetTree = tree;
-        scanTree(tree);
-        if (treeBlocks.isEmpty()) {
-            npc.releaseTree(tree);
-            return false;
-        }
-
-        calculateTreeHeight();
-        calculateChoppingTime();
-
+        base = root;
+        logs.clear();
+        canopy.clear();
+        collectCanopy(tree);
+        canopy.stream()
+                .sorted(Comparator.comparingInt((BlockPos pos) ->
+                        npc.getWorld().getBlockState(pos).get(LeavesBlock.DISTANCE)).reversed())
+                .forEach(logs::addLast);
+        // Every branch was discovered after its connection to the root.
+        // Cut in reverse discovery order so the remaining logs still connect to the root.
+        Collections.reverse(tree);
+        logs.addAll(tree);
         return true;
     }
 
     @Override
     public void start() {
-        taskTicks = 0;
-        basePos = findLowestLog();
-        currentTargetBlock = null;
-    }
-
-    @Override
-    public void tick() {
-        taskTicks++;
-
-        if (pickupDelay > 0) {
-            pickupDelay--;
-            if (pickupDelay == 0 && lastChopPos != null) {
-                pickupNearbyDrops();
-            }
-            return;
-        }
-        if (currentTargetBlock == null || npc.getWorld().getBlockState(currentTargetBlock).isAir()) {
-
-            currentTargetBlock = findBestBlockToChop();
-        }
-        if (currentTargetBlock == null) return;
-
-        Vec3d npcPos = npc.getPos();
-
-        double dist3D = npcPos.distanceTo(currentTargetBlock.toCenterPos());
-        double horizontalDist = Math.sqrt(Math.pow(currentTargetBlock.getX() - npcPos.x, 2) + Math.pow(currentTargetBlock.getZ() - npcPos.z, 2));
-        double verticalDist = currentTargetBlock.getY() - npcPos.y;
-
-        if (isInChopRange(horizontalDist, verticalDist, dist3D)) {
-            chopBlockAtPos(currentTargetBlock);
-            treeBlocks.remove(currentTargetBlock);
-            currentTargetBlock = null;
-        } else {
-            moveCloserToBlock(currentTargetBlock);
+        approachTicks = 0;
+        swingDelay = 0;
+        atBase = false;
+        if (npc.squaredDistanceTo(Vec3d.ofCenter(base)) > BASE_REACH_SQUARED) {
+            npc.getNavigation().startMovingTo(base.getX() + 0.5, base.getY(), base.getZ() + 0.5, 1.2);
         }
     }
 
     @Override
     public boolean shouldContinue() {
-        if (taskTicks > maxTaskTicks) return false;
-        if (pickupDelay > 0) return true;
-        return !treeBlocks.isEmpty();
+        return base != null && allowsCutting(base) && npc.isTreeRoot(base)
+                && npc.getWorld().getBlockState(base).isOf(logType)
+                && !logs.isEmpty() && !npc.isInventoryFull()
+                && approachTicks < APPROACH_TIMEOUT && !npc.isWorkedByAnother(base);
+    }
+
+    @Override
+    public void tick() {
+        if (!(npc.getWorld() instanceof ServerWorld world)) return;
+        if (npc.squaredDistanceTo(Vec3d.ofCenter(base)) > BASE_REACH_SQUARED) {
+            if (atBase) {
+                atBase = false;
+                npc.activeTree = null;
+                npc.getNavigation().startMovingTo(base.getX() + 0.5, base.getY(), base.getZ() + 0.5, 1.2);
+            }
+            approachTicks++;
+            if (npc.getNavigation().isIdle()) approachTicks = APPROACH_TIMEOUT;
+            return;
+        }
+
+        npc.getNavigation().stop();
+        atBase = true;
+        approachTicks = 0;
+        npc.activeTree = base;
+        if (swingDelay-- > 0) return;
+        if (!allowsCutting(base) || !npc.isTreeRoot(base) || !world.getBlockState(base).isOf(logType)) return;
+        BlockPos pos = logs.peekFirst();
+        if (!world.isChunkLoaded(pos)) {
+            logs.clear();
+            return;
+        }
+        logs.removeFirst();
+        BlockState state = world.getBlockState(pos);
+        boolean leaf = canopy.contains(pos);
+        if (leaf ? !isNaturalLeaf(state) : !state.isIn(BlockTags.LOGS)) return;
+
+        List<ItemStack> drops = Block.getDroppedStacks(state, world, pos, null, npc, leaf ? ItemStack.EMPTY : npc.getMainHandStack());
+        if (!world.breakBlock(pos, false, npc)) {
+            logs.clear();
+            return;
+        }
+        npc.swingHand(Hand.MAIN_HAND, true);
+        npc.needsWoodDelivery = true;
+        npc.memory.lastTreePos = base;
+        swingDelay = 4;
+        for (ItemStack stack : drops) {
+            ItemStack remaining = npc.getInventory().addStack(stack);
+            if (!remaining.isEmpty()) npc.dropStack(remaining);
+        }
     }
 
     @Override
     public void stop() {
         npc.getNavigation().stop();
-        if (targetTree != null) {
-            npc.releaseTree(targetTree);
-        }
-        targetTree = null;
-        treeBlocks.clear();
-        lastChopPos = null;
-        currentTargetBlock = null;
-        pickupDelay = 0;
-        taskTicks = 0;
-        treeHeight = 0;
-        basePos = null;
-        maxTaskTicks = 0;
+        npc.activeTree = null;
+        base = null;
+        zoneChest = null;
+        canopy.clear();
+        logs.clear();
+        retryAt = npc.getWorld().getTime() + 40;
         npc.memory.resetIdle();
     }
 
-    /**
-     * Quét tất cả blocks của cây (log + leaves) - quét rộng hơn
-     */
-    private void scanTree(BlockPos start) {
-        treeBlocks.clear();
-        if (start == null) return;
-        BlockPos chestPos = npc.memory.lastChestPos;
-        if (chestPos == null) return;
+    // Follow the leaf distance gradient from this tree before removing its logs.
+    private void collectCanopy(List<BlockPos> tree) {
+        var world = npc.getWorld();
+        ArrayDeque<BlockPos> pending = new ArrayDeque<>(tree);
+        while (!pending.isEmpty() && canopy.size() < MAX_LEAVES) {
+            BlockPos current = pending.removeFirst();
+            BlockState state = world.getBlockState(current);
+            int distance = isNaturalLeaf(state) ? state.get(LeavesBlock.DISTANCE) : 0;
+            if (distance >= 6) continue;
+            for (Direction direction : Direction.values()) {
+                BlockPos next = current.offset(direction);
+                if (next.getY() < base.getY() || !world.isChunkLoaded(next)) continue;
+                BlockState neighbor = world.getBlockState(next);
+                if (isNaturalLeaf(neighbor) && neighbor.get(LeavesBlock.DISTANCE) == distance + 1
+                        && canopy.add(next)) pending.addLast(next);
+            }
+        }
+    }
 
-        World world = npc.getWorld();
+    private boolean isNaturalLeaf(BlockState state) {
+        return state.getBlock() instanceof LeavesBlock && !state.get(LeavesBlock.PERSISTENT);
+    }
 
-        int radius = 7;
-        int maxHeight = targetTree.getY() + 30;
+    private boolean allowsCutting(BlockPos target) {
+        var world = npc.getWorld();
+        return zoneChest != null && world.isChunkLoaded(zoneChest)
+                && world.getBlockEntity(zoneChest) instanceof com.example.block.LumberjackChestBlockEntity chest
+                && chest.allowsCutting(target);
+    }
 
-        for (int dx = -radius; dx <= radius; dx++) {
-            for (int dz = -radius; dz <= radius; dz++) {
-                for (int dy = targetTree.getY() - 3; dy <= maxHeight; dy++) {
-                    BlockPos pos = new BlockPos(
-                            start.getX() + dx,
-                            dy,
-                            start.getZ() + dz
-                    );
+    private List<BlockPos> findConnectedLogs(BlockPos start) {
+        var world = npc.getWorld();
+        if (!allowsCutting(start) || !npc.isTreeRoot(start)) return List.of();
 
-                    if (!world.isChunkLoaded(pos)) continue;
-                    BlockState state = world.getBlockState(pos);
-                    if (npc.isTreeBlock(state)) {  // ✅ Tái sử dụng hàm từ Entity
-                        treeBlocks.add(pos);
+        Set<BlockPos> visited = new HashSet<>();
+        ArrayDeque<BlockPos> pending = new ArrayDeque<>();
+        List<BlockPos> tree = new ArrayList<>();
+        visited.add(start);
+        pending.add(start);
+        while (!pending.isEmpty()) {
+            if (tree.size() >= MAX_LOGS) {
+                npc.display.report(npc, "Cụm gỗ quá lớn để chặt an toàn");
+                return List.of();
+            }
+            BlockPos current = pending.removeFirst();
+            tree.add(current);
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dy = 0; dy <= 1; dy++) {
+                    for (int dz = -1; dz <= 1; dz++) {
+                        BlockPos next = current.add(dx, dy, dz);
+                        if (!visited.add(next)) continue;
+                        if (!world.isChunkLoaded(next)) {
+                            npc.display.report(npc, "Chưa tải đủ khu vực quanh cây");
+                            return List.of();
+                        }
+                        if (world.getBlockState(next).isIn(BlockTags.LOGS)) pending.addLast(next);
                     }
                 }
             }
         }
-
-    }
-
-    /**
-     * Kiểm tra block có nằm trong tầm chặt không
-     * - Ngang: 5 block
-     * - Dọc: 6 block (lên hoặc xuống)
-     * - Tối đa: 8 block (đường thẳng)
-     */
-    private boolean isInChopRange(double horizontalDist, double verticalDist, double dist3D) {
-        // Nếu trong tầm ngang + dọc
-        if (horizontalDist <= CHOP_RANGE_HORIZONTAL && Math.abs(verticalDist) <= CHOP_RANGE_VERTICAL) {
-            return true;
-        }
-
-        // Hoặc nếu trong tầm tối đa (đường thẳng)
-        if (dist3D <= CHOP_RANGE_MAX) {
-            return true;
-        }
-
-        return false;
-    }
-
-    /**
-     * Tìm block tốt nhất để chặt
-     * Ưu tiên: log từ thấp lên cao -> lá
-     */
-    private BlockPos findBestBlockToChop() {
-        Vec3d npcPos = npc.getPos();
-
-        BlockPos best = null;
-        double bestScore = Double.MAX_VALUE;
-
-        for (BlockPos pos : treeBlocks) {
-            // ✅ Check block còn tồn tại không
-            BlockState state = npc.getWorld().getBlockState(pos);
-            if (state.isAir()) continue;
-
-            Block block = state.getBlock();
-
-            double score;
-
-            if (block instanceof PillarBlock) {
-                // ✅ Log: Ưu tiên từ dưới lên (Y thấp trước)
-                // Y * 500 = log dưới được ưu tiên
-                score = pos.getY() * 500 + npcPos.squaredDistanceTo(pos.toCenterPos());
-            } else if (block instanceof LeavesBlock) {
-                // ✅ Leaves: Ưu tiên sau cùng
-                score = 1_000_000 + npcPos.squaredDistanceTo(pos.toCenterPos());
-            } else {
-                continue;
-            }
-
-            if (score < bestScore) {
-                bestScore = score;
-                best = pos;
-            }
-        }
-        return best;
-    }
-
-    /**
-     * Chặt block tại vị trí cụ thể
-     */
-    private void chopBlockAtPos(BlockPos pos) {
-        npc.getLookControl().lookAt(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
-
-        World world = npc.getWorld();
-
-        // ✅ Phá block và drop items
-        world.breakBlock(pos, true, npc);
-
-        lastChopPos = pos.toImmutable();
-        pickupDelay = 5; // ✅ Delay 5 ticks rồi nhặt items
-        npc.memory.lastTreePos = pos;
-        npc.memory.resetIdle();
-
-    }
-
-    /**
-     * Di chuyển NPC gần block
-     */
-    private void moveCloserToBlock(BlockPos block) {
-        // Fallback: di chuyển tới chính block
-        npc.getNavigation().startMovingTo(block.getX() + 2.5, block.getY(), block.getZ() + 2.5, 1.2f);
-    }
-
-    /**
-     * Nhặt items rơi gần đó
-     */
-    private void pickupNearbyDrops() {
-        List<ItemEntity> drops = npc.getWorld().getEntitiesByClass(ItemEntity.class, new Box(lastChopPos).expand(4.0), item -> item.isAlive());
-
-        for (ItemEntity item : drops) {
-            ItemStack stack = item.getStack();
-            boolean addedAll = addToInventory(npc.getInventory(), stack);
-
-            if (addedAll) {
-                item.discard();
-            }
-        }
-    }
-
-    private boolean addToInventory(SimpleInventory inv, ItemStack stack) {
-        for (int i = 0; i < inv.size(); i++) {
-            ItemStack slot = inv.getStack(i);
-
-            if (slot.isEmpty()) {
-                inv.setStack(i, stack.copy());
-                stack.setCount(0);
-                return true;
-            }
-
-            if (ItemStack.canCombine(slot, stack) && slot.getCount() < slot.getMaxCount()) {
-                int move = Math.min(stack.getCount(), slot.getMaxCount() - slot.getCount());
-                slot.increment(move);
-                stack.decrement(move);
-
-                if (stack.isEmpty()) return true;
-            }
-        }
-        return stack.isEmpty();
-    }
-
-    /**
-     * Tính chiều cao cây
-     */
-    private void calculateTreeHeight() {
-        int minY = Integer.MAX_VALUE;
-        int maxY = Integer.MIN_VALUE;
-
-        for (BlockPos pos : treeBlocks) {
-            BlockState state = npc.getWorld().getBlockState(pos);
-            if (state.getBlock() instanceof PillarBlock) {
-                minY = Math.min(minY, pos.getY());
-                maxY = Math.max(maxY, pos.getY());
-            }
-        }
-
-        treeHeight = (minY == Integer.MAX_VALUE) ? 1 : (maxY - minY + 1);
-    }
-
-    /**
-     * Tính thời gian chặt
-     */
-    private void calculateChoppingTime() {
-        int logCount = 0;
-        int leafCount = 0;
-
-        for (BlockPos pos : treeBlocks) {
-            BlockState state = npc.getWorld().getBlockState(pos);
-            if (state.getBlock() instanceof PillarBlock) {
-                logCount++;
-            } else if (state.getBlock() instanceof LeavesBlock) {
-                leafCount++;
-            }
-        }
-
-        maxTaskTicks = (logCount * 15) + (leafCount * 2) + 60;
-        maxTaskTicks = Math.max(80, Math.min(1200, maxTaskTicks));
-    }
-
-    /**
-     * Tìm log thấp nhất
-     */
-    private BlockPos findLowestLog() {
-        BlockPos lowest = null;
-        int lowestY = Integer.MAX_VALUE;
-
-        for (BlockPos pos : treeBlocks) {
-            BlockState state = npc.getWorld().getBlockState(pos);
-            if (state.getBlock() instanceof PillarBlock) {
-                if (pos.getY() < lowestY) {
-                    lowestY = pos.getY();
-                    lowest = pos;
-                }
-            }
-        }
-        return lowest;
+        return tree;
     }
 }

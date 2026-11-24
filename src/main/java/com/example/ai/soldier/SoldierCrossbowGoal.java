@@ -195,7 +195,7 @@ public class SoldierCrossbowGoal extends Goal {
             shootMultishotArrow(target, 10.0F, distance, heightAdjust, inaccuracy);
         }
 
-        npc.swingHand(Hand.MAIN_HAND);
+        npc.swingHand(Hand.MAIN_HAND, true);
         npc.playSound(SoundEvents.ITEM_CROSSBOW_SHOOT, 1.0F,
                 1.0F / (npc.getRandom().nextFloat() * 0.4F + 1.2F) + 0.5F);
     }

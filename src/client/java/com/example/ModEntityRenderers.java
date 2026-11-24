@@ -2,6 +2,8 @@ package com.example;
 
 import com.example.entity.FarmerNpcEntity;
 import com.example.entity.LumberjackNpcEntity;
+import com.example.entity.FishermanNpcEntity;
+import com.example.entity.MinerNpcEntity;
 import com.example.entity.SoldierNPCEntity;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
 import net.minecraft.client.render.entity.BipedEntityRenderer;
@@ -109,6 +111,68 @@ public class ModEntityRenderers {
                 }
         );
 
+        EntityRendererRegistry.register(
+                ModEntities.MINER_NPC,
+                ctx -> new BipedEntityRenderer<
+                        MinerNpcEntity,
+                        BipedEntityModel<MinerNpcEntity>
+                        >(
+                        ctx,
+                        new BipedEntityModel<>(ctx.getPart(EntityModelLayers.ZOMBIE_VILLAGER)),
+                        0.5f
+                ) {
+
+                    @Override
+                    public Identifier getTexture(MinerNpcEntity entity) {
+                        return new Identifier(
+                                "minecraft",
+                                "textures/entity/villager/villager.png"
+                        );
+                    }
+
+                    {
+                        this.addFeature(new ArmorFeatureRenderer<>(
+                                this,
+                                new BipedEntityModel<>(ctx.getPart(
+                                        EntityModelLayers.ZOMBIE_VILLAGER_INNER_ARMOR)),
+                                new BipedEntityModel<>(ctx.getPart(
+                                        EntityModelLayers.ZOMBIE_VILLAGER_OUTER_ARMOR)),
+                                ctx.getModelManager()
+                        ));
+                    }
+                }
+        );
+        // ===== FISHERMAN NPC =====
+        EntityRendererRegistry.register(
+                ModEntities.FISHERMAN_NPC,
+                ctx -> new BipedEntityRenderer<
+                        FishermanNpcEntity,
+                        BipedEntityModel<FishermanNpcEntity>
+                        >(
+                        ctx,
+                        new BipedEntityModel<>(ctx.getPart(EntityModelLayers.ZOMBIE_VILLAGER)),
+                        0.5f
+                ) {
+                    @Override
+                    public Identifier getTexture(FishermanNpcEntity entity) {
+                        return new Identifier(
+                                "minecraft",
+                                "textures/entity/villager/villager.png"
+                        );
+                    }
+
+                    {
+                        this.addFeature(new ArmorFeatureRenderer<>(
+                                this,
+                                new BipedEntityModel<>(ctx.getPart(
+                                        EntityModelLayers.ZOMBIE_VILLAGER_INNER_ARMOR)),
+                                new BipedEntityModel<>(ctx.getPart(
+                                        EntityModelLayers.ZOMBIE_VILLAGER_OUTER_ARMOR)),
+                                ctx.getModelManager()
+                        ));
+                    }
+                }
+        );
 
 //        EntityRendererRegistry.register(
 //                ModEntities.SOLDIER_NPC,

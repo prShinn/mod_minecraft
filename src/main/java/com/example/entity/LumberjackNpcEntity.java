@@ -36,20 +36,26 @@ import java.util.UUID;
 public class LumberjackNpcEntity extends PathAwareEntity {
     public final NpcDisplayComponent display = new NpcDisplayComponent();
     private final NpcEquipmentComponent equip = new NpcEquipmentComponent();
-    //    public final NpcSleepingComponent sleeping = new NpcSleepingComponent()
-//            .withSearchRadius(16)
-//            .withCooldown(120)
-//            .withWanderDuration(100);
+    public final com.example.entity.base.NpcSleepingComponent sleeping = new com.example.entity.base.NpcSleepingComponent();
     private UUID ownerUUID;
+
+    public void setOwnerUUID(UUID ownerUUID) {
+        this.ownerUUID = ownerUUID;
+    }
     public final SimpleInventory inventory = new SimpleInventory(9);
+    public final SimpleInventory plantingSaplings = new SimpleInventory(27);
+    public BlockPos saplingChestPos;
+    public boolean returningSaplings;
+    private final SimpleInventory supplies = new SimpleInventory(9);
     public final LumberjackMemory memory = new LumberjackMemory();
     public final static int FIND_CHEST_DISTANCE = 16;
     public final static int FIND_TREE_DISTANCE = 8;
-    private final GlobalReservationSystem reservationSystem = GlobalReservationSystem.getInstance();
+    private final GlobalReservationSystem reservationSystem = GlobalReservationSystem.getInstance(getWorld());
     private int treeSearchCooldown = 0;
     private static final int TREE_SEARCH_COOLDOWN = 20; // 1 second (20 ticks)
 
-
+    private int chestSearchCooldown = 60; // Thêm cooldown giống Miner
+    private static final int CHEST_SEARCH_COOLDOWN = 100;
     private static final Set<BlockPos> RESERVED_CHESTS = new HashSet<>();
 
     public boolean reserveTree(BlockPos pos) {
@@ -81,6 +87,11 @@ public class LumberjackNpcEntity extends PathAwareEntity {
     }
 
     @Override
+    public boolean cannotDespawn() {
+        return true;
+    }
+
+    @Override
     protected void initGoals() {
         super.initGoals();
         this.goalSelector.clear(goal -> true);
@@ -88,16 +99,12 @@ public class LumberjackNpcEntity extends PathAwareEntity {
 
         this.goalSelector.add(0, new SwimGoal(this));
         this.goalSelector.add(1, new EscapeDangerGoal(this, 1.4));
-//        this.goalSelector.add(2, new FindAndSleepGoal(this, sleeping));
-        this.goalSelector.add(2, new FindAndEatFoodGoal(
-                this,
-                inventory,  // NPC inventory
-                24              // search radius
-        ));
+        this.goalSelector.add(2, new com.example.ai.FindAndSleepGoal(this, () -> sleeping));
+        this.goalSelector.add(3, new FindAndEatFoodGoal(this, () -> supplies, 24, () -> display.shouldEat(), amount -> display.feed(amount)));
 //        this.goalSelector.add(3, new WanderForBedGoal(this, 1.0));
-        this.goalSelector.add(4, new ChopTreeGoal(this)); // Chặt cây
+        this.goalSelector.add(6, new ChopTreeGoal(this)); // Chặt cây
         this.goalSelector.add(5, new DepositWoodToChestGoal(this)); // Cất vao chest
-        this.goalSelector.add(6, new PlantSaplingGoal(this)); // Trồng mầm cây
+        this.goalSelector.add(4, new PlantSaplingGoal(this)); // Trồng mầm cây
         this.goalSelector.add(7, new LookAtEntityGoal(this, PlayerEntity.class, 8.0F));
         this.goalSelector.add(8, new WanderNearChestGoal(this)); // Lang thang và tìm chest
         this.goalSelector.add(8, new LookAroundGoal(this));
@@ -114,7 +121,9 @@ public class LumberjackNpcEntity extends PathAwareEntity {
     public void tick() {
         super.tick();
         if (this.getWorld() == null || this.getWorld().isClient) return;
-        display.tick(this, inventory);
+        sleeping.setSearchCenter(memory.lastChestPos);
+        sleeping.tick(this);
+        display.tick(this, supplies, goalSelector);
         if (this.getNavigation().isIdle()) {
             memory.tickIdle();
         } else {
@@ -122,6 +131,9 @@ public class LumberjackNpcEntity extends PathAwareEntity {
         }
         if (treeSearchCooldown > 0) {
             treeSearchCooldown--;
+        }
+        if (chestSearchCooldown > 0) {
+            chestSearchCooldown--;
         }
         // Trong tick() - cleanup sớm nếu HP thấp
         if (this.getHealth() <= 2.0F) {
@@ -139,7 +151,7 @@ public class LumberjackNpcEntity extends PathAwareEntity {
             return ActionResult.FAIL;
         }
 
-        ActionResult handled = equip.interactMob(this, player, ownerUUID, hand, inventory, ModItems.LUMBERJACK_TOKEN);
+        ActionResult handled = equip.interactMob(this, player, ownerUUID, hand, supplies, ModItems.LUMBERJACK_TOKEN);
         if (!handled.equals(ActionResult.FAIL)) {
             return handled;
         }
@@ -149,6 +161,13 @@ public class LumberjackNpcEntity extends PathAwareEntity {
     @Override
     public void writeCustomDataToNbt(NbtCompound nbt) {
         super.writeCustomDataToNbt(nbt);
+        display.writeNbt(nbt);
+        nbt.put("FoodInventory", inventory.toNbtList());
+        nbt.put("PlantingSaplings", plantingSaplings.toNbtList());
+        if (saplingChestPos != null) nbt.putLong("SaplingChestPos", saplingChestPos.asLong());
+        nbt.putBoolean("ReturningSaplings", returningSaplings);
+        nbt.put("Supplies", supplies.toNbtList());
+        nbt.putBoolean("NeedsWoodDelivery", needsWoodDelivery);
         if (ownerUUID != null) {
             nbt.putUuid("OwnerUUID", ownerUUID);
         }
@@ -158,6 +177,13 @@ public class LumberjackNpcEntity extends PathAwareEntity {
     @Override
     public void readCustomDataFromNbt(NbtCompound nbt) {
         super.readCustomDataFromNbt(nbt);
+        display.readNbt(nbt);
+        needsWoodDelivery = nbt.getBoolean("NeedsWoodDelivery");
+        if (nbt.contains("Supplies")) supplies.readNbtList(nbt.getList("Supplies", 10));
+        if (nbt.contains("FoodInventory")) inventory.readNbtList(nbt.getList("FoodInventory", 10));
+        if (nbt.contains("PlantingSaplings")) plantingSaplings.readNbtList(nbt.getList("PlantingSaplings", 10));
+        saplingChestPos = nbt.contains("SaplingChestPos") ? BlockPos.fromLong(nbt.getLong("SaplingChestPos")) : null;
+        returningSaplings = nbt.getBoolean("ReturningSaplings");
         if (nbt.containsUuid("OwnerUUID")) {
             ownerUUID = nbt.getUuid("OwnerUUID");
         }
@@ -180,6 +206,10 @@ public class LumberjackNpcEntity extends PathAwareEntity {
 
     @Override
     public void remove(RemovalReason reason) {
+        if (!getWorld().isClient) {
+            sleeping.cancelMovingToBed(this);
+            sleeping.wakeUp(this);
+        }
         // ✅ Fixed: Added proper cleanup
         cleanupAllReservations(); // 🔥 CLEANUP ALL (bed + trees + chests)
         super.remove(reason);
@@ -214,79 +244,104 @@ public class LumberjackNpcEntity extends PathAwareEntity {
 //        }
 //        return closestChest;
 //    }
-public Inventory findNearestChest() {
-    BlockPos center = getBlockPos();
-    World world = getWorld();
-    double closestDist = Double.MAX_VALUE;
-    Inventory closestChest = null;
-    BlockPos newChestPos = null; // 🔥 Tạo biến tạm để lưu vị trí chest mới
+    public Inventory findNearestChest() {
+        World world = getWorld();
+        if (world == null) return null;
 
-    for (int dx = -FIND_CHEST_DISTANCE; dx <= FIND_CHEST_DISTANCE; dx++) {
-        for (int dy = -2; dy <= 2; dy++) {
-            for (int dz = -FIND_CHEST_DISTANCE; dz <= FIND_CHEST_DISTANCE; dz++) {
-                BlockPos pos = center.add(dx, dy, dz);
-                if (!world.isChunkLoaded(pos)) continue;
+        // Dùng cache nếu còn hiệu lực
+        if (memory.lastChestPos != null && chestSearchCooldown > 0) {
+            BlockPos cached = memory.lastChestPos;
+            if (world.isChunkLoaded(cached)) {
+                BlockEntity be = world.getBlockEntity(cached);
+                if (be instanceof com.example.block.LumberjackChestBlockEntity inv) {
+                    return inv;
+                }
+            }
+            memory.lastChestPos = null;
+        }
 
-                BlockEntity be = world.getBlockEntity(pos);
-                if (be instanceof Inventory inv) {
-                    // Skip chest nếu đã bị NPC khác reserve
-                    if (reservationSystem.isReservedByOthers(pos, this.getUuid(), "WORK_CHEST")) {
-                        continue;
-                    }
+        // Kiểm tra cooldown
+        if (chestSearchCooldown > 0) return null;
 
-                    double dist = this.squaredDistanceTo(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
-                    if (dist < closestDist) {
-                        closestDist = dist;
-                        closestChest = inv;
-                        newChestPos = pos; // 🔥 Lưu vào biến tạm
+        BlockPos center = getBlockPos();
+        double closestDist = Double.MAX_VALUE;
+        Inventory closestChest = null;
+        BlockPos newChestPos = null;
+
+        for (int dx = -FIND_CHEST_DISTANCE; dx <= FIND_CHEST_DISTANCE; dx++) {
+            for (int dy = -2; dy <= 2; dy++) {
+                for (int dz = -FIND_CHEST_DISTANCE; dz <= FIND_CHEST_DISTANCE; dz++) {
+                    BlockPos pos = center.add(dx, dy, dz);
+                    if (!world.isChunkLoaded(pos)) continue;
+
+                    BlockEntity be = world.getBlockEntity(pos);
+                    if (be instanceof com.example.block.LumberjackChestBlockEntity lumberjackChest) {
+                        double dist = this.squaredDistanceTo(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
+                        if (dist < closestDist) {
+                            closestDist = dist;
+                            closestChest = lumberjackChest;
+                            newChestPos = pos;
+                        }
                     }
                 }
             }
         }
-    }
 
-    // 🔥 NẾU TÌM THẤY CHEST MỚI KHÁC CHEST CŨ → release chest cũ
-    if (newChestPos != null && !newChestPos.equals(memory.lastChestPos)) {
-        if (memory.lastChestPos != null) {
-            releaseChest(memory.lastChestPos); // Release chest cũ
-            System.out.println("Farmer " + this.getUuid() + " released old chest at " + memory.lastChestPos);
+        chestSearchCooldown = CHEST_SEARCH_COOLDOWN;
+        if (newChestPos != null) {
+            memory.lastChestPos = newChestPos;
         }
-        memory.lastChestPos = newChestPos;
-        System.out.println("Farmer " + this.getUuid() + " found new chest at " + newChestPos);
+
+        return closestChest;
     }
 
-    return closestChest;
-}
     /**
      * Tìm cây gần nhất trong bán kính 7 blocks từ chest
      * Chỉ tìm log có độ cao >= chest
      */
+    public BlockPos activeTree;
+    public boolean needsWoodDelivery;
+
+    public boolean isWorkedByAnother(BlockPos tree) {
+        return !getWorld().getEntitiesByClass(LumberjackNpcEntity.class,
+                new net.minecraft.util.math.Box(tree).expand(8, 40, 8),
+                other -> other != this && other.activeTree != null
+                        && Math.abs(tree.getX() - other.activeTree.getX()) <= 2
+                        && Math.abs(tree.getZ() - other.activeTree.getZ()) <= 2
+                        && Math.abs(tree.getY() - other.activeTree.getY()) <= 40).isEmpty();
+    }
+
     public BlockPos findNearestTree() {
         if (treeSearchCooldown > 0) {
             return null;
         }
-        if (memory.lastChestPos == null) {
-            findNearestChest(); // Tìm chest trước
+        if (findNearestChest() == null || memory.lastChestPos == null) {
+            display.report(this, "Không tìm thấy rương tiều phu");
+            return null;
         }
-
-        if (memory.lastChestPos == null) return null;
 
         BlockPos chestPos = memory.lastChestPos;
         World world = getWorld();
 
-        int radius = FIND_TREE_DISTANCE;
+        var workChest = world.getBlockEntity(chestPos);
+        if (!(workChest instanceof com.example.block.LumberjackChestBlockEntity zone)
+                || !zone.allowsCutting(chestPos)) {
+            display.report(this, "Chưa bật vùng chặt trên rương tiều phu");
+            treeSearchCooldown = TREE_SEARCH_COOLDOWN;
+            return null;
+        }
+
+        int radius = com.example.block.LumberjackChestBlockEntity.CUT_RADIUS;
         BlockPos found = null;
         double bestDist = Double.MAX_VALUE;
         for (int dx = -radius; dx <= radius; dx++) {
             for (int dz = -radius; dz <= radius; dz++) {
-                for (int dy = 0; dy <= 40; dy++) {
+                for (int dy = -com.example.block.LumberjackChestBlockEntity.CUT_BELOW;
+                     dy <= com.example.block.LumberjackChestBlockEntity.CUT_ABOVE; dy++) {
                     BlockPos pos = chestPos.add(dx, dy, dz);
-                    if (!world.isChunkLoaded(pos)) continue;
+                    if (!zone.allowsCutting(pos) || !isTreeRoot(pos)) continue;
 
-                    BlockState state = world.getBlockState(pos);
-                    if (!isTreeBlock(state)) continue;
-
-                    if (reservationSystem.isReservedByOthers(pos, this.getUuid(), "TREE")) {
+                    if (isWorkedByAnother(pos)) {
                         continue;
                     }
 
@@ -305,8 +360,21 @@ public Inventory findNearestChest() {
         }
 
         treeSearchCooldown = TREE_SEARCH_COOLDOWN;
+        if (found == null) display.report(this, "Chưa có cây trong vùng chặt");
         return found;
 
+    }
+
+    public boolean isTreeRoot(BlockPos pos) {
+        World world = getWorld();
+        if (!world.isChunkLoaded(pos)) return false;
+        BlockState log = world.getBlockState(pos);
+        if (!log.isIn(net.minecraft.registry.tag.BlockTags.LOGS)) return false;
+        BlockState below = world.getBlockState(pos.down());
+        return below.isIn(net.minecraft.registry.tag.BlockTags.DIRT)
+                || (log.isOf(Blocks.MANGROVE_LOG)
+                    && (below.isOf(Blocks.MANGROVE_ROOTS) || below.isOf(Blocks.MUDDY_MANGROVE_ROOTS)
+                        || below.isOf(Blocks.MUD)));
     }
 
     /**
@@ -329,9 +397,23 @@ public Inventory findNearestChest() {
     public SimpleInventory getInventory() {
         return inventory;
     }
+
+    public boolean isInventoryFull() {
+        for (int i = 0; i < inventory.size(); i++) {
+            if (inventory.getStack(i).isEmpty()) return false;
+        }
+        return true;
+    }
+
     @Override
     public void onDeath(DamageSource damageSource) {
         cleanupAllReservations();
+        if (!getWorld().isClient) {
+            for (int slot = 0; slot < plantingSaplings.size(); slot++) {
+                ItemStack stack = plantingSaplings.removeStack(slot);
+                if (!stack.isEmpty()) dropStack(stack);
+            }
+        }
         super.onDeath(damageSource);
     }
 }

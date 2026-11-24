@@ -13,8 +13,10 @@ import java.util.EnumSet;
 
 public class FindAndEatFoodGoal extends Goal {
     private final PathAwareEntity npc;
-    private final SimpleInventory npcInventory;
+    private final java.util.function.Supplier<SimpleInventory> inventory;
     private final int searchRadius;
+    private final java.util.function.BooleanSupplier hungry;
+    private final java.util.function.IntConsumer feed;
 
     private BlockPos targetFoodChest = null;
     private int cooldown = 0;
@@ -24,18 +26,26 @@ public class FindAndEatFoodGoal extends Goal {
     // ===== CACHING =====
     private final FoodChestCacheManager cacheManager = new FoodChestCacheManager();
 
-    public FindAndEatFoodGoal(PathAwareEntity npc, SimpleInventory npcInventory, int searchRadius) {
+    public FindAndEatFoodGoal(PathAwareEntity npc, java.util.function.Supplier<SimpleInventory> inventory, int searchRadius,
+                              java.util.function.BooleanSupplier hungry, java.util.function.IntConsumer feed) {
         this.npc = npc;
-        this.npcInventory = npcInventory;
+        this.inventory = inventory;
         this.searchRadius = searchRadius;
+        this.hungry = hungry;
+        this.feed = feed;
         this.setControls(EnumSet.of(Control.MOVE, Control.LOOK));
     }
 
     @Override
     public boolean canStart() {
         // ===== CONDITION 1: Inventory đủ food? =====
-        if (hasEnoughFood()) {
+        if (npc.getPose() == net.minecraft.entity.EntityPose.SLEEPING || !hungry.getAsBoolean() || hasEnoughFood()) {
             targetFoodChest = null;
+            return false;
+        }
+
+        if (cooldown > 0) {
+            cooldown--;
             return false;
         }
 
@@ -45,12 +55,6 @@ public class FindAndEatFoodGoal extends Goal {
             // ✅ Chest còn hợp lệ → dùng cache
             targetFoodChest = cachedChest;
             return true;
-        }
-
-        // ===== CONDITION 3: Cooldown (tránh spam search) =====
-        if (cooldown > 0) {
-            cooldown--;
-            return false;
         }
 
         // ===== CONDITION 4: Scan chest mới =====
@@ -63,6 +67,7 @@ public class FindAndEatFoodGoal extends Goal {
             return true;
         }
 
+        com.example.entity.base.NpcDisplayComponent.reportWorker(npc, "Không tìm thấy rương thức ăn còn đồ");
         return false;
     }
 
@@ -84,11 +89,6 @@ public class FindAndEatFoodGoal extends Goal {
 
         World world = npc.getWorld();
         if (world == null || world.isClient()) return;
-        if (cooldown > 0) {
-            cooldown--;
-            return;
-        }
-        cooldown = SEARCH_COOLDOWN;
         double dist = npc.squaredDistanceTo(
                 targetFoodChest.getX() + 0.5,
                 targetFoodChest.getY() + 0.5,
@@ -102,7 +102,7 @@ public class FindAndEatFoodGoal extends Goal {
         }
 
         // ===== CHECK: Reached chest =====
-        if (dist < 1.5) {
+        if (dist <= 6.25) {
             // Check xem chest còn valid không
             if (!FoodChestHelper.isValidFoodChest(targetFoodChest, world)) {
                 // Chest bị phá → reset cache
@@ -111,25 +111,21 @@ public class FindAndEatFoodGoal extends Goal {
                 return;
             }
 
-            // Lấy food từ chest
             ItemStack food = FoodChestHelper.takeFood(targetFoodChest, world);
-            if (!food.isEmpty() && npcInventory != null) {
-                npcInventory.addStack(food);
-
-                // Nếu inventory đủ → stop
-                if (hasEnoughFood()) {
-                    targetFoodChest = null;
-                }
-            } else {
-                // Chest hết food → không reset cache, có thể có food sau
-                targetFoodChest = null;
+            if (!food.isEmpty()) {
+                npc.swingHand(net.minecraft.util.Hand.MAIN_HAND, true);
+                feed.accept(food.getItem().getFoodComponent().getHunger());
             }
+            targetFoodChest = null;
+        } else if (npc.getNavigation().isIdle()) {
+            cacheManager.invalidateCache();
+            targetFoodChest = null;
         }
     }
 
     @Override
     public boolean shouldContinue() {
-        if (hasEnoughFood()) {
+        if (npc.getPose() == net.minecraft.entity.EntityPose.SLEEPING || !hungry.getAsBoolean() || hasEnoughFood()) {
             return false;
         }
 
@@ -149,7 +145,8 @@ public class FindAndEatFoodGoal extends Goal {
     @Override
     public void stop() {
         npc.getNavigation().stop();
-        // ⚠️ Không reset targetFoodChest - cho tick() xử lý
+        targetFoodChest = null;
+        cooldown = SEARCH_COOLDOWN;
     }
 
     // ===== HELPER METHODS =====
@@ -166,7 +163,7 @@ public class FindAndEatFoodGoal extends Goal {
      * Tính tổng food trong NPC inventory
      */
     private int getTotalFoodCount() {
-        if (npcInventory == null) return 0;
+        SimpleInventory npcInventory = inventory.get();
         int total = 0;
         for (int i = 0; i < npcInventory.size(); i++) {
             ItemStack stack = npcInventory.getStack(i);

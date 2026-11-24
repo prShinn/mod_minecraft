@@ -26,11 +26,12 @@ public class ModPackets {
         ServerPlayNetworking.registerGlobalReceiver(
                 NPC_MOVE_MODE,
                 (server, player, handler, buf, sender) -> {
-                    System.out.println("SERVER RECEIVED PACKET");
+                    if (buf.readableBytes() != 16) return;
                     UUID npcId = buf.readUuid();
                     server.execute(() -> {
                         Entity e = player.getServerWorld().getEntity(npcId);
-                        if (!(e instanceof SoldierNPCEntity npc)) return;
+                        if (!(e instanceof SoldierNPCEntity npc) || npc.getOwner() != player
+                                || npc.squaredDistanceTo(player) > 64) return;
                         // ✅ Đổi mode
                         ModeNpc.ModeMove newMode =
                                 npc.getMoveMode() == ModeNpc.ModeMove.FOLLOW

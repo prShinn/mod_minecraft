@@ -50,8 +50,8 @@ public class SoldierNPCEntity extends PathAwareEntity {
     private static final int FOOD_TICK_INTERVAL = 1200; // 1p
     private static final int SHOW_NAME_DURATION = 20; // 1 giây
     private static final double VIEW_DISTANCE = 6.0;
-    public static final float FOLLOW_DISTANCE = 30f;
-    public static final float TELEPORT_DISTANCE = 40f;
+    public static final float FOLLOW_DISTANCE = 48f; // Lang thang tối đa
+    public static final float TELEPORT_DISTANCE = 60f; // Quá xa thì teleport
     private final float teleportDistance = 0;
     private static final int PLAYER_SEARCH_INTERVAL = 30; // 1 giây
     // 1/10 xác suất
@@ -61,6 +61,16 @@ public class SoldierNPCEntity extends PathAwareEntity {
 
     // ===== OWNER & FOLLOW =====
     private UUID ownerUUID;
+    private final com.example.entity.base.NpcSleepingComponent sleeping = new com.example.entity.base.NpcSleepingComponent();
+
+    @Override
+    public void remove(RemovalReason reason) {
+        if (!getWorld().isClient) {
+            sleeping.cancelMovingToBed(this);
+            sleeping.wakeUp(this);
+        }
+        super.remove(reason);
+    }
     private UUID followPlayerUUID;
 
     // ===== DISPLAY =====
@@ -105,10 +115,15 @@ public class SoldierNPCEntity extends PathAwareEntity {
         super(type, world);
     }
 
+    @Override
+    public boolean cannotDespawn() {
+        return true;
+    }
+
     // ===== ATTRIBUTES =====
     public static DefaultAttributeContainer.Builder createAttributes() {
         return HostileEntity.createHostileAttributes()
-                .add(EntityAttributes.GENERIC_MAX_HEALTH, 25.0D)
+                .add(EntityAttributes.GENERIC_MAX_HEALTH, 20D)
                 .add(EntityAttributes.GENERIC_ATTACK_DAMAGE, 2.0D)
                 .add(EntityAttributes.GENERIC_MOVEMENT_SPEED, 0.25D);
     }
@@ -161,6 +176,7 @@ public class SoldierNPCEntity extends PathAwareEntity {
             }
         }); // cung thu
         this.goalSelector.add(3, new EscapeDangerGoal(this, 1.4));
+        this.goalSelector.add(4, new com.example.ai.FindAndSleepGoal(this, () -> sleeping));
         this.goalSelector.add(4, new HealAllyGoal(this) {
             @Override
             public boolean canStart() {
@@ -172,6 +188,7 @@ public class SoldierNPCEntity extends PathAwareEntity {
                 return false;
             }
         });
+        this.goalSelector.add(4, new com.example.ai.foodChest.FindAndEatFoodGoal(this, () -> foodInventory, 24, this::shouldEat, this::feedFromChest));
         this.goalSelector.add(5, new FollowOwnerLikeGoal(this, 1.3D));
         this.goalSelector.add(6, new ReturnToPlayerGoal(this));
 // nhin player
@@ -221,6 +238,7 @@ public class SoldierNPCEntity extends PathAwareEntity {
         // Display management
         updateNameDisplay();
         // Food system
+        sleeping.tick(this);
         handleFoodSystem();
         // Healing system
         handleGradualHeal();
@@ -266,6 +284,11 @@ public class SoldierNPCEntity extends PathAwareEntity {
             // Starve damage
             this.damage(this.getWorld().getDamageSources().starve(), 1.0F);
         }
+    }
+
+    private void feedFromChest(int nutrition) {
+        hunger = Math.min(MAX_HUNGER, hunger + nutrition);
+        eatCooldown = 100;
     }
 
     private boolean shouldEat() {
@@ -342,7 +365,9 @@ public class SoldierNPCEntity extends PathAwareEntity {
                 .append(Text.literal(" [" + hp + "/" + maxHp + "] ").formatted(Formatting.GREEN))
                 .append(Text.literal("🍖[" + hunger + "/" + MAX_HUNGER + "] x" + foodCount).formatted(Formatting.GOLD));
 
-        this.setCustomName(name);
+        this.setCustomName(name.append(Text.literal(" • "
+                + com.example.entity.base.NpcDisplayComponent.workLabel(this, goalSelector, null))
+                .formatted(Formatting.YELLOW)));
     }
 
     public int getTotalFoodCount() {
@@ -450,11 +475,7 @@ public class SoldierNPCEntity extends PathAwareEntity {
             }
             ItemStack token = new ItemStack(ModItems.SOLDIER_TOKEN);
 
-            NbtCompound entityNbt = new NbtCompound();
-            this.writeCustomDataToNbt(entityNbt);
-            entityNbt.putFloat("Health", this.getHealth());
-
-            token.getOrCreateNbt().put("SoldierEntityTag", entityNbt);
+            com.example.item.WorkChestToken.save(this, token);
 
             if (!player.getInventory().insertStack(token)) {
                 this.dropStack(token);

@@ -1,263 +1,309 @@
 package com.example.ai.lumberjack;
 
+import com.example.ai.DeliveryTarget;
+import com.example.block.LumberjackChestBlockEntity;
 import com.example.entity.LumberjackNpcEntity;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.entity.ai.goal.Goal;
 import net.minecraft.inventory.Inventory;
-import net.minecraft.item.Item;
+import net.minecraft.item.BlockItem;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
+import net.minecraft.util.Hand;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class PlantSaplingGoal extends Goal {
+    private static final int PLANT_RADIUS = 8;
+    private static final int ACCESS_LENGTH = 8;
+    private static final int TRAVEL_TIMEOUT = 240;
+    private static final double PLANT_REACH_SQUARED = 2.25;
+
     private final LumberjackNpcEntity npc;
-    private BlockPos plantPos;
-    private int taskTicks = 0;
-    private static final int MAX_TASK_TICKS = 160;
-    private static final double PLANT_DIST_SQ = 2.25;
-    private static final int PLANT_DISTANCE = 2;
-    private int searchCooldown = 0;
+    private final List<BlockPos> plots = new ArrayList<>();
+    private final Map<BlockPos, Long> blockedPlots = new HashMap<>();
+    private BlockPos chest;
+    private BlockPos plot;
+    private int travelTicks;
+    private long retryAt;
+    private boolean finished;
+
     public PlantSaplingGoal(LumberjackNpcEntity npc) {
         this.npc = npc;
-        this.setControls(EnumSet.of(Control.MOVE, Control.LOOK));
+        setControls(EnumSet.of(Control.MOVE, Control.LOOK));
     }
+
     @Override
     public boolean canStart() {
-        if (searchCooldown-- > 0) return false;
-        searchCooldown = 20;
+        long now = npc.getWorld().getTime();
+        if (npc.sleeping.isSleeping() || npc.activeTree != null || npc.needsWoodDelivery || now < retryAt) return false;
+        retryAt = now + 40;
+        blockedPlots.values().removeIf(until -> until <= now);
 
-        // Kiểm tra có mầm cây không
-        if (!hasSapling()) return false;
+        chest = npc.saplingChestPos;
+        if (chest != null && !npc.getWorld().isChunkLoaded(chest)) return false;
+        Inventory source = getChest();
+        if (source == null) {
+            source = npc.findNearestChest();
+            chest = npc.memory.lastChestPos;
+        }
+        if (source == null || chest == null) return false;
+        if (npc.returningSaplings && !npc.plantingSaplings.isEmpty()) return true;
 
-        // Tìm vị trí trống để trồng
-        BlockPos found = findPlantingSpot();
-        if (found == null) return false;
-
-        plantPos = found;
-        return true;
+        plots.clear();
+        for (BlockPos pos : BlockPos.iterate(chest.add(-PLANT_RADIUS, -2, -PLANT_RADIUS),
+                chest.add(PLANT_RADIUS, 2, PLANT_RADIUS))) {
+            if (isPlantable(pos) && !blockedPlots.containsKey(pos)) plots.add(pos.toImmutable());
+        }
+        if (!npc.plantingSaplings.isEmpty()) return true;
+        return !plots.isEmpty() && (countSaplings(source) > 0 || countSaplings(npc.inventory) > 0);
     }
+
     @Override
     public void start() {
-        taskTicks = 0;
-        npc.getNavigation().startMovingTo(
-                plantPos.getX() + 1.5,
-                plantPos.getY(),
-                plantPos.getZ() + 1.5,
-                1.2
-        );
+        finished = false;
+        plot = null;
+        if (npc.returningSaplings || npc.plantingSaplings.isEmpty()) {
+            moveToChest();
+        } else {
+            nextPlot();
+        }
     }
+
+    @Override
+    public boolean shouldContinue() {
+        return !finished && !npc.sleeping.isSleeping();
+    }
+
     @Override
     public void tick() {
-        taskTicks++;
-
-        if (plantPos == null || !npc.getWorld().isChunkLoaded(plantPos)) {
-            stop();
+        if (finished) return;
+        travelTicks++;
+        Inventory source = getChest();
+        if (source == null) {
+            finished = true;
+            return;
+        }
+        if (plot == null) {
+            if (!npc.returningSaplings && !npc.plantingSaplings.isEmpty()) {
+                nextPlot();
+            } else if (DeliveryTarget.canReach(npc, chest)) {
+                if (npc.returningSaplings) {
+                    returnBatch(source);
+                    finished = true;
+                } else {
+                    takeBatch(source);
+                    nextPlot();
+                }
+            } else if (travelFailed()) {
+                npc.display.report(npc, "Không có đường tới rương tiều phu");
+                finished = true;
+            }
             return;
         }
 
-        // Đến gần vị trí trồng
-        if (npc.squaredDistanceTo(Vec3d.ofCenter(plantPos)) < PLANT_DIST_SQ) {
+        if (!isPlantable(plot)) {
+            nextPlot();
+        } else if (canReachPlot(plot)) {
             plantSapling();
-            plantPos = findPlantingSpot();
-            if (plantPos == null || !hasSapling()) {
-                stop();
-                return;
-            }
-
-            npc.getNavigation().startMovingTo(
-                    plantPos.getX() + 0.5,
-                    plantPos.getY(),
-                    plantPos.getZ() + 0.5,
-                    1.2
-            );
-
+            nextPlot();
+        } else if (travelFailed()) {
+            markBlocked(plot);
+            nextPlot();
         }
     }
-    @Override
-    public boolean shouldContinue() {
-        if (taskTicks > MAX_TASK_TICKS) return false;
-        if (plantPos == null) return false;
 
-        World world = npc.getWorld();
-        BlockState ground = world.getBlockState(plantPos);
-        BlockState above = world.getBlockState(plantPos.up());
-
-        // Vẫn là đất và không có gì ở trên
-        return isValidGround(ground.getBlock()) && above.isAir();
-    }
     @Override
     public void stop() {
         npc.getNavigation().stop();
-        plantPos = null;
-        taskTicks = 0;
+        plots.clear();
+        plot = null;
+        chest = null;
+        retryAt = npc.getWorld().getTime() + 40;
     }
-    /**
-     * Kiểm tra có mầm cây trong inventory hoặc chest không
-     */
-    private boolean hasSapling() {
-        // Kiểm tra inventory của NPC
-        for (int i = 0; i < npc.inventory.size(); i++) {
-            ItemStack stack = npc.inventory.getStack(i);
-            if (!stack.isEmpty() && isSaplingItem(stack.getItem())) {
-                return true;
-            }
-        }
 
-        // Kiểm tra chest
-        Inventory chest = npc.findNearestChest();
-        if (chest != null) {
-            for (int i = 0; i < chest.size(); i++) {
-                ItemStack stack = chest.getStack(i);
-                if (!stack.isEmpty() && isSaplingItem(stack.getItem())) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-    /**
-     * Lấy mầm cây từ inventory hoặc chest
-     */
-    private ItemStack takeSapling() {
-        // Thử lấy từ inventory NPC trước
-        for (int i = 0; i < npc.inventory.size(); i++) {
-            ItemStack stack = npc.inventory.getStack(i);
-            if (!stack.isEmpty() && isSaplingItem(stack.getItem())) {
-                return npc.inventory.removeStack(i, 1);
-            }
-        }
-
-        // Không có -> lấy từ chest
-        Inventory chest = npc.findNearestChest();
-        if (chest != null) {
-            for (int i = 0; i < chest.size(); i++) {
-                ItemStack stack = chest.getStack(i);
-                if (!stack.isEmpty() && isSaplingItem(stack.getItem())) {
-                    return chest.removeStack(i, 1);
-                }
-            }
-        }
-
-        return ItemStack.EMPTY;
-    }
-    /**
-     * Kiểm tra item có phải sapling không
-     */
-    private boolean isSaplingItem(Item item) {
-        return item == Items.OAK_SAPLING ||
-                item == Items.SPRUCE_SAPLING ||
-                item == Items.BIRCH_SAPLING ||
-                item == Items.JUNGLE_SAPLING ||
-                item == Items.ACACIA_SAPLING ||
-                item == Items.DARK_OAK_SAPLING ||
-                item == Items.MANGROVE_PROPAGULE ||
-                item == Items.CHERRY_SAPLING;
-    }
-    /**
-     * Kiểm tra block có phải đất hợp lệ không
-     */
-    private boolean isValidGround(Block block) {
-        return block == Blocks.DIRT ||
-                block == Blocks.GRASS_BLOCK ||
-                block == Blocks.PODZOL ||
-                block == Blocks.COARSE_DIRT ||
-                block == Blocks.MYCELIUM;
-    }
-    /**
-     * Tìm vị trí trống để trồng cây
-     * Chỉ tìm trong vùng 7 blocks quanh chest và phải là dirt/grass
-     */
-    private BlockPos findPlantingSpot() {
-        if (npc.memory.lastChestPos == null) {
-            npc.findNearestChest();
-        }
-
-        if (npc.memory.lastChestPos == null) return null;
-
-        BlockPos chestPos = npc.memory.lastChestPos;
-        World world = npc.getWorld();
-        double closestDist = Double.MAX_VALUE;
-        BlockPos closestSpot = null;
-
-        // Tìm trong bán kính 7 blocks quanh chest
-        for (int dx = -PLANT_DISTANCE; dx <= PLANT_DISTANCE; dx++) {
-            for (int dz = -PLANT_DISTANCE; dz <= PLANT_DISTANCE; dz++) {
-                for (int dy = -2; dy <= 2; dy++) {
-                    BlockPos pos = chestPos.add(dx, dy, dz);
-                    if (!world.isChunkLoaded(pos)) continue;
-
-                    BlockState ground = world.getBlockState(pos);
-                    BlockState above = world.getBlockState(pos.up());
-
-                    // Phải là đất và không có gì ở trên
-                    if (isValidGround(ground.getBlock()) && above.isAir()) {
-                        // Kiểm tra có đủ ánh sáng không (mầm cây cần ánh sáng)
-                        if (world.getLightLevel(pos.up()) >= 0) {
-                            double dist = npc.squaredDistanceTo(
-                                    pos.getX() + 0.5,
-                                    pos.getY() + 0.5,
-                                    pos.getZ() + 0.5
-                            );
-
-                            if (dist < closestDist) {
-                                closestDist = dist;
-                                closestSpot = pos;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        return closestSpot;
-    }
-    /**
-     * Trồng mầm cây tại vị trí
-     */
-    private void plantSapling() {
-        ItemStack sapling = takeSapling();
-        if (sapling.isEmpty()) return;
-
-        World world = npc.getWorld();
-        BlockPos abovePos = plantPos.up();
-
-        // Kiểm tra lại điều kiện
-        if (!world.getBlockState(abovePos).isAir()) {
-            // Vị trí không còn trống -> trả lại sapling
-            npc.inventory.addStack(sapling);
+    private void nextPlot() {
+        plot = null;
+        if (npc.plantingSaplings.isEmpty()) {
+            clearBatch();
+            finished = true;
             return;
         }
 
-        // Trồng sapling tương ứng
-        Block saplingBlock = getSaplingBlock(sapling.getItem());
-        if (saplingBlock != null) {
-            world.setBlockState(abovePos, saplingBlock.getDefaultState());
-            npc.memory.lastTreePos = abovePos;
-            npc.memory.resetIdle();
-        } else {
-            // Không phải sapling hợp lệ -> trả lại
-            npc.inventory.addStack(sapling);
+        plots.sort(Comparator.comparingDouble(npc.getBlockPos()::getSquaredDistance));
+        var navigation = npc.getNavigation();
+        navigation.stop();
+        // Limit path searches per tick. Recheck the remaining plots on the next tick.
+        int attemptedPaths = 0;
+        while (!plots.isEmpty() && attemptedPaths < 8) {
+            BlockPos candidate = plots.remove(0);
+            if (!isPlantable(candidate)) continue;
+            if (canReachPlot(candidate)) {
+                plot = candidate;
+                return;
+            }
+            attemptedPaths++;
+            BlockPos target = candidate.up();
+            var path = navigation.findPathTo(target.getX() + 0.5, target.getY(), target.getZ() + 0.5, 0);
+            if (path != null && path.reachesTarget() && navigation.startMovingAlong(path, 1.2)) {
+                plot = candidate;
+                travelTicks = 0;
+                return;
+            }
+            markBlocked(candidate);
+        }
+        if (plots.isEmpty()) {
+            npc.returningSaplings = true;
+            moveToChest();
         }
     }
-    /**
-     * Lấy block sapling từ item
-     */
-    private Block getSaplingBlock(Item item) {
-        if (item == Items.OAK_SAPLING) return Blocks.OAK_SAPLING;
-        if (item == Items.SPRUCE_SAPLING) return Blocks.SPRUCE_SAPLING;
-        if (item == Items.BIRCH_SAPLING) return Blocks.BIRCH_SAPLING;
-        if (item == Items.JUNGLE_SAPLING) return Blocks.JUNGLE_SAPLING;
-        if (item == Items.ACACIA_SAPLING) return Blocks.ACACIA_SAPLING;
-        if (item == Items.DARK_OAK_SAPLING) return Blocks.DARK_OAK_SAPLING;
-        if (item == Items.MANGROVE_PROPAGULE) return Blocks.MANGROVE_PROPAGULE;
-        if (item == Items.CHERRY_SAPLING) return Blocks.CHERRY_SAPLING;
-        return null;
+
+    private void moveToChest() {
+        travelTicks = 0;
+        var navigation = npc.getNavigation();
+        navigation.stop();
+        if (!DeliveryTarget.canReach(npc, chest)) {
+            var path = navigation.findPathTo(chest.getX() + 0.5, chest.getY(), chest.getZ() + 0.5, 1);
+            if (path != null && path.reachesTarget()) navigation.startMovingAlong(path, 1.2);
+        }
+    }
+
+    private boolean travelFailed() {
+        return travelTicks >= TRAVEL_TIMEOUT || npc.getNavigation().isIdle();
+    }
+
+    private boolean canReachPlot(BlockPos ground) {
+        Vec3d target = Vec3d.ofCenter(ground.up());
+        if (npc.squaredDistanceTo(target) > PLANT_REACH_SQUARED) return false;
+        var hit = npc.getWorld().raycast(new net.minecraft.world.RaycastContext(
+                npc.getEyePos(), target, net.minecraft.world.RaycastContext.ShapeType.COLLIDER,
+                net.minecraft.world.RaycastContext.FluidHandling.NONE, npc));
+        return hit.getType() == net.minecraft.util.hit.HitResult.Type.MISS;
+    }
+
+    private void markBlocked(BlockPos pos) {
+        blockedPlots.put(pos, npc.getWorld().getTime() + 200);
+    }
+
+    private Inventory getChest() {
+        var world = npc.getWorld();
+        return chest != null && world.isChunkLoaded(chest)
+                && world.getBlockEntity(chest) instanceof LumberjackChestBlockEntity source ? source : null;
+    }
+
+    private boolean isPlantable(BlockPos ground) {
+        var world = npc.getWorld();
+        if (!world.isChunkLoaded(ground)) return false;
+        int dx = ground.getX() - chest.getX();
+        int dz = ground.getZ() - chest.getZ();
+        if (dx * dx + dz * dz > PLANT_RADIUS * PLANT_RADIUS) return false;
+        // Reserve one straight lane on each horizontal axis through the chest.
+        if ((dx == 0 || dz == 0) && Math.abs(dx) + Math.abs(dz) <= ACCESS_LENGTH) return false;
+
+        Block block = world.getBlockState(ground).getBlock();
+        return (block == Blocks.DIRT || block == Blocks.GRASS_BLOCK || block == Blocks.PODZOL
+                || block == Blocks.COARSE_DIRT || block == Blocks.MYCELIUM)
+                && world.getBlockState(ground.up()).isAir() && world.getLightLevel(ground.up()) >= 8;
+    }
+
+    private void takeBatch(Inventory source) {
+        // Saplings carried by NPCs from an older save can still be planted.
+        Inventory stock = countSaplings(npc.inventory) > 0 ? npc.inventory : source;
+        int remaining = Math.min(plots.size(), stock == source ? shareOf(source) : countSaplings(stock));
+        for (int slot = 0, batchSlot = 0; slot < stock.size() && remaining > 0; slot++) {
+            ItemStack stack = stock.getStack(slot);
+            if (!isSapling(stack)) continue;
+            ItemStack taken = stock.removeStack(slot, Math.min(remaining, stack.getCount()));
+            npc.plantingSaplings.setStack(batchSlot++, taken);
+            remaining -= taken.getCount();
+        }
+        if (!npc.plantingSaplings.isEmpty()) npc.saplingChestPos = chest;
+    }
+
+    private int shareOf(Inventory source) {
+        int total = countSaplings(source);
+        if (total == 0) return 0;
+        int workers = 1;
+        boolean unknownAssignment = false;
+        int radius = LumberjackNpcEntity.FIND_CHEST_DISTANCE;
+        for (LumberjackNpcEntity other : npc.getWorld().getEntitiesByClass(LumberjackNpcEntity.class,
+                new Box(chest).expand(radius, 4, radius), worker -> worker != npc && worker.isAlive())) {
+            BlockPos otherChest = other.memory.lastChestPos;
+            if (chest.equals(otherChest)) workers++;
+            else if (otherChest == null) unknownAssignment = true;
+        }
+        return unknownAssignment ? (total > 8 ? total / 2 : total) : Math.max(1, total / workers);
+    }
+
+    private int countSaplings(Inventory inventory) {
+        int count = 0;
+        for (int slot = 0; slot < inventory.size(); slot++) {
+            ItemStack stack = inventory.getStack(slot);
+            if (isSapling(stack)) count += stack.getCount();
+        }
+        return count;
+    }
+
+    private boolean isSapling(ItemStack stack) {
+        var item = stack.getItem();
+        return item == Items.OAK_SAPLING || item == Items.SPRUCE_SAPLING || item == Items.BIRCH_SAPLING
+                || item == Items.JUNGLE_SAPLING || item == Items.ACACIA_SAPLING || item == Items.DARK_OAK_SAPLING
+                || item == Items.MANGROVE_PROPAGULE || item == Items.CHERRY_SAPLING;
+    }
+
+    private void plantSapling() {
+        var world = npc.getWorld();
+        BlockPos target = plot.up();
+        for (int slot = 0; slot < npc.plantingSaplings.size(); slot++) {
+            ItemStack stack = npc.plantingSaplings.getStack(slot);
+            if (!(stack.getItem() instanceof BlockItem sapling)) continue;
+            BlockState state = sapling.getBlock().getDefaultState();
+            if (state.canPlaceAt(world, target) && world.setBlockState(target, state)) {
+                npc.plantingSaplings.removeStack(slot, 1);
+                npc.swingHand(Hand.MAIN_HAND, true);
+                npc.memory.lastTreePos = target;
+                npc.memory.resetIdle();
+                return;
+            }
+        }
+    }
+
+    private void returnBatch(Inventory source) {
+        for (int i = 0; i < npc.plantingSaplings.size(); i++) {
+            ItemStack stack = npc.plantingSaplings.getStack(i);
+            for (int slot = 0; slot < source.size() && !stack.isEmpty(); slot++) {
+                ItemStack current = source.getStack(slot);
+                if (current.isEmpty()) {
+                    source.setStack(slot, stack.copy());
+                    npc.plantingSaplings.setStack(i, ItemStack.EMPTY);
+                    break;
+                }
+                if (ItemStack.canCombine(current, stack)) {
+                    int capacity = Math.min(source.getMaxCountPerStack(), current.getMaxCount()) - current.getCount();
+                    if (capacity <= 0) continue;
+                    int count = Math.min(stack.getCount(), capacity);
+                    current.increment(count);
+                    stack.decrement(count);
+                    source.markDirty();
+                }
+            }
+        }
+        if (npc.plantingSaplings.isEmpty()) clearBatch();
+        else npc.display.report(npc, "Rương đầy, tiều phu vẫn giữ mầm dư");
+    }
+
+    private void clearBatch() {
+        npc.saplingChestPos = null;
+        npc.returningSaplings = false;
     }
 }
