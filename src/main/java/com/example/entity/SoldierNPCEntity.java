@@ -152,6 +152,12 @@ public class SoldierNPCEntity extends PathAwareEntity {
                 }
                 return false;
             }
+
+            @Override
+            public boolean shouldContinue() {
+                // Đổi sang cung/nỏ giữa trận → nhường goal tầm xa (cùng priority, không tự chen được)
+                return SoldierNPCEntity.this.getMainHandStack().getItem() instanceof SwordItem && super.shouldContinue();
+            }
         }); // binh linh
         this.goalSelector.add(2, new SoldierBowGoal(this) {
             @Override
@@ -176,7 +182,6 @@ public class SoldierNPCEntity extends PathAwareEntity {
             }
         }); // cung thu
         this.goalSelector.add(3, new EscapeDangerGoal(this, 1.4));
-        this.goalSelector.add(4, new com.example.ai.FindAndSleepGoal(this, () -> sleeping));
         this.goalSelector.add(4, new HealAllyGoal(this) {
             @Override
             public boolean canStart() {
@@ -204,13 +209,22 @@ public class SoldierNPCEntity extends PathAwareEntity {
         // đánh quái
         this.targetSelector.add(1, new DefendPlayerGoal(this, 32.0F)); // bảo vệ
         this.targetSelector.add(1, new ActiveTargetGoal<>(this, HostileEntity.class, true, target -> {
+            if (!hasCombatWeapon() || isTargetIgnored(target)) return false; // bác sĩ/tay không không khoá quái
             // Mở rộng khoảng cách check quanh npc hoặc player: 25 block
             PlayerEntity owner = this.getOwner();
             return this.squaredDistanceTo(target) <= 26 * 26
                     || (owner != null && owner.squaredDistanceTo(target) <= 25 * 25) || isThreateningVillager(target);
 
         })); // đánh hostile
-        this.targetSelector.add(2, new RevengeGoal(this, PlayerEntity.class)); // đánh trả khi bị tấn công
+        // đánh trả khi bị tấn công (PlayerEntity.class = loại KHÔNG đánh trả); không vũ khí thì để EscapeDanger bỏ chạy
+        this.targetSelector.add(2, new RevengeGoal(this, PlayerEntity.class) {
+            @Override
+            public boolean canStart() {
+                LivingEntity attacker = getAttacker();
+                // Kẻ vừa bị bỏ vì không đánh được (vd xương bắn từ vách) không được khoá lại mỗi phát trúng
+                return hasCombatWeapon() && (attacker == null || !isTargetIgnored(attacker)) && super.canStart();
+            }
+        });
 
     }
 
@@ -233,6 +247,7 @@ public class SoldierNPCEntity extends PathAwareEntity {
             }
         }
 
+        dropStuckTarget();
         // Display management
         updateNameDisplay();
         // Food system
@@ -240,6 +255,42 @@ public class SoldierNPCEntity extends PathAwareEntity {
         handleFoodSystem();
         // Healing system
         handleGradualHeal();
+    }
+
+    // ===== MỤC TIÊU KẸT =====
+    /** Có mục tiêu quá lâu mà không goal tấn công nào chạy (không tới được, sai vũ khí) → bỏ để theo chủ/đi tuần tiếp. */
+    private static final int STUCK_TARGET_TICKS = 100;
+    /** Mục tiêu vừa bỏ bị bỏ qua 30s, tránh khoá lại ngay rồi đơ tiếp. */
+    private static final int IGNORE_TARGET_TICKS = 600;
+    private int noAttackTicks;
+    @Nullable
+    private UUID ignoredTarget;
+    private long ignoreTargetUntil;
+
+    public boolean hasCombatWeapon() {
+        Item item = getMainHandStack().getItem();
+        return item instanceof SwordItem || item instanceof BowItem || item instanceof CrossbowItem;
+    }
+
+    public boolean isTargetIgnored(LivingEntity target) {
+        return target.getUuid().equals(ignoredTarget) && getWorld().getTime() < ignoreTargetUntil;
+    }
+
+    private void dropStuckTarget() {
+        LivingEntity target = getTarget();
+        boolean attacking = target != null && goalSelector.getRunningGoals().anyMatch(e ->
+                e.getGoal() instanceof MeleeAttackGoal
+                        || e.getGoal() instanceof com.example.ai.soldier.SoldierBowGoal
+                        || e.getGoal() instanceof com.example.ai.soldier.SoldierCrossbowGoal);
+        if (target == null || attacking) {
+            noAttackTicks = 0;
+            return;
+        }
+        if (++noAttackTicks < STUCK_TARGET_TICKS) return;
+        noAttackTicks = 0;
+        ignoredTarget = target.getUuid();
+        ignoreTargetUntil = getWorld().getTime() + IGNORE_TARGET_TICKS;
+        setTarget(null);
     }
 
     // ===== FOOD SYSTEM =====
@@ -655,6 +706,7 @@ public class SoldierNPCEntity extends PathAwareEntity {
     }
     @Override
     public boolean damage(DamageSource source, float amount) {
+        if (isFriendlyFire(source, ownerUUID)) return false; // tên lạc của đồng đội: không mất máu, không đánh trả
         boolean result = super.damage(source, amount);
 
         if (!this.getWorld().isClient && result) {
@@ -665,6 +717,12 @@ public class SoldierNPCEntity extends PathAwareEntity {
         }
 
         return result;
+    }
+
+    /** Sát thương đến từ Binh lính (kể cả tên/đạn họ bắn) có cùng chủ với nạn nhân. */
+    public static boolean isFriendlyFire(DamageSource source, @Nullable UUID victimOwner) {
+        return victimOwner != null && source.getAttacker() instanceof SoldierNPCEntity soldier
+                && victimOwner.equals(soldier.getOwnerUuid());
     }
 
     private void damageRandomArmor() {

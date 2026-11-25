@@ -358,6 +358,13 @@ public abstract class WorkerNpcEntity extends PathAwareEntity {
     }
 
     @Override
+    public boolean damage(DamageSource source, float amount) {
+        // Tên lạc của Binh lính cùng chủ: không mất máu, không hoảng chạy
+        if (com.example.entity.SoldierNPCEntity.isFriendlyFire(source, ownerUUID)) return false;
+        return super.damage(source, amount);
+    }
+
+    @Override
     public void onDeath(DamageSource damageSource) {
         reservationSystem.releaseAll(getUuid());
         super.onDeath(damageSource);

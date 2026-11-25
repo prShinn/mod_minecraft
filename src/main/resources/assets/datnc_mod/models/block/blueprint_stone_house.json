@@ -1,0 +1,7 @@
+{
+  "parent": "datnc_mod:block/blueprint",
+  "textures": {
+    "tex": "minecraft:block/mossy_stone_bricks",
+    "particle": "minecraft:block/mossy_stone_bricks"
+  }
+}

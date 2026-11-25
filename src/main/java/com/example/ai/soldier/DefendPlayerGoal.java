@@ -36,6 +36,8 @@ public class DefendPlayerGoal extends Goal {
 
         if (attacker != null &&
                 attacker.isAlive() &&
+                this.npc.hasCombatWeapon() &&
+                !this.npc.isTargetIgnored(attacker) &&
                 !(attacker instanceof PlayerEntity) && // Không đánh player khác
                 this.npc.squaredDistanceTo(attacker) <= this.maxDistance * this.maxDistance) {
 
@@ -54,6 +56,11 @@ public class DefendPlayerGoal extends Goal {
         }
 
         if (this.targetMob == null || !this.targetMob.isAlive()) {
+            return false;
+        }
+        // Mục tiêu bị bỏ (lính không đánh được) hoặc bay quá xa lính → nhả để goal khác chạy
+        if (this.npc.getTarget() != this.targetMob
+                || this.npc.squaredDistanceTo(this.targetMob) > this.maxDistance * this.maxDistance) {
             return false;
         }
 
