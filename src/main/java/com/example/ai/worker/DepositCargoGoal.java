@@ -14,6 +14,9 @@ import java.util.EnumSet;
 /** Mang hàng trong cargo về nơi nộp (rương nghề, hoặc nơi do NPC chỉ định). */
 public class DepositCargoGoal extends Goal {
     private static final int MAX_TASK_TICKS = 400;
+    private static final int RETRY_TICKS = 40;
+    /** Rương đầy / không có chỗ nộp: chờ lâu hơn (10s) để không quét rương + tìm đường mỗi 2s. */
+    private static final int BLOCKED_RETRY_TICKS = 200;
 
     private final WorkerNpcEntity npc;
     private final DeliveryTarget delivery = new DeliveryTarget();
@@ -21,6 +24,7 @@ public class DepositCargoGoal extends Goal {
     private long retryAt;
     private int taskTicks;
     private boolean finished;
+    private boolean blocked;
 
     public DepositCargoGoal(WorkerNpcEntity npc) {
         this.npc = npc;
@@ -37,7 +41,7 @@ public class DepositCargoGoal extends Goal {
         if (!npc.needsToDeposit()) return false;
         target = npc.findDepositTarget(delivery);
         if (target == null) {
-            retryAt = npc.getWorld().getTime() + 40;
+            retryAt = npc.getWorld().getTime() + BLOCKED_RETRY_TICKS;
             return false;
         }
         return true;
@@ -47,6 +51,7 @@ public class DepositCargoGoal extends Goal {
     public void start() {
         taskTicks = 0;
         finished = false;
+        blocked = false;
         if (!DeliveryTarget.canReach(npc, target)) {
             npc.getNavigation().startMovingTo(target.getX() + 0.5, target.getY(), target.getZ() + 0.5, 1.3);
         }
@@ -62,6 +67,7 @@ public class DepositCargoGoal extends Goal {
             finished = true;
         } else if (!DeliveryTarget.hasSpace(chest, npc.getCargo(), stack -> true)) {
             npc.display.report(npc, "Rương nộp hàng đã đầy");
+            blocked = true;
             finished = true;
         } else if (DeliveryTarget.canReach(npc, target)) {
             npc.getLookControl().lookAt(target.getX() + 0.5, target.getY() + 0.5, target.getZ() + 0.5);
@@ -71,6 +77,7 @@ public class DepositCargoGoal extends Goal {
         } else if (npc.getNavigation().isIdle() || taskTicks >= MAX_TASK_TICKS) {
             delivery.markBlocked(npc, target);
             npc.display.report(npc, "Không có đường tới rương nộp hàng");
+            blocked = true;
             finished = true;
         }
     }
@@ -83,7 +90,7 @@ public class DepositCargoGoal extends Goal {
     @Override
     public void stop() {
         npc.getNavigation().stop();
-        retryAt = npc.getWorld().getTime() + 40;
+        retryAt = npc.getWorld().getTime() + (blocked ? BLOCKED_RETRY_TICKS : RETRY_TICKS);
         target = null;
         npc.resetIdle();
     }

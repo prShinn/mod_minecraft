@@ -31,6 +31,10 @@ public class HealAllyGoal extends Goal {
     private static final int HEAL_COOLDOWN_TICKS = 60; // 3s
 
     private int healCooldown = 0;
+    /** Ngưỡng máu cần chữa — canStart và shouldContinue PHẢI dùng chung, nếu không goal bật/tắt liên tục. */
+    private static final float HEAL_THRESHOLD = 0.7F;
+    private static final int SCAN_INTERVAL_TICKS = 20;
+    private int scanCooldown = 0;
 
     public HealAllyGoal(PathAwareEntity medic) {
         this.medic = medic;
@@ -42,6 +46,8 @@ public class HealAllyGoal extends Goal {
     // =========================
     @Override
     public boolean canStart() {
+        if (scanCooldown-- > 0) return false;
+        scanCooldown = SCAN_INTERVAL_TICKS;
 
         List<LivingEntity> targets = medic.getWorld().getEntitiesByClass(
                 LivingEntity.class,
@@ -60,7 +66,7 @@ public class HealAllyGoal extends Goal {
     public boolean shouldContinue() {
         return target != null
                 && target.isAlive()
-                && target.getHealth() < target.getMaxHealth() * 0.7F;
+                && target.getHealth() < target.getMaxHealth() * HEAL_THRESHOLD;
     }
 
     @Override
@@ -93,6 +99,7 @@ public class HealAllyGoal extends Goal {
 
     @Override
     public void stop() {
+        medic.getNavigation().stop();
         target = null;
         healCooldown = 0;
     }
@@ -109,10 +116,8 @@ public class HealAllyGoal extends Goal {
 
         if (target instanceof SoldierNPCEntity soldier) {
             soldier.requestHeal(healAmount);
-        } else if (target instanceof FarmerNpcEntity farmer) {
-            farmer.display.requestHeal(healAmount);
-        } else if (target instanceof LumberjackNpcEntity lumberjack) {
-            lumberjack.display.requestHeal(healAmount);
+        } else if (target instanceof com.example.entity.base.WorkerNpcEntity worker) {
+            worker.display.requestHeal(healAmount); // mọi NPC nghề hồi máu dần qua display
         } else {
             target.heal(healAmount);
         }
@@ -191,7 +196,7 @@ public class HealAllyGoal extends Goal {
 
         if (entity == medic) return false;
         if (!entity.isAlive()) return false;
-        if (entity.getHealth() >= entity.getMaxHealth()) return false;
+        if (entity.getHealth() >= entity.getMaxHealth() * HEAL_THRESHOLD) return false;
 
         // ❌ Player
         if (entity instanceof PlayerEntity) return false;
@@ -207,6 +212,7 @@ public class HealAllyGoal extends Goal {
 
         // ✔ Villager + NPC custom (Soldier)
         if (entity instanceof SoldierNPCEntity) return true;
+        if (entity instanceof com.example.entity.base.WorkerNpcEntity) return true;
         if (entity instanceof VillagerEntity) return true;
         return false;
 

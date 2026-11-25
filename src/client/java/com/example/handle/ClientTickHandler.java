@@ -46,7 +46,6 @@ public class ClientTickHandler {
                         if (npc != null) {
                             ModeNpc.ModeMove newMode = ModeNpc.ModeMove.values()[modeOrdinal];
                             npc.setMoveMode(newMode);
-                            System.out.println("CLIENT: Updated NPC mode to " + newMode);
                         }
                     });
                 }

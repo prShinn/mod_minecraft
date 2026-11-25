@@ -75,7 +75,8 @@ public class CollectAnimalDropsGoal extends Goal {
     @Override
     public void tick() {
         ticks++;
-        if (npc.squaredDistanceTo(item) <= PICKUP_RANGE_SQ) {
+        if (npc.canReachTarget(item, PICKUP_RANGE_SQ, ticks)) {
+            npc.getNavigation().stop();
             ItemStack rest = DepositCargoGoal.insert(npc.getCargo(), item.getStack());
             if (rest.isEmpty()) item.discard();
             else item.setStack(rest);

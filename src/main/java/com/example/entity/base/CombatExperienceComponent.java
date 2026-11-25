@@ -62,8 +62,6 @@ public class CombatExperienceComponent {
         level++;
         experience -= maxExperience;
         recalculateRequiredXp();
-
-        System.out.println("✨ Soldier tăng lên cấp " + level);
     }
 
     /**

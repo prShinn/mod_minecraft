@@ -19,6 +19,8 @@ public class SoldierBowGoal extends Goal {
     private final FindSightAttack mapAI = new FindSightAttack();
     private LivingEntity target;
     private int attackCooldown;
+    /** Tìm đường tối đa 2 lần/giây thay vì mỗi tick (nhiều cung thủ → lag). */
+    private int repathCooldown;
     // Khoảng cách
     private static final double DETECTION_DISTANCE = 30.0; // phát hiện xa
     private static final double MAX_ATTACK_DISTANCE = 15.0;
@@ -68,12 +70,19 @@ public class SoldierBowGoal extends Goal {
         double maxDistSq = MAX_ATTACK_DISTANCE * MAX_ATTACK_DISTANCE;
         double minDistSq = MIN_ATTACK_DISTANCE * MIN_ATTACK_DISTANCE;
 
+        if (repathCooldown > 0) repathCooldown--;
         if (distanceSq > maxDistSq) {
             // Xa hơn 15 → chạy lại gần
-            npc.getNavigation().startMovingTo(target, 1.3f);
+            if (repathCooldown == 0) {
+                npc.getNavigation().startMovingTo(target, 1.3f);
+                repathCooldown = 10;
+            }
         } else if (distanceSq < minDistSq) {
             // Quá gần → lùi
-            moveAwayFromTarget();
+            if (repathCooldown == 0) {
+                moveAwayFromTarget();
+                repathCooldown = 10;
+            }
         } else {
             // Trong tầm bắn
             npc.getNavigation().stop();
@@ -211,6 +220,8 @@ public class SoldierBowGoal extends Goal {
     public boolean shouldContinue() {
         return target != null
                 && target.isAlive()
+                && npc.getTarget() == target // mục tiêu đổi/bị xoá → dừng, canStart nhận mục tiêu mới
+                && npc.squaredDistanceTo(target) <= DETECTION_DISTANCE * DETECTION_DISTANCE
                 && npc.getMainHandStack().getItem() instanceof BowItem;
     }
 

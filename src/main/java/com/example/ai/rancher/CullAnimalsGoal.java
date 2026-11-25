@@ -106,7 +106,7 @@ public class CullAnimalsGoal extends Goal {
         }
 
         npc.getLookControl().lookAt(target, 30.0F, 30.0F);
-        if (npc.squaredDistanceTo(target) <= ATTACK_RANGE_SQ) {
+        if (npc.canReachTarget(target, ATTACK_RANGE_SQ, ticks)) {
             npc.getNavigation().stop();
             if (attackCooldown <= 0) {
                 npc.swingHand(Hand.MAIN_HAND);

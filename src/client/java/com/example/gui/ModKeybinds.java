@@ -14,8 +14,7 @@ public class ModKeybinds {
                 new KeyBinding(
                         "key.soldiernpc.open_gui",
                         InputUtil.Type.KEYSYM,
-//                        GLFW.GLFW_KEY_G,
-                        GLFW.GLFW_KEY_TAB,
+                        GLFW.GLFW_KEY_G, // TAB trùng phím Danh sách người chơi
                         "category.soldiernpc"
                 )
         );

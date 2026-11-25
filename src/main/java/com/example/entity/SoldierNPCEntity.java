@@ -403,6 +403,8 @@ public class SoldierNPCEntity extends PathAwareEntity {
     @Override
     public ActionResult interactMob(PlayerEntity player, Hand hand) {
         if (this.getWorld().isClient) return ActionResult.SUCCESS;
+        // Xác còn hiện ~1 giây khi chết: chặn thu hồi/tương tác để không "hồi sinh" bằng token
+        if (!this.isAlive()) return ActionResult.PASS;
         // ===== SHIFT + RIGHT CLICK → THU HỒI NPC =====
         ActionResult recallResult = tryRecallNpc(player);
         if (recallResult != null) return recallResult;
@@ -761,7 +763,8 @@ public class SoldierNPCEntity extends PathAwareEntity {
         // Cập nhật MaxHealth theo level
         this.getAttributeInstance(EntityAttributes.GENERIC_MAX_HEALTH)
                 .setBaseValue(combat.getCurrentMaxHealth());
-        this.setHealth((float) combat.getCurrentMaxHealth());
+        // Giữ máu đã lưu (vanilla đọc trước), chỉ kẹp về max mới
+        if (this.getHealth() > this.getMaxHealth()) this.setHealth(this.getMaxHealth());
 
     }
 

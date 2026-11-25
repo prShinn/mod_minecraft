@@ -55,7 +55,8 @@ public class ShearSheepGoal extends Goal {
     public void tick() {
         ticks++;
         npc.getLookControl().lookAt(sheep, 30.0F, 30.0F);
-        if (npc.squaredDistanceTo(sheep) <= SHEAR_RANGE_SQ) {
+        if (npc.canReachTarget(sheep, SHEAR_RANGE_SQ, ticks)) {
+            npc.getNavigation().stop();
             npc.swingHand(Hand.MAIN_HAND);
             sheep.sheared(SoundCategory.NEUTRAL);
             npc.getWorld().emitGameEvent(npc, GameEvent.SHEAR, sheep.getPos());

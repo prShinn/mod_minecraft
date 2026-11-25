@@ -29,18 +29,16 @@ public class FindSightAttack {
         double offsetDistance = 4.0;
 
         Vec3d leftPos = npcPos.add(perpendicular.multiply(offsetDistance));
-        Vec3d rightPos = npcPos.add(perpendicular.multiply(offsetDistance));
-        Path path = npc.getNavigation().findPathTo(leftPos.x, leftPos.y, leftPos.z, 0);
-        float rightOfLeft = new Random().nextFloat(10) + 1;
-        if(rightOfLeft <= 5)
-        {
+        Vec3d rightPos = npcPos.subtract(perpendicular.multiply(offsetDistance)); // phía đối diện leftPos
+        if (npc.getRandom().nextBoolean()) {
+            Path path = npc.getNavigation().findPathTo(leftPos.x, leftPos.y, leftPos.z, 0);
             // Kiểm tra đường đi tới leftPos
             if (path != null && path.reachesTarget()) {
                 npc.getNavigation().startMovingTo(leftPos.x, leftPos.y, leftPos.z, 1.2);
             }
         }else{
             // Nếu trái không đi được → thử phải
-            path = npc.getNavigation().findPathTo(rightPos.x, rightPos.y, rightPos.z, 0);
+            Path path = npc.getNavigation().findPathTo(rightPos.x, rightPos.y, rightPos.z, 0);
             if (path != null && path.reachesTarget()) {
                 npc.getNavigation().startMovingTo(rightPos.x, rightPos.y, rightPos.z, 1.2);
             }

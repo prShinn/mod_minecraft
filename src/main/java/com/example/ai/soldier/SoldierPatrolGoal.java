@@ -102,7 +102,7 @@ public class SoldierPatrolGoal extends Goal {
         return !soldier.getWorld().isClient
                 && soldier.getMoveMode() == ModeNpc.ModeMove.WANDER
                 && soldier.getTarget() == null
-                && !soldier.isSleeping()
+                && soldier.getPose() != net.minecraft.entity.EntityPose.SLEEPING
                 && soldier.getOwnerUuid() != null;
     }
 

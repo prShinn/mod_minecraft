@@ -37,7 +37,8 @@ public class BlueprintItem extends BlockItem {
     public ActionResult place(ItemPlacementContext context) {
         PlayerEntity player = context.getPlayer();
         if (!context.getWorld().isClient && player != null
-                && BuildSiteState.get((ServerWorld) context.getWorld()).countFor(player.getUuid())
+                && BuildSiteState.get((ServerWorld) context.getWorld())
+                        .countFor((ServerWorld) context.getWorld(), player.getUuid())
                 >= BuildSiteState.MAX_SITES_PER_OWNER) {
             player.sendMessage(Text.literal("Đã có tối đa " + BuildSiteState.MAX_SITES_PER_OWNER
                     + " công trình đang chờ xây. Hãy hoàn thành hoặc phá bớt."), true);

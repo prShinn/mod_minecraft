@@ -10,6 +10,7 @@ import com.example.block.ProfessionChestBlockEntity;
 import com.example.block.RancherChestBlockEntity;
 import com.example.entity.base.WorkerNpcEntity;
 import com.example.registry.ModItems;
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.mob.PathAwareEntity;
 import net.minecraft.inventory.SimpleInventory;
@@ -24,6 +25,12 @@ import net.minecraft.world.World;
  * xén lông cừu, cho vật nuôi ăn để sinh sản, nhặt trứng/lông/da và nộp về rương.
  */
 public class RancherNpcEntity extends WorkerNpcEntity {
+
+    /**
+     * Tầm thao tác từ xa (bằng bán kính làm việc 12 block) — CHỦ Ý THIẾT KẾ: chuồng rào kín,
+     * Thợ đứng ở rương/ngoài rào thao tác xa, không cần đường vào hay tầm nhìn.
+     */
+    public static final double REMOTE_REACH_SQ = 12.0 * 12.0;
 
     /** Túi thức ăn cho vật nuôi (lấy từ rương), tách riêng khỏi đồ ăn của NPC. */
     private final SimpleInventory feed = new SimpleInventory(9);
@@ -69,6 +76,16 @@ public class RancherNpcEntity extends WorkerNpcEntity {
 
     public SimpleInventory getFeed() {
         return feed;
+    }
+
+    /**
+     * Đạt tầm thao tác nếu đã ở trong tầm gần, hoặc đã đi tới điểm gần nhất có thể
+     * (navigation dừng) mà mục tiêu vẫn nằm trong tầm 12 block (thao tác qua hàng rào).
+     */
+    public boolean canReachTarget(Entity target, double closeRangeSq, int elapsedTicks) {
+        double distSq = squaredDistanceTo(target);
+        if (distSq <= closeRangeSq) return true;
+        return elapsedTicks >= 10 && getNavigation().isIdle() && distSq <= REMOTE_REACH_SQ;
     }
 
     @Override

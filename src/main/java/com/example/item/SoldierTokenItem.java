@@ -140,13 +140,6 @@ public class SoldierTokenItem extends Item implements WorkChestToken {
         WorkChestToken.restore(npc, stack);
         npc.refreshPositionAndAngles(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5, player.getYaw(), 0);
         npc.setOwner(player);
-        NbtCompound nbt = new NbtCompound();
-        if (!nbt.containsUuid("OwnerUUID")) {
-            nbt.putUuid("OwnerUUID", player.getUuid());
-        }
-        if (!nbt.containsUuid("FollowPlayer")) {
-            nbt.putUuid("FollowPlayer", player.getUuid());
-        }
 
 
         // Spawn

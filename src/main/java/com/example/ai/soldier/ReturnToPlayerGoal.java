@@ -10,7 +10,8 @@ import java.util.EnumSet;
 public class ReturnToPlayerGoal extends Goal {
     private final SoldierNPCEntity soldier;
     private PlayerEntity owner;
-    private int wanderTimer = 0;
+    /** Thời điểm (world time) bắt đầu ở quá xa chủ; -1 = đang trong vùng. canStart chỉ được gọi 2 tick/lần nên không đếm bằng ++. */
+    private long outOfRangeSince = -1;
 
     // Thời gian lang thang trước khi quay về (giây)
     private static final int WANDER_TIME = 30; // 30 giây = 600 ticks
@@ -42,7 +43,7 @@ public class ReturnToPlayerGoal extends Goal {
 
         // Đang trong combat → ưu tiên chiến đấu
         if (soldier.getTarget() != null) {
-            wanderTimer = 0; // Reset timer khi combat
+            outOfRangeSince = -1; // Reset timer khi combat
             return false;
         }
 
@@ -53,21 +54,22 @@ public class ReturnToPlayerGoal extends Goal {
 
         // Đã ở gần player → reset timer
         if (distanceSq >= minDistSq && distanceSq <= maxDistSq) {
-            wanderTimer = 0;
+            outOfRangeSince = -1;
             return false;
         }
 
         // Quá gần → không cần về
         if (distanceSq < minDistSq) {
-            wanderTimer = 0;
+            outOfRangeSince = -1;
             return false;
         }
 
         // Tăng timer mỗi tick
-        wanderTimer++;
+        long now = soldier.getWorld().getTime();
+        if (outOfRangeSince < 0) outOfRangeSince = now;
 
         // Đã lang thang đủ lâu → quay về
-        return wanderTimer >= WANDER_TICKS;
+        return now - outOfRangeSince >= WANDER_TICKS;
     }
 
     @Override
@@ -122,7 +124,7 @@ public class ReturnToPlayerGoal extends Goal {
     public void stop() {
         super.stop();
         // Reset timer khi về đến
-        wanderTimer = 0;
+        outOfRangeSince = -1;
         soldier.getNavigation().stop();
         soldier.playSound(SoundEvents.ENTITY_VILLAGER_YES, 0.5F, 1.0F);
     }

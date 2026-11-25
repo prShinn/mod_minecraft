@@ -174,7 +174,8 @@ public class BreedAnimalsGoal extends Goal {
             return;
         }
         npc.getLookControl().lookAt(animal, 30.0F, 30.0F);
-        if (npc.squaredDistanceTo(animal) > FEED_RANGE_SQ) return;
+        if (!npc.canReachTarget(animal, FEED_RANGE_SQ, ticks)) return;
+        npc.getNavigation().stop();
         if (!consumeFeed(npc.getFeed(), animal)) {
             done = true;
             return;

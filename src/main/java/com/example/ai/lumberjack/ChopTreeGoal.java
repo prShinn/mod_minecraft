@@ -98,7 +98,10 @@ public class ChopTreeGoal extends Goal {
                 npc.getNavigation().startMovingTo(base.getX() + 0.5, base.getY(), base.getZ() + 0.5, 1.2);
             }
             approachTicks++;
-            if (npc.getNavigation().isIdle()) approachTicks = APPROACH_TIMEOUT;
+            // Path tạm dừng (vướng vật cản/hết đoạn) → thử tìm đường lại mỗi giây; quá APPROACH_TIMEOUT mới bỏ cây
+            if (npc.getNavigation().isIdle() && approachTicks % 20 == 0) {
+                npc.getNavigation().startMovingTo(base.getX() + 0.5, base.getY(), base.getZ() + 0.5, 1.2);
+            }
             return;
         }
 
@@ -135,6 +138,8 @@ public class ChopTreeGoal extends Goal {
 
     @Override
     public void stop() {
+        // Hết thời gian mà chưa tới được gốc → bỏ qua cây này 1 phút, sang cây khác
+        if (base != null && !atBase && approachTicks >= APPROACH_TIMEOUT) npc.skipTree(base, 1200);
         npc.getNavigation().stop();
         npc.activeTree = null;
         base = null;

@@ -69,7 +69,7 @@ public class DefendPlayerGoal extends Goal {
 
     @Override
     public void stop() {
-        this.npc.setTarget(null);
+        if (this.npc.getTarget() == this.targetMob) this.npc.setTarget(null);
         this.targetMob = null;
         this.cooldown = 20;
         super.stop();

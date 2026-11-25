@@ -75,6 +75,8 @@ public class PatrolFlagBlock extends Block {
     public BlockState getStateForNeighborUpdate(BlockState state, Direction direction, BlockState neighborState,
                                                 WorldAccess world, BlockPos pos, BlockPos neighborPos) {
         if (direction == Direction.DOWN && !state.canPlaceAt(world, pos)) {
+            // Đường này không chạy loot table → tự rơi item để người chơi không mất block
+            if (world instanceof World w && !w.isClient) Block.dropStacks(state, w, pos);
             return Blocks.AIR.getDefaultState();
         }
         return super.getStateForNeighborUpdate(state, direction, neighborState, world, pos, neighborPos);

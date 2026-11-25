@@ -141,6 +141,18 @@ public class LumberjackNpcEntity extends WorkerNpcEntity {
                         && Math.abs(tree.getY() - other.activeTree.getY()) <= 40).isEmpty();
     }
 
+    /** Gốc cây không tới được → bỏ qua tới thời điểm (world time) này, tránh chọn lại mãi. */
+    private final java.util.Map<BlockPos, Long> skippedTrees = new java.util.HashMap<>();
+
+    public void skipTree(BlockPos root, int ticks) {
+        skippedTrees.put(root.toImmutable(), getWorld().getTime() + ticks);
+    }
+
+    private boolean isTreeSkipped(BlockPos root) {
+        Long until = skippedTrees.get(root);
+        return until != null && until > getWorld().getTime();
+    }
+
     /** Tìm gốc cây gần nhất trong vùng chặt đã bật của rương. */
     public BlockPos findNearestTree() {
         if (treeSearchCooldown > 0) return null;
@@ -155,6 +167,8 @@ public class LumberjackNpcEntity extends WorkerNpcEntity {
             return null;
         }
 
+        long now = world.getTime();
+        skippedTrees.values().removeIf(until -> until <= now);
         int radius = LumberjackChestBlockEntity.CUT_RADIUS;
         BlockPos found = null;
         double bestDist = Double.MAX_VALUE;
@@ -162,7 +176,7 @@ public class LumberjackNpcEntity extends WorkerNpcEntity {
             for (int dz = -radius; dz <= radius; dz++) {
                 for (int dy = -LumberjackChestBlockEntity.CUT_BELOW; dy <= LumberjackChestBlockEntity.CUT_ABOVE; dy++) {
                     BlockPos pos = chestPos.add(dx, dy, dz);
-                    if (!zone.allowsCutting(pos) || !isTreeRoot(pos) || isWorkedByAnother(pos)) continue;
+                    if (!zone.allowsCutting(pos) || !isTreeRoot(pos) || isTreeSkipped(pos) || isWorkedByAnother(pos)) continue;
                     double dist = squaredDistanceTo(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
                     if (dist < bestDist) {
                         bestDist = dist;

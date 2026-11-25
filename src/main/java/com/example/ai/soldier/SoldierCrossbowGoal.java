@@ -22,6 +22,8 @@ public class SoldierCrossbowGoal extends Goal {
     private final FindSightAttack mapAI = new FindSightAttack();
     private LivingEntity target;
     private int attackCooldown;
+    /** Tìm đường tối đa 2 lần/giây thay vì mỗi tick (nhiều cung thủ → lag). */
+    private int repathCooldown;
     private int chargingTime;
     private boolean isCharged = false;
 
@@ -79,10 +81,17 @@ public class SoldierCrossbowGoal extends Goal {
         double minDistSq = MIN_ATTACK_DISTANCE * MIN_ATTACK_DISTANCE;
 
         // DI CHUYỂN
+        if (repathCooldown > 0) repathCooldown--;
         if (distanceSq > maxDistSq) {
-            npc.getNavigation().startMovingTo(target, 1.1);
+            if (repathCooldown == 0) {
+                npc.getNavigation().startMovingTo(target, 1.1);
+                repathCooldown = 10;
+            }
         } else if (distanceSq < minDistSq) {
-            moveAwayFromTarget();
+            if (repathCooldown == 0) {
+                moveAwayFromTarget();
+                repathCooldown = 10;
+            }
         } else {
             npc.getNavigation().stop();
         }
@@ -232,7 +241,10 @@ public class SoldierCrossbowGoal extends Goal {
 
     @Override
     public boolean shouldContinue() {
-        return target != null && target.isAlive() && npc.getMainHandStack().getItem() instanceof CrossbowItem;
+        return target != null && target.isAlive()
+                && npc.getTarget() == target // mục tiêu đổi/bị xoá → dừng, canStart nhận mục tiêu mới
+                && npc.squaredDistanceTo(target) <= DETECTION_DISTANCE * DETECTION_DISTANCE
+                && npc.getMainHandStack().getItem() instanceof CrossbowItem;
     }
 
     private float calculateInaccuracy(double distance) {
