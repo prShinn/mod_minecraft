@@ -202,6 +202,31 @@ public abstract class WorkerNpcEntity extends PathAwareEntity {
 
         if (chestSearchCooldown > 0) chestSearchCooldown--;
         if (getHealth() <= 2.0F) reservationSystem.releaseAll(getUuid());
+
+        // Thân bị block đè (cây mọc trùm lên người...) → xử lý trước mọi việc khác để không ngạt thở
+        if (age % 10 == 0 && com.example.helper.NpcStuckHelper.escapeIfStuck(
+                this, canChopBlockingTrees(), canChopBlockingTrees() ? cargo : null)) {
+            display.report(this, "Bị kẹt trong block, đang thoát ra");
+        }
+    }
+
+    /** Được chặt gỗ/lá đang đè lên người khi bị kẹt (Tiều phu). NPC khác chỉ dịch sang ô trống. */
+    protected boolean canChopBlockingTrees() {
+        return false;
+    }
+
+    /**
+     * Tính đường tới target; chấp nhận khi đường tới đích hoặc điểm cuối nằm trong tầm thao tác
+     * (reachSq, tính từ đáy điểm đứng tới tâm block target). Null nếu không tới được.
+     */
+    @Nullable
+    public net.minecraft.entity.ai.pathing.Path findReachablePath(BlockPos target, double reachSq) {
+        var path = getNavigation().findPathTo(target.getX() + 0.5, target.getY(), target.getZ() + 0.5, 1);
+        if (path == null) return null;
+        if (path.reachesTarget()) return path;
+        var end = path.getEnd();
+        return end != null && net.minecraft.util.math.Vec3d.ofBottomCenter(end.getBlockPos())
+                .squaredDistanceTo(net.minecraft.util.math.Vec3d.ofCenter(target)) <= reachSq ? path : null;
     }
 
     // ===== Rương nghề =====
@@ -367,12 +392,25 @@ public abstract class WorkerNpcEntity extends PathAwareEntity {
     @Override
     public void onDeath(DamageSource damageSource) {
         reservationSystem.releaseAll(getUuid());
+        if (!getWorld().isClient) {
+            // Giáp người chơi mặc cho NPC rơi 100% (vanilla chỉ 8.5%). Phải làm TRƯỚC super.onDeath
+            // và xoá khỏi slot, nếu không vanilla tung xúc xắc rơi thêm lần nữa → nhân đôi giáp.
+            for (EquipmentSlot slot : EquipmentSlot.values()) {
+                if (!slot.isArmorSlot()) continue;
+                ItemStack armor = getEquippedStack(slot);
+                if (!armor.isEmpty()) {
+                    dropStack(armor.copy());
+                    equipStack(slot, ItemStack.EMPTY);
+                }
+            }
+        }
         super.onDeath(damageSource);
         if (getWorld().isClient) return;
+        // Chết là mất NPC: KHÔNG rơi token (token chỉ có khi thu hồi bằng Shift + chuột phải).
+        // Đồ đang mang vẫn rơi ra để người chơi không mất tài nguyên.
         dropInventory(cargo);
         dropInventory(supplies);
         dropWorkerItems();
-        dropStack(new ItemStack(tokenItem()));
     }
 
     protected void dropInventory(Inventory inventory) {

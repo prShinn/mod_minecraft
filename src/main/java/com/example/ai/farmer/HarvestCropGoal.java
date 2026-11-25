@@ -27,6 +27,12 @@ public class HarvestCropGoal extends Goal {
 
     private static final int MAX_TASK_TICKS = 100;// Nếu làm việc quá lâu thì từ bỏ
     private static final double HARVEST_DISTANCE_SQ = 2.25;
+    /** Tầm thu hoạch (bình phương, tính từ chân NPC tới tâm ô cây) — khớp điều kiện trong tick(). */
+    private static final double HARVEST_REACH_SQ = 2.5;
+    private static final int MAX_REPATHS = 3;
+    /** Thời gian tối đa = 5s + 0.5s mỗi nút đường đi (đường vòng qua cửa rào dài hơn). */
+    private int maxTicks = MAX_TASK_TICKS;
+    private int repathAttempts;
 
     public HarvestCropGoal(FarmerNpcEntity npc) {
         this.npc = npc;
@@ -54,12 +60,22 @@ public class HarvestCropGoal extends Goal {
     @Override
     public void start() {
         taskTicks = 0;
-        npc.getNavigation().startMovingTo(targetCrop.getX() + 0.5, targetCrop.getY(), targetCrop.getZ() + 0.5, 1.5F);
+        repathAttempts = 0;
+        // Tìm đường thật (đi vòng qua cửa rào) trước khi đi; không có đường → bỏ ô này một lúc
+        var path = npc.findReachablePath(targetCrop, HARVEST_REACH_SQ);
+        if (path == null) {
+            npc.skipPlot(targetCrop.down());
+            targetCrop = null;
+            return;
+        }
+        maxTicks = MAX_TASK_TICKS + path.getLength() * 10;
+        npc.getNavigation().startMovingAlong(path, 1.5F);
 
     }
 
     @Override
     public void tick() {
+        if (targetCrop == null) return; // start() vừa bỏ ô không có đường
         taskTicks++;
 
         if (!npc.getWorld().isChunkLoaded(targetCrop)) {
@@ -77,9 +93,18 @@ public class HarvestCropGoal extends Goal {
             stop();
             return;
         }
-        if (npc.squaredDistanceTo(Vec3d.ofCenter(targetCrop)) < 2.5) {
+        if (npc.squaredDistanceTo(Vec3d.ofCenter(targetCrop)) < HARVEST_REACH_SQ) {
             npc.activeFarmPlot = targetCrop.down();
             harvestCrop();
+        } else if (pickupDelay == 0 && npc.getNavigation().isIdle()) {
+            // Đứng lại giữa đường (bị chặn/đường cụt) → tính lại đường, quá 3 lần thì bỏ ô này
+            var path = ++repathAttempts > MAX_REPATHS ? null : npc.findReachablePath(targetCrop, HARVEST_REACH_SQ);
+            if (path == null) {
+                npc.skipPlot(targetCrop.down());
+                stop();
+                return;
+            }
+            npc.getNavigation().startMovingAlong(path, 1.5F);
         }
     }
 
@@ -91,8 +116,11 @@ public class HarvestCropGoal extends Goal {
 //        var state = npc.getWorld().getBlockState(targetCrop);
 //        return state.getBlock() instanceof CropBlock crop
 //                && crop.isMature(state);
-        if (taskTicks > MAX_TASK_TICKS) return false;
         if (targetCrop == null) return false;
+        if (taskTicks > maxTicks) {
+            if (pickupDelay == 0) npc.skipPlot(targetCrop.down()); // hết giờ mà chưa tới nơi
+            return false;
+        }
 
         // ✅ vẫn tiếp tục nếu đang chờ pickup
         if (pickupDelay > 0) return true;

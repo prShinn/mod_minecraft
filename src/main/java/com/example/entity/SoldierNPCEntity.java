@@ -88,6 +88,8 @@ public class SoldierNPCEntity extends PathAwareEntity {
 
     // ===== INVENTORY =====
     public final SimpleInventory foodInventory = new SimpleInventory(9);
+    /** Chiến lợi phẩm nhặt sau khi giết quái, mang về cất vào Rương binh lính. */
+    public final SoldierLoot loot = new SoldierLoot();
 
     public ModeNpc.ModeMove getMoveMode() {
         int id = this.dataTracker.get(MOVE_MODE);
@@ -97,6 +99,42 @@ public class SoldierNPCEntity extends PathAwareEntity {
     public void setMoveMode(ModeNpc.ModeMove moveMode) {
         this.moveMode = moveMode;
         this.dataTracker.set(MOVE_MODE, moveMode.ordinal());
+        guardAnchor = null; // đổi chế độ → tìm lại điểm neo quanh chỗ đang đứng
+        guardAnchorCooldown = 0;
+    }
+
+    // ===== ĐIỂM NEO CANH GÁC =====
+    /** Rương binh lính / giường / rương nghề gần nhất (40 block) mà lính canh quanh khi không theo chủ. */
+    @Nullable
+    private net.minecraft.util.math.BlockPos guardAnchor;
+    private int guardAnchorCooldown;
+
+    @Nullable
+    public net.minecraft.util.math.BlockPos getGuardAnchor() {
+        return guardAnchor;
+    }
+
+    /** Đang canh tại điểm neo: không theo chủ, không đang giữ tuyến tuần tra, và có điểm neo. */
+    public boolean hasGuardPost() {
+        return getMoveMode() != ModeNpc.ModeMove.FOLLOW && guardAnchor != null
+                && !SoldierPatrolGoal.isOnPatrolDuty(this);
+    }
+
+    /** Bị giữ tại chỗ (tuyến tuần tra hoặc điểm neo) → không chạy theo / dịch chuyển tới chủ. */
+    public boolean isHeldAtPost() {
+        return SoldierPatrolGoal.isOnPatrolDuty(this) || hasGuardPost();
+    }
+
+    private void updateGuardAnchor() {
+        if (guardAnchorCooldown-- > 0) return;
+        if (getMoveMode() == ModeNpc.ModeMove.FOLLOW) {
+            guardAnchor = null;
+            guardAnchorCooldown = 40;
+            return;
+        }
+        // Tìm quanh điểm neo cũ (nếu có) để lính đuổi quái ra xa không làm mất căn cứ
+        guardAnchor = GuardPost.find(this, guardAnchor != null ? guardAnchor : getBlockPos());
+        guardAnchorCooldown = guardAnchor != null ? 200 : 40;
     }
 
     public static final TrackedData<Integer> MOVE_MODE =
@@ -194,14 +232,31 @@ public class SoldierNPCEntity extends PathAwareEntity {
             }
         });
         this.goalSelector.add(4, new com.example.ai.foodChest.FindAndEatFoodGoal(this, () -> foodInventory, 24, this::shouldEat, this::feedFromChest));
+        // nhặt chiến lợi phẩm quanh chỗ quái vừa bị lính giết (ngoài giao tranh)
+        this.goalSelector.add(4, new CollectLootGoal(this));
         this.goalSelector.add(5, new FollowOwnerLikeGoal(this, 1.3D));
         this.goalSelector.add(6, new ReturnToPlayerGoal(this));
+        // mang chiến lợi phẩm về cất vào Rương binh lính của chủ
+        this.goalSelector.add(6, new DepositLootGoal(this));
 // nhin player
         this.goalSelector.add(7, new LookAtEntityGoal(this, PlayerEntity.class, 8.0F));
         // đi tuần giữa các Cờ Tuần Tra (chỉ khi owner đặt >= 2 cờ gần đó)
         this.goalSelector.add(7, new SoldierPatrolGoal(this));
         // đi lang thang xa
-        this.goalSelector.add(8, new WanderAroundFarGoal(this, 1.0D));
+        // canh gác: đi quanh điểm neo (rương binh lính / giường / rương nghề gần nhất)
+        this.goalSelector.add(8, new GuardPostWanderGoal(this));
+        this.goalSelector.add(8, new WanderAroundFarGoal(this, 1.0D) {
+            // Chỉ lang thang tự do khi KHÔNG có điểm neo (giữ cách cũ)
+            @Override
+            public boolean canStart() {
+                return !SoldierNPCEntity.this.hasGuardPost() && super.canStart();
+            }
+
+            @Override
+            public boolean shouldContinue() {
+                return !SoldierNPCEntity.this.hasGuardPost() && super.shouldContinue();
+            }
+        });
         // đi xung quanh gần (phat trien sau)
 //        this.goalSelector.add(8, new WanderAroundGoal(this, 0.8));
         // nhìn xung quanh
@@ -233,6 +288,9 @@ public class SoldierNPCEntity extends PathAwareEntity {
     public void tick() {
         super.tick();
         if (this.getWorld() == null || this.getWorld().isClient) return;// check ở server
+        // Thân bị block đè (cây mọc trùm lên...) → dịch sang ô trống gần nhất, không phá công trình
+        if (this.age % 10 == 0) com.example.helper.NpcStuckHelper.escapeIfStuck(this, false, null);
+        updateGuardAnchor();
         // Chủ đang chết: getOwner() trả null (không đi theo xác) nhưng GIỮ ownerUUID để hồi sinh vẫn là chủ
 
         double currentMaxHealth = combat.getCurrentMaxHealth();
@@ -446,8 +504,22 @@ public class SoldierNPCEntity extends PathAwareEntity {
                 ItemStack stack = foodInventory.removeStack(i);
                 if (!stack.isEmpty()) this.dropStack(stack);
             }
+            // Chiến lợi phẩm chưa kịp cất cũng rơi ra
+            for (int i = 0; i < loot.bag.size(); i++) {
+                ItemStack stack = loot.bag.removeStack(i);
+                if (!stack.isEmpty()) this.dropStack(stack);
+            }
         }
         super.onDeath(damageSource);
+    }
+
+    /** Ghi nhận chỗ quái do lính giết (kể cả bằng tên) để chỉ nhặt đồ rơi của chính con đó. */
+    @Override
+    public boolean onKilledOther(ServerWorld world, LivingEntity other) {
+        if (other instanceof net.minecraft.entity.mob.Monster) {
+            loot.recordKill(other.getPos(), world.getTime());
+        }
+        return super.onKilledOther(world, other);
     }
 
     // ===== INTERACTION =====
@@ -781,6 +853,7 @@ public class SoldierNPCEntity extends PathAwareEntity {
         nbt.putInt("Hunger", hunger);
 
         Inventories.writeNbt(nbt, foodInventory.stacks);
+        loot.writeNbt(nbt);
 
         nbt.putInt("MoveMode", this.dataTracker.get(MOVE_MODE));
 
@@ -810,6 +883,7 @@ public class SoldierNPCEntity extends PathAwareEntity {
         if (nbt.contains("Hunger")) hunger = nbt.getInt("Hunger");
 
         Inventories.readNbt(nbt, foodInventory.stacks);
+        loot.readNbt(nbt);
 
         if (nbt.contains("MoveMode")) {
             this.dataTracker.set(MOVE_MODE, nbt.getInt("MoveMode"));

@@ -9,7 +9,8 @@ public class LumberjackChestBlockEntity extends ProfessionChestBlockEntity {
     public static final int CUT_RADIUS = 8;
     public static final int CUT_BELOW = 6;
     public static final int CUT_ABOVE = 64;
-    private boolean cuttingEnabled;
+    /** Mặc định bật vùng chặt khi đặt rương mới; Shift + chuột phải tay không để tắt/bật. */
+    private boolean cuttingEnabled = true;
 
     public boolean allowsCutting(BlockPos target) {
         return cuttingEnabled && Math.abs(target.getX() - pos.getX()) <= CUT_RADIUS
@@ -27,7 +28,7 @@ public class LumberjackChestBlockEntity extends ProfessionChestBlockEntity {
     @Override
     public void readNbt(net.minecraft.nbt.NbtCompound nbt) {
         super.readNbt(nbt);
-        cuttingEnabled = nbt.getBoolean("CuttingEnabled");
+        cuttingEnabled = !nbt.contains("CuttingEnabled") || nbt.getBoolean("CuttingEnabled");
     }
 
     @Override

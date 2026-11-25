@@ -26,6 +26,8 @@ public class FollowOwnerLikeGoal extends Goal {
         if (owner == null) return false;
         // Đang combat thì không follow
         if (npc.getTarget() != null) return false;
+        // Lính giữ tuyến tuần tra hoặc canh điểm neo → ở lại, không chạy theo chủ
+        if (npc.isHeldAtPost()) return false;
 
         // CHỈ CHECK OWNER
         double distSq = npc.squaredDistanceTo(owner);
@@ -37,8 +39,9 @@ public class FollowOwnerLikeGoal extends Goal {
     @Override
     public boolean shouldContinue() {
         if (owner == null) return false;
-        // ✅ QUAN TRỌNG: Nếu đổi sang WANDER mode → dừng follow ngay
-        if (npc.getMoveMode() == ModeNpc.ModeMove.WANDER) {
+        if (npc.isHeldAtPost()) return false;
+        // ✅ QUAN TRỌNG: Nếu đổi sang chế độ không theo chủ (canh gác/đi tuần) → dừng follow ngay
+        if (npc.getMoveMode() != ModeNpc.ModeMove.FOLLOW) {
             double distSq = npc.squaredDistanceTo(owner);
             float followDist = getFollowDistance();
             // Chỉ tiếp tục nếu quá xa (theo ngưỡng WANDER)

@@ -20,7 +20,6 @@ import org.jetbrains.annotations.Nullable;
  * BlockEntity chung cho tất cả Rương Nghề Nghiệp.
  * - Inventory 27 slot (3×9), serialize/deserialize NBT.
  * - Implement NamedScreenHandlerFactory để mở GUI chest 3×9.
- * - Lưu thêm "StoredTool" là công cụ đã dùng craft rương (trả lại khi phá).
  */
 public class ProfessionChestBlockEntity extends BlockEntity
         implements net.minecraft.inventory.Inventory, NamedScreenHandlerFactory {
@@ -28,8 +27,6 @@ public class ProfessionChestBlockEntity extends BlockEntity
     /** Inventory 27 slot chứa vật phẩm NPC cất vào. */
     protected final DefaultedList<ItemStack> inventory =
             DefaultedList.ofSize(27, ItemStack.EMPTY);
-
-    /** Công cụ đã dùng để craft rương này — trả lại khi phá. */
     private java.util.UUID ownerId;
 
     public boolean canOpen(PlayerEntity player) {
@@ -46,7 +43,6 @@ public class ProfessionChestBlockEntity extends BlockEntity
         markDirty();
     }
 
-    private ItemStack storedTool = ItemStack.EMPTY;
 
     public ProfessionChestBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
         super(type, pos, state);
@@ -113,15 +109,6 @@ public class ProfessionChestBlockEntity extends BlockEntity
     @Override
     public void clear() { inventory.clear(); }
 
-    // ===== Stored Tool (craft ingredient) =====
-
-    public ItemStack getStoredTool() { return storedTool; }
-
-    public void setStoredTool(ItemStack tool) {
-        this.storedTool = tool.copy();
-        markDirty();
-    }
-
     // ===== NBT =====
 
     @Override
@@ -129,9 +116,7 @@ public class ProfessionChestBlockEntity extends BlockEntity
         super.readNbt(nbt);
         Inventories.readNbt(nbt, inventory);
         ownerId = nbt.containsUuid("ChestOwner") ? nbt.getUuid("ChestOwner") : null;
-        if (nbt.contains("StoredTool")) {
-            storedTool = ItemStack.fromNbt(nbt.getCompound("StoredTool"));
-        }
+        // "StoredTool" của rương cũ bị bỏ qua: không còn trả công cụ khi phá rương
     }
 
     @Override
@@ -139,8 +124,5 @@ public class ProfessionChestBlockEntity extends BlockEntity
         super.writeNbt(nbt);
         Inventories.writeNbt(nbt, inventory);
         if (ownerId != null) nbt.putUuid("ChestOwner", ownerId);
-        if (!storedTool.isEmpty()) {
-            nbt.put("StoredTool", storedTool.writeNbt(new NbtCompound()));
-        }
     }
 }

@@ -12,7 +12,8 @@ import java.util.UUID;
 
 /**
  * Soldier tự đi tuần vòng tròn giữa các Cờ Tuần Tra của chủ (cần >= 2 cờ trong bán kính).
- * Chỉ chạy ở chế độ WANDER, ngoài giao tranh; các goal ưu tiên cao hơn (ngủ, ăn, theo chủ...) vẫn chen ngang được.
+ * Chỉ chạy ở chế độ PATROL ("Đi tuần tra"), ngoài giao tranh; các goal ưu tiên cao hơn (ngủ, ăn...) vẫn chen ngang được.
+ * Khi có tuyến hợp lệ, lính PATROL không bị kéo về chủ (xem {@link #isOnPatrolDuty}).
  */
 public class SoldierPatrolGoal extends Goal {
     private static final double SPEED = 1.0D;
@@ -100,16 +101,29 @@ public class SoldierPatrolGoal extends Goal {
 
     private boolean canPatrol() {
         return !soldier.getWorld().isClient
-                && soldier.getMoveMode() == ModeNpc.ModeMove.WANDER
+                && soldier.getMoveMode() == ModeNpc.ModeMove.PATROL
                 && soldier.getTarget() == null
                 && soldier.getPose() != net.minecraft.entity.EntityPose.SLEEPING
                 && soldier.getOwnerUuid() != null;
     }
 
     private List<BlockPos> route() {
+        return routeOf(soldier);
+    }
+
+    private static List<BlockPos> routeOf(SoldierNPCEntity soldier) {
         UUID owner = soldier.getOwnerUuid();
         if (owner == null || !(soldier.getWorld() instanceof ServerWorld world)) return List.of();
         return PatrolFlagState.get(world).routeFor(world, owner, soldier.getBlockPos());
+    }
+
+    /**
+     * Lính đang ở chế độ Đi tuần tra và có tuyến hợp lệ (≥ 2 cờ của chủ quanh đó).
+     * Khi đúng, các goal theo/quay về chủ nhường để lính ở lại giữ tuyến;
+     * không có tuyến thì lính xử lý như "Tự do canh gác".
+     */
+    public static boolean isOnPatrolDuty(SoldierNPCEntity soldier) {
+        return soldier.getMoveMode() == ModeNpc.ModeMove.PATROL && routeOf(soldier).size() >= 2;
     }
 
     /** Cờ kế tiếp trong tuyến sau {@code previous}; chưa có mốc thì chọn cờ gần nhất. */

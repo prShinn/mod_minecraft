@@ -39,7 +39,7 @@ public class SoldierScreen extends HandledScreen<SoldierScreenHandler> {
     public SoldierScreen(SoldierScreenHandler handler, PlayerInventory inventory, Text title) {
         super(handler, inventory, title);
         this.backgroundWidth = 176;
-        this.backgroundHeight = 222;
+        this.backgroundHeight = PLAYER_INV_Y + 82; // túi người chơi 3 hàng + thanh nóng
         this.playerInventoryTitleY = PLAYER_INV_Y - 11;
     }
 
@@ -149,6 +149,7 @@ public class SoldierScreen extends HandledScreen<SoldierScreenHandler> {
         context.drawText(textRenderer, Text.literal("Kinh nghiệm " + handler.getStat(PROP_XP_PERMILLE) / 10 + "%"),
                 STATS_X, 53, TEXT, false);
         context.drawText(textRenderer, Text.literal("Túi đồ ăn"), FOOD_X, FOOD_Y - 10, TEXT, false);
+        context.drawText(textRenderer, Text.literal("Chiến lợi phẩm (chỉ lấy ra)"), LOOT_X, LOOT_Y - 10, TEXT, false);
     }
 
     private static String formatTenth(int valueX10) {

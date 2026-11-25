@@ -20,7 +20,7 @@
   "entity.datnc_mod.cook_npc": "Đầu bếp",
   "block.datnc_mod.cook_chest": "Rương Đầu Bếp",
   "block.datnc_mod.patrol_flag": "Cờ Tuần Tra",
-  "message.datnc_mod.patrol_flag_placed": "Cờ tuần tra: %s/%s (cần ≥ 2 cờ để Binh lính đi tuần)",
+  "message.datnc_mod.patrol_flag_placed": "Cờ tuần tra: %s/%s (cần ≥ 2 cờ; chỉ Binh lính ở chế độ \"Đi tuần tra\" mới đi tuần)",
   "message.datnc_mod.patrol_flag_limit": "Mỗi khu vực chỉ đặt tối đa %s cờ tuần tra. Hãy phá bớt một cờ.",
   "message.datnc_mod.chest_unavailable": "Hãy dùng đúng thẻ nghề của rương này.",
   "message.datnc_mod.chest_spawn_failed": "Cần chừa khoảng trống phía trên rương để triệu hồi NPC.",

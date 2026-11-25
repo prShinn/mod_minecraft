@@ -211,6 +211,8 @@ public class NpcDisplayComponent {
         if (goal instanceof com.example.ai.cook.CookFoodGoal) return "Đang nấu ăn";
         if (goal instanceof com.example.ai.builder.BuildStructureGoal build) return build.label();
         if (goal instanceof com.example.ai.soldier.SoldierPatrolGoal) return "Đang đi tuần";
+        if (goal instanceof com.example.ai.soldier.CollectLootGoal) return "Đang nhặt chiến lợi phẩm";
+        if (goal instanceof com.example.ai.soldier.DepositLootGoal) return "Đang cất chiến lợi phẩm";
         if (goal instanceof com.example.ai.soldier.FollowOwnerLikeGoal
                 || goal instanceof com.example.ai.soldier.ReturnToPlayerGoal) return "Đang đi theo chủ";
         return null;

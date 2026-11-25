@@ -30,7 +30,10 @@ import org.jetbrains.annotations.Nullable;
 public class SoldierScreenHandler extends ScreenHandler {
     public static final int EQUIPMENT_SLOTS = 5;
     public static final int FOOD_SLOTS = 9;
-    private static final int NPC_SLOTS = EQUIPMENT_SLOTS + FOOD_SLOTS;
+    /** Túi chiến lợi phẩm: chỉ cho lấy ra (khi chưa có Rương binh lính để lính tự cất). */
+    public static final int LOOT_SLOTS = com.example.ai.soldier.SoldierLoot.BAG_SIZE;
+    private static final int LOOT_START = EQUIPMENT_SLOTS + FOOD_SLOTS;
+    private static final int NPC_SLOTS = LOOT_START + LOOT_SLOTS;
     private static final double MAX_DISTANCE_SQ = 8.0 * 8.0;
 
     // ===== Chỉ số đồng bộ (property được gửi dạng short → giữ giá trị trong [-32768, 32767]) =====
@@ -46,7 +49,8 @@ public class SoldierScreenHandler extends ScreenHandler {
     public static final int ARMOR_X = 8, ARMOR_Y = 18;
     public static final int WEAPON_X = 80, WEAPON_Y = 72;
     public static final int FOOD_X = 8, FOOD_Y = 104;
-    public static final int PLAYER_INV_Y = 140;
+    public static final int LOOT_X = 8, LOOT_Y = 136;
+    public static final int PLAYER_INV_Y = 186;
 
     private static final Identifier[] EMPTY_ARMOR_SPRITES = {
             PlayerScreenHandler.EMPTY_HELMET_SLOT_TEXTURE, PlayerScreenHandler.EMPTY_CHESTPLATE_SLOT_TEXTURE,
@@ -64,20 +68,23 @@ public class SoldierScreenHandler extends ScreenHandler {
     /** Phía client: dữ liệu ô và chỉ số do server đồng bộ xuống. */
     public SoldierScreenHandler(int syncId, PlayerInventory playerInventory, PacketByteBuf buf) {
         this(syncId, playerInventory, null, buf.readVarInt(),
-                new SimpleInventory(EQUIPMENT_SLOTS), new SimpleInventory(FOOD_SLOTS), new ArrayPropertyDelegate(PROP_COUNT));
+                new SimpleInventory(EQUIPMENT_SLOTS), new SimpleInventory(FOOD_SLOTS), new SimpleInventory(LOOT_SLOTS),
+                new ArrayPropertyDelegate(PROP_COUNT));
     }
 
     /** Phía server: view trực tiếp lên NPC. */
     public SoldierScreenHandler(int syncId, PlayerInventory playerInventory, SoldierNPCEntity npc) {
         this(syncId, playerInventory, npc, npc.getId(),
-                new SoldierEquipmentInventory(npc), npc.foodInventory, liveStats(npc));
+                new SoldierEquipmentInventory(npc), npc.foodInventory, npc.loot.bag, liveStats(npc));
     }
 
     private SoldierScreenHandler(int syncId, PlayerInventory playerInventory, @Nullable SoldierNPCEntity npc,
-                                 int npcEntityId, Inventory equipment, Inventory food, PropertyDelegate properties) {
+                                 int npcEntityId, Inventory equipment, Inventory food, Inventory loot,
+                                 PropertyDelegate properties) {
         super(ModScreenHandlers.SOLDIER, syncId);
         checkSize(equipment, EQUIPMENT_SLOTS);
         checkSize(food, FOOD_SLOTS);
+        checkSize(loot, LOOT_SLOTS);
         this.npc = npc;
         this.npcEntityId = npcEntityId;
         this.properties = properties;
@@ -91,6 +98,14 @@ public class SoldierScreenHandler extends ScreenHandler {
                 @Override
                 public boolean canInsert(ItemStack stack) {
                     return stack.isFood();
+                }
+            });
+        }
+        for (int i = 0; i < LOOT_SLOTS; i++) {
+            addSlot(new Slot(loot, i, LOOT_X + (i % 9) * 18, LOOT_Y + (i / 9) * 18) {
+                @Override
+                public boolean canInsert(ItemStack stack) {
+                    return false; // chỉ lấy ra; lính tự nhặt vào
                 }
             });
         }
@@ -167,7 +182,8 @@ public class SoldierScreenHandler extends ScreenHandler {
             // Từ NPC → túi người chơi
             if (!insertItem(stack, NPC_SLOTS, slots.size(), true)) return ItemStack.EMPTY;
         } else if (!insertItem(stack, 0, EQUIPMENT_SLOTS, false)
-                && !insertItem(stack, EQUIPMENT_SLOTS, NPC_SLOTS, false)) {
+                && !insertItem(stack, EQUIPMENT_SLOTS, LOOT_START, false)) {
+            // Không bao giờ shift-click vào túi chiến lợi phẩm (chỉ lấy ra)
             // Không hợp ô nào của NPC → chuyển giữa túi chính và thanh nóng như rương thường
             int hotbarStart = slots.size() - 9;
             if (index < hotbarStart) {

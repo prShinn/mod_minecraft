@@ -42,7 +42,13 @@ public class LumberjackNpcEntity extends WorkerNpcEntity {
 
     public LumberjackNpcEntity(EntityType<? extends PathAwareEntity> entityType, World world) {
         super(entityType, world, 9);
+        // Mặc định pathfinder coi lá là tường (penalty -1): cây mới mọc chắn lối là mất đường tới rương.
+        // Tiều phu được tính đường xuyên lá (hơi đắt hơn đất trống) rồi chặt lá trên đường đi — xem clearLeavesOnPath().
+        setPathfindingPenalty(net.minecraft.entity.ai.pathing.PathNodeType.LEAVES, LEAVES_PATH_PENALTY);
     }
+
+    private static final float LEAVES_PATH_PENALTY = 4.0F;
+    private static final double LEAVES_CLEAR_RANGE_SQ = 3.0 * 3.0;
 
     @Override
     protected void addWorkGoals() {
@@ -82,6 +88,12 @@ public class LumberjackNpcEntity extends WorkerNpcEntity {
         return 2;
     }
 
+    /** Cây mọc trùm lên người → chặt ngay gỗ/lá đang đè, đồ cho vào túi. */
+    @Override
+    protected boolean canChopBlockingTrees() {
+        return true;
+    }
+
     @Override
     protected String legacyCargoKey() {
         return "FoodInventory";
@@ -94,6 +106,25 @@ public class LumberjackNpcEntity extends WorkerNpcEntity {
         if (getNavigation().isIdle()) memory.tickIdle();
         else memory.resetIdle();
         if (treeSearchCooldown > 0) treeSearchCooldown--;
+        if (age % 5 == 0) clearLeavesOnPath();
+    }
+
+    /** Chặt lá nằm trên 2 nút đường kế tiếp (ngang chân và ngang đầu), lá cho vào túi. */
+    private void clearLeavesOnPath() {
+        var path = getNavigation().getCurrentPath();
+        if (path == null || path.isFinished() || !(getWorld() instanceof net.minecraft.server.world.ServerWorld world)) return;
+        int from = path.getCurrentNodeIndex();
+        for (int i = from; i < Math.min(from + 2, path.getLength()); i++) {
+            BlockPos node = path.getNodePos(i);
+            for (BlockPos pos : new BlockPos[]{node, node.up()}) {
+                if (getBlockPos().getSquaredDistance(pos) > LEAVES_CLEAR_RANGE_SQ) continue;
+                BlockState state = world.getBlockState(pos);
+                if (state.isIn(BlockTags.LEAVES)) {
+                    swingHand(net.minecraft.util.Hand.MAIN_HAND);
+                    com.example.helper.NpcStuckHelper.breakInto(world, this, pos, state, cargo);
+                }
+            }
+        }
     }
 
     // ===== NBT =====

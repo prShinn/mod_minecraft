@@ -18,6 +18,10 @@ public class PlantSeedGoal extends Goal {
     private BlockPos farmland;
     private BlockPos chest;
     private int travelTicks;
+    /** Tầm gieo hạt / tầm với rương (bình phương), khớp điều kiện trong tick(). */
+    private static final double PLANT_REACH_SQ = 4.0;
+    private static final double CHEST_REACH_SQ = 6.25;
+    private static final int MAX_PATH_CHECKS = 6;
     private long retryAt;
     private boolean finished;
 
@@ -44,7 +48,7 @@ public class PlantSeedGoal extends Goal {
     public void start() {
         finished = false;
         if (npc.plantingSeeds.isEmpty() || npc.returningSeeds) {
-            moveTo(chest, false);
+            moveToChest();
         } else {
             beginPlanting();
         }
@@ -84,6 +88,7 @@ public class PlantSeedGoal extends Goal {
             }
             nextPlot();
         } else if (travelFailed()) {
+            npc.skipPlot(farmland); // đi mãi không tới (rào, vật cản) → để ô khác lên trước
             nextPlot();
         }
     }
@@ -105,14 +110,26 @@ public class PlantSeedGoal extends Goal {
             finished = true;
             return;
         }
-        plots.removeIf(plot -> !isPlantable(plot));
-        if (!plots.isEmpty()) {
-            plots.sort(Comparator.comparingDouble(npc.getBlockPos()::getSquaredDistance));
-            farmland = plots.remove(0);
-            moveTo(farmland, true);
-        } else {
-            npc.returningSeeds = true;
-            moveTo(chest, false);
+        plots.removeIf(plot -> !isPlantable(plot) || npc.isPlotSkipped(plot));
+        plots.sort(Comparator.comparingDouble(npc.getBlockPos()::getSquaredDistance));
+        // Ưu tiên ô có đường đi thật (vòng qua cửa rào); giới hạn số lần tính đường mỗi lượt để không lag
+        for (int checks = 0; checks < MAX_PATH_CHECKS && !plots.isEmpty(); checks++) {
+            BlockPos candidate = plots.remove(0);
+            if (moveTo(candidate.up(), PLANT_REACH_SQ)) {
+                farmland = candidate;
+                return;
+            }
+            npc.skipPlot(candidate);
+        }
+        // Không còn ô nào tới được → mang hạt về rương
+        npc.returningSeeds = true;
+        moveToChest();
+    }
+
+    private void moveToChest() {
+        if (!moveTo(chest, CHEST_REACH_SQ)) {
+            npc.display.report(npc, "Không có đường tới rương nghề");
+            finished = true;
         }
     }
 
@@ -142,9 +159,12 @@ public class PlantSeedGoal extends Goal {
         return travelTicks >= 240 || npc.getNavigation().isIdle();
     }
 
-    private void moveTo(BlockPos pos, boolean plot) {
+    /** Tính đường tới target rồi đi; false nếu không có đường tới được tầm reachSq. */
+    private boolean moveTo(BlockPos target, double reachSq) {
         travelTicks = 0;
         npc.getNavigation().stop();
-        npc.getNavigation().startMovingTo(pos.getX() + 0.5, pos.getY() + (plot ? 1 : 0), pos.getZ() + 0.5, 1.3);
+        if (npc.squaredDistanceTo(Vec3d.ofCenter(target)) <= reachSq) return true; // đã đứng trong tầm
+        var path = npc.findReachablePath(target, reachSq);
+        return path != null && npc.getNavigation().startMovingAlong(path, 1.3);
     }
 }

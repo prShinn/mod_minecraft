@@ -41,6 +41,12 @@ public class ReturnToPlayerGoal extends Goal {
             return false;
         }
 
+        // Lính giữ tuyến tuần tra hoặc canh điểm neo → ở lại, không quay về chủ
+        if (soldier.isHeldAtPost()) {
+            outOfRangeSince = -1;
+            return false;
+        }
+
         // Đang trong combat → ưu tiên chiến đấu
         if (soldier.getTarget() != null) {
             outOfRangeSince = -1; // Reset timer khi combat

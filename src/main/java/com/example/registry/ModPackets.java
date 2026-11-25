@@ -73,11 +73,9 @@ public class ModPackets {
                         Entity e = player.getServerWorld().getEntity(npcId);
                         if (!(e instanceof SoldierNPCEntity npc) || npc.getOwner() != player
                                 || npc.squaredDistanceTo(player) > 64) return;
-                        // ✅ Đổi mode
-                        ModeNpc.ModeMove newMode =
-                                npc.getMoveMode() == ModeNpc.ModeMove.FOLLOW
-                                        ? ModeNpc.ModeMove.WANDER
-                                        : ModeNpc.ModeMove.FOLLOW;
+                        // ✅ Đổi mode xoay vòng: Đi theo chủ → Tự do canh gác → Đi tuần tra → Đi theo chủ
+                        ModeNpc.ModeMove[] modes = ModeNpc.ModeMove.values();
+                        ModeNpc.ModeMove newMode = modes[(npc.getMoveMode().ordinal() + 1) % modes.length];
 
                         npc.setMoveMode(newMode);
                         // ✅ Gửi feedback cho player

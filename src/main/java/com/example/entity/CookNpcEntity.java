@@ -126,7 +126,7 @@ public class CookNpcEntity extends WorkerNpcEntity {
         if (!isFoodChest(be) || !DeliveryTarget.hasSpace((Inventory) be, cargo, stack -> true)) return false;
         if (DeliveryTarget.canReach(this, pos)) return true;
         var path = getNavigation().findPathTo(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5, 1);
-        return path != null && path.reachesTarget();
+        return DeliveryTarget.pathReachesChest(path, pos);
     }
 
     // ===== Getters & lưu trữ =====

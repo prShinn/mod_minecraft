@@ -174,7 +174,7 @@ public class PlantSaplingGoal extends Goal {
         navigation.stop();
         if (!DeliveryTarget.canReach(npc, chest)) {
             var path = navigation.findPathTo(chest.getX() + 0.5, chest.getY(), chest.getZ() + 0.5, 1);
-            if (path != null && path.reachesTarget()) navigation.startMovingAlong(path, 1.2);
+            if (DeliveryTarget.pathReachesChest(path, chest)) navigation.startMovingAlong(path, 1.2);
         }
     }
 

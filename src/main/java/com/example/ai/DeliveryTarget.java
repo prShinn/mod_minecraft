@@ -69,9 +69,21 @@ public final class DeliveryTarget {
         path = null;
         if (canReach(npc, pos)) return true;
         path = npc.getNavigation().findPathTo(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5, 1);
-        if (path != null && path.reachesTarget()) return true;
+        if (pathReachesChest(path, pos)) return true;
         markBlocked(npc, pos);
         return false;
+    }
+
+    /**
+     * reachesTarget() đòi điểm cuối cách rương ≤ 1 theo Manhattan; đứng trên đường xúc/đất cày (cao 15/16)
+     * thì điểm cuối bị tính thấp hơn rương 1 tầng → sai thành "không có đường". Chấp nhận khi điểm cuối
+     * nằm trong tầm với REACH_SQUARED, cùng ngưỡng canReach dùng lúc cất đồ.
+     */
+    public static boolean pathReachesChest(@org.jetbrains.annotations.Nullable Path path, BlockPos pos) {
+        if (path == null) return false;
+        if (path.reachesTarget()) return true;
+        var end = path.getEnd();
+        return end != null && Vec3d.ofBottomCenter(end.getBlockPos()).squaredDistanceTo(Vec3d.ofCenter(pos)) <= REACH_SQUARED;
     }
 
     public static boolean canReach(PathAwareEntity npc, BlockPos pos) {

@@ -194,6 +194,9 @@ public class FarmerNpcEntity extends WorkerNpcEntity {
         BlockPos nearestEmptyFarmland = null;
         double nearestFarmlandDist = Double.MAX_VALUE;
         BlockPos.Mutable mutable = new BlockPos.Mutable();
+        boolean skippedAny = false;
+        long now = world.getTime();
+        skippedPlots.values().removeIf(until -> until <= now);
 
         for (int dx = -FARM_RADIUS; dx <= FARM_RADIUS; dx++) {
             for (int dz = -FARM_RADIUS; dz <= FARM_RADIUS; dz++) {
@@ -206,6 +209,10 @@ public class FarmerNpcEntity extends WorkerNpcEntity {
                     BlockPos cropPos = farmlandPos.up();
                     BlockState cropState = world.getBlockState(cropPos);
                     double dist = squaredDistanceTo(cropPos.getX() + 0.5, cropPos.getY() + 0.5, cropPos.getZ() + 0.5);
+                    if (isPlotSkipped(farmlandPos)) {
+                        skippedAny = true;
+                        continue; // vừa thử mà không có đường tới → để ô khác lên trước
+                    }
                     if (cropState.getBlock() instanceof CropBlock crop && crop.isMature(cropState)) {
                         if (isWorkedByAnother(farmlandPos)) continue;
                         if (dist < nearestCropDist) {
@@ -224,6 +231,26 @@ public class FarmerNpcEntity extends WorkerNpcEntity {
         }
         cachedMatureCrop = nearestMatureCrop;
         cachedEmptyFarmland = nearestEmptyFarmland;
+        if (skippedAny && nearestMatureCrop == null && nearestEmptyFarmland == null) {
+            display.report(this, "Không tìm được đường vào ruộng (rào kín?)");
+        }
+    }
+
+    // ===== Ô ruộng không tới được =====
+
+    /** Ô đất cày vừa thử mà không có đường tới → bỏ qua một lúc, tránh đứng loanh quanh sát rào. */
+    private final java.util.Map<BlockPos, Long> skippedPlots = new java.util.HashMap<>();
+    private static final int PLOT_SKIP_TICKS = 600; // 30 giây
+
+    public void skipPlot(BlockPos farmland) {
+        skippedPlots.put(farmland.toImmutable(), getWorld().getTime() + PLOT_SKIP_TICKS);
+        if (farmland.up().equals(cachedMatureCrop)) cachedMatureCrop = null;
+        if (farmland.equals(cachedEmptyFarmland)) cachedEmptyFarmland = null;
+    }
+
+    public boolean isPlotSkipped(BlockPos farmland) {
+        Long until = skippedPlots.get(farmland);
+        return until != null && until > getWorld().getTime();
     }
 
     // ===== Hạt giống =====

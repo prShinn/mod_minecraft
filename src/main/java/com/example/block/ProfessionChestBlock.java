@@ -6,7 +6,6 @@ import net.minecraft.block.BlockWithEntity;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NbtCompound;
 import net.minecraft.screen.NamedScreenHandlerFactory;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
@@ -83,10 +82,7 @@ public abstract class ProfessionChestBlock extends BlockWithEntity {
                 || state.isOf(com.example.registry.ModBlocks.SOLDIER_CHEST) && held.isOf(com.example.registry.ModItems.SOLDIER_TOKEN);
     }
 
-    /**
-     * Khi block được đặt xuống: chuyển StoredTool từ ItemStack NBT sang BlockEntity.
-     * Điều này đảm bảo khi phá rương, công cụ sẽ được trả lại cho người chơi.
-     */
+    /** Khi đặt rương nghề: ghi người đặt làm chủ rương. */
     @Override
     public void onPlaced(World world, BlockPos pos, BlockState state,
                          @Nullable net.minecraft.entity.LivingEntity placer,
@@ -97,21 +93,13 @@ public abstract class ProfessionChestBlock extends BlockWithEntity {
                 && world.getBlockEntity(pos) instanceof ProfessionChestBlockEntity chest) {
             chest.setOwner(player);
         }
-        if (!world.isClient && itemStack.hasNbt()) {
-            NbtCompound nbt = itemStack.getNbt();
-            if (nbt != null && nbt.contains("StoredTool")) {
-                BlockEntity be = world.getBlockEntity(pos);
-                if (be instanceof ProfessionChestBlockEntity chestBe) {
-                    chestBe.setStoredTool(ItemStack.fromNbt(nbt.getCompound("StoredTool")));
-                }
-            }
-        }
     }
 
     /**
      * Khi block bị thay thế (bị phá):
-     * - Scatter toàn bộ items trong inventory ra đất.
-     * - Drop lại công cụ đã dùng để craft (nếu có).
+     * - Scatter toàn bộ items trong inventory ra đất (giống rương thường).
+     * - Bản thân rương rơi theo loot table. KHÔNG trả lại công cụ đã dùng để chế tạo
+     *   (công cụ bị tiêu hao vào rương; tránh craft-phá lặp để lấy lại cúp/cuốc).
      */
     @Override
     public void onStateReplaced(BlockState state, World world, BlockPos pos,
@@ -121,14 +109,6 @@ public abstract class ProfessionChestBlock extends BlockWithEntity {
             if (!world.isClient && be instanceof ProfessionChestBlockEntity chestBe) {
                 // Scatter inventory items
                 ItemScatterer.spawn(world, pos, chestBe);
-                // Drop lại công cụ craft
-                ItemStack storedTool = chestBe.getStoredTool();
-                if (!storedTool.isEmpty()) {
-                    ItemScatterer.spawn(world, (double) pos.getX() + 0.5,
-                            (double) pos.getY() + 0.5,
-                            (double) pos.getZ() + 0.5,
-                            storedTool);
-                }
                 world.updateComparators(pos, this);
             }
             super.onStateReplaced(state, world, pos, newState, moved);

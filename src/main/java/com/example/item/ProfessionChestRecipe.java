@@ -4,7 +4,6 @@ import com.example.registry.ModBlocks;
 import com.example.registry.ModRecipes;
 import net.minecraft.inventory.RecipeInputInventory;
 import net.minecraft.item.*;
-import net.minecraft.nbt.NbtCompound;
 import net.minecraft.recipe.Ingredient;
 import net.minecraft.recipe.RecipeSerializer;
 import net.minecraft.recipe.SpecialCraftingRecipe;
@@ -76,19 +75,8 @@ public abstract class ProfessionChestRecipe extends SpecialCraftingRecipe {
 
     @Override
     public ItemStack craft(RecipeInputInventory inventory, DynamicRegistryManager registryManager) {
-        ItemStack output = createOutput();
-
-        // Lưu công cụ vào NBT của output để block entity trả lại khi phá
-        for (int i = 0; i < inventory.size(); i++) {
-            ItemStack stack = inventory.getStack(i);
-            if (!stack.isEmpty() && isMatchingTool(stack)) {
-                NbtCompound nbt = output.getOrCreateNbt();
-                nbt.put("StoredTool", stack.writeNbt(new NbtCompound()));
-                break;
-            }
-        }
-
-        return output;
+        // Công cụ bị tiêu hao vào rương, không lưu lại để trả khi phá
+        return createOutput();
     }
 
     @Override
