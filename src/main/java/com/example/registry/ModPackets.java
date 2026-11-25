@@ -30,6 +30,7 @@ public class ModPackets {
     public static void registerServer() {
         registerMoveMode();
         registerOpenSoldierGui();
+        com.example.village.VillageOverview.registerServer();
     }
 
     private static void registerOpenSoldierGui() {

@@ -39,6 +39,16 @@ public class NpcDisplayComponent {
 
     private String issue;
     private long issueUntil;
+    private long issueAt;
+
+    /** Sự cố gần nhất nếu xảy ra trong {@code windowTicks} tick qua (Sổ quản lý làng giữ lâu hơn tên trên đầu). */
+    public String recentIssue(World world, int windowTicks) {
+        return issue != null && world.getTime() - issueAt <= windowTicks ? issue : null;
+    }
+
+    public int getHunger() {
+        return hunger;
+    }
 
     public void report(PathAwareEntity npc, String message) {
         // Sự cố mới (khác sự cố đang hiển thị) → hạt giận dữ trên đầu
@@ -46,7 +56,8 @@ public class NpcDisplayComponent {
             com.example.helper.NpcFeedback.problem(npc);
         }
         issue = message;
-        issueUntil = npc.getWorld().getTime() + 120;
+        issueAt = npc.getWorld().getTime();
+        issueUntil = issueAt + 120;
     }
 
     public static void reportWorker(PathAwareEntity npc, String message) {

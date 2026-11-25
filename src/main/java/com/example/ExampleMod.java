@@ -35,6 +35,7 @@ public class ExampleMod implements ModInitializer {
 		// 6. Thêm items vào Creative Tab (INGREDIENTS)
 		ItemGroupEvents.modifyEntriesEvent(ItemGroups.INGREDIENTS).register(entries -> {
 			entries.add(ModItems.SOLDIER_TOKEN);
+			entries.add(ModItems.VILLAGE_LEDGER);
 			entries.add(ModItems.FARMER_TOKEN);
 			entries.add(ModItems.LUMBERJACK_TOKEN);
 			entries.add(ModItems.MINER_TOKEN);

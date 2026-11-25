@@ -25,6 +25,11 @@ public class ClientTickHandler {
                     ClientPlayNetworking.send(ModPackets.OPEN_SOLDIER_GUI, buf);
                 }
             }
+            while (ModKeybinds.OPEN_VILLAGE_OVERVIEW.wasPressed()) {
+                if (client.player != null && client.currentScreen == null) {
+                    com.example.gui.VillageOverviewScreen.requestData(true);
+                }
+            }
         });
         ClientPlayNetworking.registerGlobalReceiver(
                 SYNC_MODE_PACKET,

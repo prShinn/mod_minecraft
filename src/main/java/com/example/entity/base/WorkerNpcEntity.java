@@ -421,5 +421,8 @@ public abstract class WorkerNpcEntity extends PathAwareEntity {
     public boolean isIdleFor(int ticks) { return idleTicks > ticks; }
     public void resetIdle() { idleTicks = 0; }
     public UUID getOwnerUUID() { return ownerUUID; }
+    /** Nhãn việc đang làm cho Sổ quản lý làng (goalSelector là protected). */
+    public String overviewLabel(@Nullable String issue) { return NpcDisplayComponent.workLabel(this, goalSelector, issue); }
+    public int suppliesFoodCount() { return display.getTotalFoodCount(supplies); }
     public void setOwnerUUID(UUID uuid) { this.ownerUUID = uuid; }
 }

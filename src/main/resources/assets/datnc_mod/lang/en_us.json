@@ -35,6 +35,8 @@
   "entity.datnc_mod.soldier_npc": "Binh lính",
   "entity.datnc_mod.farmer_npc": "Nông dân",
   "entity.datnc_mod.lumberjack_npc": "Tiều phu",
+  "item.datnc_mod.village_ledger": "Sổ quản lý làng",
+  "key.datnc_mod.village_overview": "Mở Sổ quản lý làng",
   "key.soldiernpc.open_gui": "Mở bảng Binh lính",
   "category.soldiernpc": "NPC Nghề nghiệp"
 }

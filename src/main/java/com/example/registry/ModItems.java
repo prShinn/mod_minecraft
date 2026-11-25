@@ -21,6 +21,7 @@ public class ModItems {
     public static Item RANCHER_TOKEN;
     public static Item COOK_TOKEN;
     public static Item BUILDER_TOKEN;
+    public static Item VILLAGE_LEDGER;
 
     public static void register() {
         SOLDIER_TOKEN = Registry.register(Registries.ITEM,
@@ -57,5 +58,9 @@ public class ModItems {
         BUILDER_TOKEN = Registry.register(Registries.ITEM,
                 new Identifier(ExampleMod.MODID, "builder_token"),
                 new WorkerTokenItem(new Item.Settings().maxCount(1), () -> ModEntities.BUILDER_NPC));
+
+        VILLAGE_LEDGER = Registry.register(Registries.ITEM,
+                new Identifier(ExampleMod.MODID, "village_ledger"),
+                new com.example.item.VillageLedgerItem(new Item.Settings().maxCount(1)));
     }
 }

@@ -822,6 +822,11 @@ public class SoldierNPCEntity extends PathAwareEntity {
         return hunger;
     }
 
+    /** Nhãn việc đang làm cho Sổ quản lý làng (goalSelector là protected). */
+    public String overviewLabel() {
+        return com.example.entity.base.NpcDisplayComponent.workLabel(this, goalSelector, null);
+    }
+
     public UUID getFollowPlayerUUID() {
         return followPlayerUUID;
     }

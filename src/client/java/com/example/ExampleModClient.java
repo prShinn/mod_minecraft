@@ -15,6 +15,7 @@ public class ExampleModClient implements ClientModInitializer {
         net.minecraft.client.gui.screen.ingame.HandledScreens.register(
                 com.example.registry.ModScreenHandlers.SOLDIER, com.example.gui.SoldierScreen::new);
         ClientTickHandler.register();
+        com.example.gui.VillageOverviewScreen.registerClient();
 
     }
 }
