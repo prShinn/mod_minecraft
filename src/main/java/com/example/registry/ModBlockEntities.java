@@ -20,6 +20,9 @@ public class ModBlockEntities {
     public static BlockEntityType<RancherChestBlockEntity> RANCHER_CHEST_BE;
     public static BlockEntityType<CookChestBlockEntity> COOK_CHEST_BE;
 
+    public static BlockEntityType<BuilderChestBlockEntity> BUILDER_CHEST_BE;
+    public static BlockEntityType<BlueprintBlockEntity> BLUEPRINT_BE;
+
     public static BlockEntityType<ProfessionChestBlockEntity> UTILITY_CHEST;
 
     public static void register() {
@@ -64,5 +67,14 @@ public class ModBlockEntities {
         COOK_CHEST_BE = Registry.register(Registries.BLOCK_ENTITY_TYPE,
                 new Identifier(ExampleMod.MODID, "cook_chest_be"),
                 FabricBlockEntityTypeBuilder.create(CookChestBlockEntity::new, ModBlocks.COOK_CHEST).build());
+
+        BUILDER_CHEST_BE = Registry.register(Registries.BLOCK_ENTITY_TYPE,
+                new Identifier(ExampleMod.MODID, "builder_chest_be"),
+                FabricBlockEntityTypeBuilder.create(BuilderChestBlockEntity::new, ModBlocks.BUILDER_CHEST).build());
+
+        BLUEPRINT_BE = Registry.register(Registries.BLOCK_ENTITY_TYPE,
+                new Identifier(ExampleMod.MODID, "blueprint_be"),
+                FabricBlockEntityTypeBuilder.create(BlueprintBlockEntity::new,
+                        ModBlocks.BLUEPRINTS.toArray(new net.minecraft.block.Block[0])).build());
     }
 }

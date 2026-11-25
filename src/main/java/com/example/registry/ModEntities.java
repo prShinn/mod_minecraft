@@ -23,6 +23,7 @@ public class ModEntities {
     public static EntityType<FishermanNpcEntity> FISHERMAN_NPC;
     public static EntityType<RancherNpcEntity> RANCHER_NPC;
     public static EntityType<CookNpcEntity> COOK_NPC;
+    public static EntityType<com.example.entity.BuilderNpcEntity> BUILDER_NPC;
 
     public static void register() {
         SOLDIER_NPC = Registry.register(
@@ -61,6 +62,11 @@ public class ModEntities {
         COOK_NPC = Registry.register(
                 Registries.ENTITY_TYPE, new Identifier(ExampleMod.MODID, "cook_npc"),
                 FabricEntityTypeBuilder.create(SpawnGroup.CREATURE, CookNpcEntity::new)
+                        .dimensions(EntityDimensions.fixed(0.6F, 1.95F)).build());
+
+        BUILDER_NPC = Registry.register(
+                Registries.ENTITY_TYPE, new Identifier(ExampleMod.MODID, "builder_npc"),
+                FabricEntityTypeBuilder.create(SpawnGroup.CREATURE, com.example.entity.BuilderNpcEntity::new)
                         .dimensions(EntityDimensions.fixed(0.6F, 1.95F)).build());
     }
 }

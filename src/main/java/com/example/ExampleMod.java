@@ -41,6 +41,7 @@ public class ExampleMod implements ModInitializer {
 			entries.add(ModItems.FISHERMAN_TOKEN);
 			entries.add(ModItems.RANCHER_TOKEN);
 			entries.add(ModItems.COOK_TOKEN);
+			entries.add(ModItems.BUILDER_TOKEN);
 		});
 
 		// 7. Thêm block vào Creative Tab (BUILDING_BLOCKS)
@@ -54,9 +55,13 @@ public class ExampleMod implements ModInitializer {
 			entries.add(ModBlocks.FISHERMAN_CHEST.asItem());
 			entries.add(ModBlocks.RANCHER_CHEST.asItem());
 			entries.add(ModBlocks.COOK_CHEST.asItem());
+			entries.add(ModBlocks.PATROL_FLAG.asItem());
+			entries.add(ModBlocks.BUILDER_CHEST.asItem());
+			ModBlocks.BLUEPRINTS.forEach(block -> entries.add(block.asItem()));
 		});
 
-		// 8. Register packets
+		// 8. GUI (screen handler) + packets
+		ModScreenHandlers.register();
 		ModPackets.registerServer();
 
 		LOGGER.info("datnc_mod initialized!");

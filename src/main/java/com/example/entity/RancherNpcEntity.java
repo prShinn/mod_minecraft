@@ -2,6 +2,7 @@ package com.example.entity;
 
 import com.example.ai.rancher.BreedAnimalsGoal;
 import com.example.ai.rancher.CollectAnimalDropsGoal;
+import com.example.ai.rancher.CullAnimalsGoal;
 import com.example.ai.rancher.ShearSheepGoal;
 import com.example.ai.worker.DepositCargoGoal;
 import com.example.ai.worker.WorkerWanderGoal;
@@ -36,6 +37,7 @@ public class RancherNpcEntity extends WorkerNpcEntity {
         this.goalSelector.add(5, new DepositCargoGoal(this));
         this.goalSelector.add(6, new CollectAnimalDropsGoal(this));
         this.goalSelector.add(7, new ShearSheepGoal(this));
+        this.goalSelector.add(8, new CullAnimalsGoal(this));
         this.goalSelector.add(8, new BreedAnimalsGoal(this));
         this.goalSelector.add(9, new WorkerWanderGoal(this));
     }

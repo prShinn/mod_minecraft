@@ -1,206 +1,39 @@
 package com.example;
 
-import com.example.entity.FarmerNpcEntity;
-import com.example.entity.LumberjackNpcEntity;
-import com.example.entity.FishermanNpcEntity;
-import com.example.entity.MinerNpcEntity;
-import com.example.entity.SoldierNPCEntity;
-import com.example.entity.base.WorkerNpcEntity;
-import net.minecraft.entity.EntityType;
+import com.example.registry.ModEntities;
+import com.example.render.NpcOverlayFeature;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
 import net.minecraft.client.render.entity.BipedEntityRenderer;
 import net.minecraft.client.render.entity.feature.ArmorFeatureRenderer;
 import net.minecraft.client.render.entity.model.BipedEntityModel;
 import net.minecraft.client.render.entity.model.EntityModelLayers;
-
-import com.example.registry.ModEntities;
+import net.minecraft.entity.EntityType;
+import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.util.Identifier;
+
+/**
+ * Renderer cho mọi NPC: thân dân làng + lớp áo biome đồng bằng + lớp áo nghề vanilla
+ * (để nhận ra nghề bằng mắt) + giáp. BipedEntityRenderer tự vẽ đồ cầm tay (HeldItemFeatureRenderer).
+ */
 public class ModEntityRenderers {
+    /** villager.png đã vá 4px cuối tay (v34..37) — model zombie villager có tay dài 12px, ảnh gốc chỉ vẽ 8px. */
+    private static final Identifier BASE_TEXTURE = new Identifier("datnc_mod", "textures/entity/npc_base.png");
+    private static final Identifier BIOME_TEXTURE = new Identifier("minecraft", "textures/entity/villager/type/plains.png");
+
     public static void register() {
-
-        EntityRendererRegistry.register(
-                ModEntities.SOLDIER_NPC,
-                ctx -> new BipedEntityRenderer<
-                        SoldierNPCEntity,
-                        BipedEntityModel<SoldierNPCEntity>
-                        >(
-                        ctx,
-                        new BipedEntityModel<>(ctx.getPart(EntityModelLayers.ZOMBIE_VILLAGER)),
-                        0.5f
-                ) {
-
-                    @Override
-                    public Identifier getTexture(SoldierNPCEntity entity) {
-                        return new Identifier(
-                                "minecraft",
-                                "textures/entity/villager/villager.png"
-                        );
-                    }
-
-                    {
-                        this.addFeature(new ArmorFeatureRenderer<>(
-                                this,
-                                new BipedEntityModel<>(ctx.getPart(
-                                        EntityModelLayers.ZOMBIE_VILLAGER_INNER_ARMOR)),
-                                new BipedEntityModel<>(ctx.getPart(
-                                        EntityModelLayers.ZOMBIE_VILLAGER_OUTER_ARMOR)),
-                                ctx.getModelManager()
-                        ));
-                    }
-                }
-        );
-        EntityRendererRegistry.register(
-                ModEntities.FARMER_NPC,
-                ctx -> new BipedEntityRenderer<
-                        FarmerNpcEntity,
-                        BipedEntityModel<FarmerNpcEntity>
-                        >(
-                        ctx,
-                        new BipedEntityModel<>(ctx.getPart(EntityModelLayers.ZOMBIE_VILLAGER)),
-                        0.5f
-                ) {
-
-                    @Override
-                    public Identifier getTexture(FarmerNpcEntity entity) {
-                        return new Identifier(
-                                "minecraft",
-                                "textures/entity/villager/villager.png"
-                        );
-                    }
-
-                    {
-                        this.addFeature(new ArmorFeatureRenderer<>(
-                                this,
-                                new BipedEntityModel<>(ctx.getPart(
-                                        EntityModelLayers.ZOMBIE_VILLAGER_INNER_ARMOR)),
-                                new BipedEntityModel<>(ctx.getPart(
-                                        EntityModelLayers.ZOMBIE_VILLAGER_OUTER_ARMOR)),
-                                ctx.getModelManager()
-                        ));
-                    }
-                }
-        );
-
-        EntityRendererRegistry.register(
-                ModEntities.LUMBERJACK_NPC,
-                ctx -> new BipedEntityRenderer<
-                        LumberjackNpcEntity,
-                        BipedEntityModel<LumberjackNpcEntity>
-                        >(
-                        ctx,
-                        new BipedEntityModel<>(ctx.getPart(EntityModelLayers.ZOMBIE_VILLAGER)),
-                        0.5f
-                ) {
-
-                    @Override
-                    public Identifier getTexture(LumberjackNpcEntity entity) {
-                        return new Identifier(
-                                "minecraft",
-                                "textures/entity/villager/villager.png"
-                        );
-                    }
-
-                    {
-                        this.addFeature(new ArmorFeatureRenderer<>(
-                                this,
-                                new BipedEntityModel<>(ctx.getPart(
-                                        EntityModelLayers.ZOMBIE_VILLAGER_INNER_ARMOR)),
-                                new BipedEntityModel<>(ctx.getPart(
-                                        EntityModelLayers.ZOMBIE_VILLAGER_OUTER_ARMOR)),
-                                ctx.getModelManager()
-                        ));
-                    }
-                }
-        );
-
-        EntityRendererRegistry.register(
-                ModEntities.MINER_NPC,
-                ctx -> new BipedEntityRenderer<
-                        MinerNpcEntity,
-                        BipedEntityModel<MinerNpcEntity>
-                        >(
-                        ctx,
-                        new BipedEntityModel<>(ctx.getPart(EntityModelLayers.ZOMBIE_VILLAGER)),
-                        0.5f
-                ) {
-
-                    @Override
-                    public Identifier getTexture(MinerNpcEntity entity) {
-                        return new Identifier(
-                                "minecraft",
-                                "textures/entity/villager/villager.png"
-                        );
-                    }
-
-                    {
-                        this.addFeature(new ArmorFeatureRenderer<>(
-                                this,
-                                new BipedEntityModel<>(ctx.getPart(
-                                        EntityModelLayers.ZOMBIE_VILLAGER_INNER_ARMOR)),
-                                new BipedEntityModel<>(ctx.getPart(
-                                        EntityModelLayers.ZOMBIE_VILLAGER_OUTER_ARMOR)),
-                                ctx.getModelManager()
-                        ));
-                    }
-                }
-        );
-        // ===== FISHERMAN NPC =====
-        EntityRendererRegistry.register(
-                ModEntities.FISHERMAN_NPC,
-                ctx -> new BipedEntityRenderer<
-                        FishermanNpcEntity,
-                        BipedEntityModel<FishermanNpcEntity>
-                        >(
-                        ctx,
-                        new BipedEntityModel<>(ctx.getPart(EntityModelLayers.ZOMBIE_VILLAGER)),
-                        0.5f
-                ) {
-                    @Override
-                    public Identifier getTexture(FishermanNpcEntity entity) {
-                        return new Identifier(
-                                "minecraft",
-                                "textures/entity/villager/villager.png"
-                        );
-                    }
-
-                    {
-                        this.addFeature(new ArmorFeatureRenderer<>(
-                                this,
-                                new BipedEntityModel<>(ctx.getPart(
-                                        EntityModelLayers.ZOMBIE_VILLAGER_INNER_ARMOR)),
-                                new BipedEntityModel<>(ctx.getPart(
-                                        EntityModelLayers.ZOMBIE_VILLAGER_OUTER_ARMOR)),
-                                ctx.getModelManager()
-                        ));
-                    }
-                }
-        );
-
-        // ===== RANCHER & COOK NPC =====
-        registerWorker(ModEntities.RANCHER_NPC);
-        registerWorker(ModEntities.COOK_NPC);
-
-//        EntityRendererRegistry.register(
-//                ModEntities.SOLDIER_NPC,
-//                ctx -> new BipedEntityRenderer<>(
-//                        ctx,
-//                        new BipedEntityModel<>(ctx.getPart(EntityModelLayers.ZOMBIE_VILLAGER)),
-//                        0.5f
-//                ) {
-//
-//                    @Override
-//                    public Identifier getTexture(SoldierNPCEntity entity) {
-//                        return new Identifier("minecraft", "textures/entity/villager/villager.png");
-////                        return new Identifier("minecraft", "textures/entity/villager/villager.png");
-//                    }
-//
-//                }
-//        );
-
+        registerNpc(ModEntities.SOLDIER_NPC, "weaponsmith");
+        registerNpc(ModEntities.FARMER_NPC, "farmer");
+        registerNpc(ModEntities.LUMBERJACK_NPC, "fletcher");
+        registerNpc(ModEntities.MINER_NPC, "toolsmith");
+        registerNpc(ModEntities.FISHERMAN_NPC, "fisherman");
+        registerNpc(ModEntities.RANCHER_NPC, "shepherd");
+        registerNpc(ModEntities.COOK_NPC, "butcher");
+        registerNpc(ModEntities.BUILDER_NPC, "mason");
     }
 
-    /** Renderer dân làng + giáp dùng chung cho các NPC kế thừa WorkerNpcEntity. */
-    private static <T extends WorkerNpcEntity> void registerWorker(EntityType<T> type) {
+    /** @param profession tên file trong textures/entity/villager/profession của vanilla. */
+    private static <T extends MobEntity> void registerNpc(EntityType<T> type, String profession) {
+        Identifier professionTexture = new Identifier("minecraft", "textures/entity/villager/profession/" + profession + ".png");
         EntityRendererRegistry.register(
                 type,
                 ctx -> new BipedEntityRenderer<T, BipedEntityModel<T>>(
@@ -208,18 +41,20 @@ public class ModEntityRenderers {
                         new BipedEntityModel<>(ctx.getPart(EntityModelLayers.ZOMBIE_VILLAGER)),
                         0.5f
                 ) {
-                    @Override
-                    public Identifier getTexture(T entity) {
-                        return new Identifier("minecraft", "textures/entity/villager/villager.png");
-                    }
-
                     {
+                        // Áo phải vẽ trước giáp để giáp nằm trên cùng
+                        this.addFeature(new NpcOverlayFeature<>(this, BIOME_TEXTURE, professionTexture));
                         this.addFeature(new ArmorFeatureRenderer<>(
                                 this,
                                 new BipedEntityModel<>(ctx.getPart(EntityModelLayers.ZOMBIE_VILLAGER_INNER_ARMOR)),
                                 new BipedEntityModel<>(ctx.getPart(EntityModelLayers.ZOMBIE_VILLAGER_OUTER_ARMOR)),
                                 ctx.getModelManager()
                         ));
+                    }
+
+                    @Override
+                    public Identifier getTexture(T entity) {
+                        return BASE_TEXTURE;
                     }
                 }
         );

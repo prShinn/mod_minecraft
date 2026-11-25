@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=east":  { "model": "datnc_mod:block/patrol_flag" },
+    "facing=south": { "model": "datnc_mod:block/patrol_flag", "y": 90 },
+    "facing=west":  { "model": "datnc_mod:block/patrol_flag", "y": 180 },
+    "facing=north": { "model": "datnc_mod:block/patrol_flag", "y": 270 }
+  }
+}

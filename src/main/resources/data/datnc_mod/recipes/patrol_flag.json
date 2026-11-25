@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "WW",
+    "WS",
+    " S"
+  ],
+  "key": {
+    "W": { "item": "minecraft:red_wool" },
+    "S": { "item": "minecraft:stick" }
+  },
+  "result": {
+    "item": "datnc_mod:patrol_flag",
+    "count": 2
+  }
+}

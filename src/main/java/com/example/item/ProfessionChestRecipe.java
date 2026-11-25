@@ -276,4 +276,33 @@ public abstract class ProfessionChestRecipe extends SpecialCraftingRecipe {
             return ModRecipes.COOK_CHEST_RECIPE;
         }
     }
+
+    /**
+     * Rương Thợ xây: Chest + Máy cắt đá (Stonecutter).
+     */
+    public static class BuilderChestRecipe extends ProfessionChestRecipe {
+        public BuilderChestRecipe(Identifier id, CraftingRecipeCategory category) {
+            super(id, category);
+        }
+
+        @Override
+        protected boolean isMatchingTool(ItemStack stack) {
+            return stack.isOf(Items.STONECUTTER);
+        }
+
+        @Override
+        protected ItemStack createOutput() {
+            return new ItemStack(ModBlocks.BUILDER_CHEST);
+        }
+
+        @Override
+        protected Ingredient getToolIngredient() {
+            return Ingredient.ofItems(Items.STONECUTTER);
+        }
+
+        @Override
+        public RecipeSerializer<?> getSerializer() {
+            return ModRecipes.BUILDER_CHEST_RECIPE;
+        }
+    }
 }

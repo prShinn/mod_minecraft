@@ -46,7 +46,7 @@ public class SoldierNPCEntity extends PathAwareEntity {
     private double damageDealtThisAttack = 0;
 
     // ===== CONSTANTS =====
-    private static final int MAX_HUNGER = 20;
+    public static final int MAX_HUNGER = 20;
     private static final int FOOD_TICK_INTERVAL = 1200; // 1p
     private static final int SHOW_NAME_DURATION = 20; // 1 giây
     private static final double VIEW_DISTANCE = 6.0;
@@ -193,6 +193,8 @@ public class SoldierNPCEntity extends PathAwareEntity {
         this.goalSelector.add(6, new ReturnToPlayerGoal(this));
 // nhin player
         this.goalSelector.add(7, new LookAtEntityGoal(this, PlayerEntity.class, 8.0F));
+        // đi tuần giữa các Cờ Tuần Tra (chỉ khi owner đặt >= 2 cờ gần đó)
+        this.goalSelector.add(7, new SoldierPatrolGoal(this));
         // đi lang thang xa
         this.goalSelector.add(8, new WanderAroundFarGoal(this, 1.0D));
         // đi xung quanh gần (phat trien sau)
@@ -217,11 +219,7 @@ public class SoldierNPCEntity extends PathAwareEntity {
     public void tick() {
         super.tick();
         if (this.getWorld() == null || this.getWorld().isClient) return;// check ở server
-        // Check player alive
-        PlayerEntity owner = getOwner();
-        if (owner != null && !owner.isAlive()) {
-            this.ownerUUID = null;
-        }
+        // Chủ đang chết: getOwner() trả null (không đi theo xác) nhưng GIỮ ownerUUID để hồi sinh vẫn là chủ
 
         double currentMaxHealth = combat.getCurrentMaxHealth();
         if (this.getAttributeInstance(EntityAttributes.GENERIC_MAX_HEALTH).getBaseValue()
@@ -361,7 +359,7 @@ public class SoldierNPCEntity extends PathAwareEntity {
         int maxHp = Math.round(this.getMaxHealth());
         int foodCount = getTotalFoodCount();
         MutableText name = Text.literal(getNameNpc()).formatted(Formatting.WHITE)
-                .append(Text.literal(" [Lv." + combat.getLevel() + "] ").formatted(Formatting.AQUA))
+                .append(Text.literal(" [Cấp " + combat.getLevel() + "] ").formatted(Formatting.AQUA))
                 .append(Text.literal(" [" + hp + "/" + maxHp + "] ").formatted(Formatting.GREEN))
                 .append(Text.literal("🍖[" + hunger + "/" + MAX_HUNGER + "] x" + foodCount).formatted(Formatting.GOLD));
 
@@ -379,6 +377,26 @@ public class SoldierNPCEntity extends PathAwareEntity {
             }
         }
         return total;
+    }
+
+    // ===== DEATH =====
+    @Override
+    public void onDeath(DamageSource damageSource) {
+        if (!this.getWorld().isClient) {
+            // Rơi 100% trang bị + túi đồ ăn rồi xoá khỏi NPC, để vanilla không rơi thêm lần nữa (tránh nhân đồ)
+            for (EquipmentSlot slot : EquipmentSlot.values()) {
+                ItemStack stack = this.getEquippedStack(slot);
+                if (!stack.isEmpty()) {
+                    this.dropStack(stack.copy());
+                    this.equipStack(slot, ItemStack.EMPTY);
+                }
+            }
+            for (int i = 0; i < foodInventory.size(); i++) {
+                ItemStack stack = foodInventory.removeStack(i);
+                if (!stack.isEmpty()) this.dropStack(stack);
+            }
+        }
+        super.onDeath(damageSource);
     }
 
     // ===== INTERACTION =====
@@ -400,6 +418,9 @@ public class SoldierNPCEntity extends PathAwareEntity {
                 }
                 return ActionResult.CONSUME;
             }
+        }
+        if (ownerUUID != null && !ownerUUID.equals(player.getUuid())) {
+            return super.interactMob(player, hand); // người lạ không được thay/lột trang bị
         }
         ActionResult handleItems = tryHandleItems(player, held);
         if (handleItems != null) return handleItems;
@@ -509,7 +530,8 @@ public class SoldierNPCEntity extends PathAwareEntity {
         return false; // full
     }
 
-    private boolean isWeapon(ItemStack stack) {
+    /** Vũ khí Binh lính dùng được (kiếm, rìu, cung, nỏ) — dùng chung cho GUI trang bị. */
+    public static boolean isWeapon(ItemStack stack) {
         if (stack.isEmpty()) return false;
         return stack.getItem() instanceof SwordItem
                 || stack.getItem() instanceof AxeItem
@@ -784,7 +806,17 @@ public class SoldierNPCEntity extends PathAwareEntity {
         if (ownerUUID == null) return null;
         if (this.getWorld().isClient) return null;
 
-        return ((ServerWorld) this.getWorld()).getEntity(ownerUUID) instanceof PlayerEntity player ? player : null;
+        return ((ServerWorld) this.getWorld()).getEntity(ownerUUID) instanceof PlayerEntity player
+                && player.isAlive() ? player : null;
+    }
+
+    @Nullable
+    public UUID getOwnerUuid() {
+        return ownerUUID;
+    }
+
+    public int getHunger() {
+        return hunger;
     }
 
     public UUID getFollowPlayerUUID() {

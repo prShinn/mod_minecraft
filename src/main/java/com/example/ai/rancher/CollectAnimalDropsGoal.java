@@ -33,6 +33,8 @@ public class CollectAnimalDropsGoal extends Goal {
 
     public static boolean isAnimalProduct(ItemStack stack) {
         return stack.isOf(Items.EGG) || stack.isOf(Items.FEATHER) || stack.isOf(Items.LEATHER)
+                || stack.isOf(Items.BEEF) || stack.isOf(Items.PORKCHOP)
+                || stack.isOf(Items.MUTTON) || stack.isOf(Items.CHICKEN)
                 || stack.isIn(ItemTags.WOOL);
     }
 

@@ -13,6 +13,20 @@ public class GlobalReservationSystem {
         return BY_WORLD.computeIfAbsent(world, ignored -> new GlobalReservationSystem());
     }
 
+    /** Đặt chỗ tự hết hạn sau 30 giây (NPC chết/kẹt không giữ chỗ mãi). */
+    static final long RESERVATION_TIMEOUT_MS = 30_000;
+
+    /** Đồng hồ (ms) — tách ra để test được việc hết hạn mà không phải chờ thật. */
+    private final java.util.function.LongSupplier clock;
+
+    GlobalReservationSystem() {
+        this(System::currentTimeMillis);
+    }
+
+    GlobalReservationSystem(java.util.function.LongSupplier clock) {
+        this.clock = clock;
+    }
+
     // ========== RESERVATION STORAGE ==========
     private final Map<String, ReservationEntry> reservations = new ConcurrentHashMap<>();
     private final Map<UUID, Set<String>> npcReservations = new ConcurrentHashMap<>();
@@ -23,15 +37,15 @@ public class GlobalReservationSystem {
         final BlockPos pos;
         final ReservationType type;
 
-        ReservationEntry(UUID npcId, BlockPos pos, ReservationType type) {
+        ReservationEntry(UUID npcId, BlockPos pos, ReservationType type, long timestamp) {
             this.npcId = npcId;
             this.pos = pos;
             this.type = type;
-            this.timestamp = System.currentTimeMillis();
+            this.timestamp = timestamp;
         }
 
-        boolean isExpired() {
-            return System.currentTimeMillis() - timestamp > 30000; // 30 seconds timeout
+        boolean isExpired(long now) {
+            return now - timestamp > RESERVATION_TIMEOUT_MS;
         }
     }
 
@@ -56,7 +70,7 @@ public class GlobalReservationSystem {
         }
 
         // Reserve it
-        reservations.put(key, new ReservationEntry(npcId, pos, ReservationType.valueOf(type)));
+        reservations.put(key, new ReservationEntry(npcId, pos, ReservationType.valueOf(type), clock.getAsLong()));
         npcReservations.computeIfAbsent(npcId, k -> new HashSet<>()).add(key);
         return true;
     }
@@ -130,7 +144,7 @@ public class GlobalReservationSystem {
     public synchronized boolean isReservedByOthers(BlockPos pos, UUID npcId, String type) {
         String key = createKey(pos, type);
         ReservationEntry existing = reservations.get(key);
-        return existing != null && !existing.isExpired() && !existing.npcId.equals(npcId);
+        return existing != null && !existing.isExpired(clock.getAsLong()) && !existing.npcId.equals(npcId);
     }
 
     /**
@@ -149,10 +163,11 @@ public class GlobalReservationSystem {
     }
 
     private void cleanupExpired() {
+        long now = clock.getAsLong();
         Iterator<Map.Entry<String, ReservationEntry>> it = reservations.entrySet().iterator();
         while (it.hasNext()) {
             Map.Entry<String, ReservationEntry> entry = it.next();
-            if (entry.getValue().isExpired()) {
+            if (entry.getValue().isExpired(now)) {
                 String key = entry.getKey();
                 UUID npcId = entry.getValue().npcId;
 

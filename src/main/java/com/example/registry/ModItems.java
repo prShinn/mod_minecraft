@@ -20,6 +20,7 @@ public class ModItems {
     public static Item FISHERMAN_TOKEN;
     public static Item RANCHER_TOKEN;
     public static Item COOK_TOKEN;
+    public static Item BUILDER_TOKEN;
 
     public static void register() {
         SOLDIER_TOKEN = Registry.register(Registries.ITEM,
@@ -52,5 +53,9 @@ public class ModItems {
         COOK_TOKEN = Registry.register(Registries.ITEM,
                 new Identifier(ExampleMod.MODID, "cook_token"),
                 new WorkerTokenItem(new Item.Settings().maxCount(1), () -> ModEntities.COOK_NPC));
+
+        BUILDER_TOKEN = Registry.register(Registries.ITEM,
+                new Identifier(ExampleMod.MODID, "builder_token"),
+                new WorkerTokenItem(new Item.Settings().maxCount(1), () -> ModEntities.BUILDER_NPC));
     }
 }

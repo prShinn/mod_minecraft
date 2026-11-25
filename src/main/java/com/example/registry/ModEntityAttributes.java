@@ -34,5 +34,6 @@ public class ModEntityAttributes {
         );
         FabricDefaultAttributeRegistry.register(ModEntities.RANCHER_NPC, WorkerNpcEntity.createWorkerAttributes());
         FabricDefaultAttributeRegistry.register(ModEntities.COOK_NPC, WorkerNpcEntity.createWorkerAttributes());
+        FabricDefaultAttributeRegistry.register(ModEntities.BUILDER_NPC, WorkerNpcEntity.createWorkerAttributes());
     }
 }

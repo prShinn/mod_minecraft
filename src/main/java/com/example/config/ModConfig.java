@@ -29,7 +29,7 @@ public final class ModConfig {
     /** Bán kính (block) quanh rương mà Thợ chăn nuôi làm việc. */
     public int rancherWorkRadius = 12;
     /** Số con tối đa mỗi loài trong vùng; đạt ngưỡng thì ngừng cho sinh sản. */
-    public int rancherMaxAnimalsPerType = 16;
+    public int rancherMaxAnimalsPerType = 8;
 
     /** Bán kính (block) Đầu bếp tìm rương nguyên liệu và rương thức ăn. */
     public int cookWorkRadius = 16;
@@ -39,6 +39,11 @@ public final class ModConfig {
     public int cookItemsPerFuel = 8;
     /** Số lượng tối thiểu để lại trong rương nghề khác khi Đầu bếp lấy nguyên liệu. */
     public int cookLeaveInSupplierChest = 8;
+
+    /** Bán kính (block) quanh Rương Thợ xây mà Thợ xây tìm công trình (bản vẽ) để xây. */
+    public int builderWorkRadius = 40;
+    /** Số tick giữa hai block Thợ xây đặt (20 tick = 1 giây). */
+    public int builderPlaceIntervalTicks = 6;
 
     public static ModConfig get() {
         return instance;
@@ -72,5 +77,8 @@ public final class ModConfig {
         cookTicksPerItem = Math.max(5, Math.min(1200, cookTicksPerItem));
         cookItemsPerFuel = Math.max(1, Math.min(64, cookItemsPerFuel));
         cookLeaveInSupplierChest = Math.max(0, Math.min(64, cookLeaveInSupplierChest));
+        // Tối đa 40: WorkerNpcEntity quên rương khi NPC cách rương > 3 × 16 = 48 block
+        builderWorkRadius = Math.max(8, Math.min(40, builderWorkRadius));
+        builderPlaceIntervalTicks = Math.max(1, Math.min(100, builderPlaceIntervalTicks));
     }
 }
