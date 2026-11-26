@@ -31,6 +31,7 @@ public class ModPackets {
         registerMoveMode();
         registerOpenSoldierGui();
         com.example.village.VillageOverview.registerServer();
+        com.example.block.QuarryNetworking.registerServer();
     }
 
     private static void registerOpenSoldierGui() {

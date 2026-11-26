@@ -1,14 +1,11 @@
 package com.example.entity;
 
-import com.example.ai.miner.DepositOreToChestGoal;
-import com.example.ai.miner.MineOreVeinGoal;
-import com.example.ai.miner.MinerMemory;
-import com.example.ai.miner.MinerWanderGoal;
+import com.example.ai.miner.MineQuarryGoal;
+import com.example.ai.worker.DepositCargoGoal;
 import com.example.block.MinerChestBlockEntity;
 import com.example.block.ProfessionChestBlockEntity;
 import com.example.entity.base.NpcSleepingComponent;
 import com.example.entity.base.WorkerNpcEntity;
-import com.example.registry.ModBlocks;
 import com.example.registry.ModItems;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.damage.DamageSource;
@@ -20,23 +17,13 @@ import net.minecraft.nbt.NbtCompound;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-
-/** Thợ mỏ: đào block Mỏ Quặng quanh Rương Thợ mỏ, nộp khoáng sản về rương. */
+/**
+ * Thợ mỏ: đứng cạnh Rương Thợ mỏ, đào từ xa mọi block trong vùng đào cấu hình trên rương
+ * (Shift + chuột phải tay không vào rương), đồ đào được cho thẳng vào rương. Hết block thì đứng chờ việc.
+ */
 public class MinerNpcEntity extends WorkerNpcEntity {
 
     public static final int FIND_CHEST_DISTANCE = 24;
-    public static final int FIND_ORE_DISTANCE = 16;
-    private static final int ORE_SEARCH_COOLDOWN = 60; // 3 giây giữa các lần scan
-
-    public final MinerMemory memory = new MinerMemory();
-    private final Map<BlockPos, Long> unreachableOres = new HashMap<>();
-    private final Random random = new Random();
-    private int oreSearchCooldown;
 
     public MinerNpcEntity(EntityType<? extends PathAwareEntity> entityType, World world) {
         super(entityType, world, 9);
@@ -52,9 +39,14 @@ public class MinerNpcEntity extends WorkerNpcEntity {
 
     @Override
     protected void addWorkGoals() {
-        this.goalSelector.add(5, new DepositOreToChestGoal(this));
-        this.goalSelector.add(6, new MineOreVeinGoal(this));
-        this.goalSelector.add(9, new MinerWanderGoal(this));
+        // Túi đồ cũ (bản đào Mỏ Quặng) còn khoáng sản → cất nốt vào rương
+        this.goalSelector.add(5, new DepositCargoGoal(this));
+        this.goalSelector.add(6, new MineQuarryGoal(this));
+    }
+
+    @Override
+    protected boolean usesAutoDeposit() {
+        return true;
     }
 
     @Override
@@ -93,17 +85,6 @@ public class MinerNpcEntity extends WorkerNpcEntity {
     }
 
     @Override
-    public void tick() {
-        super.tick();
-        if (getWorld().isClient) return;
-        if (!sleeping.isSleeping()) {
-            if (getNavigation().isIdle()) memory.tickIdle();
-            else memory.resetIdle();
-        }
-        if (oreSearchCooldown > 0) oreSearchCooldown--;
-    }
-
-    @Override
     public boolean damage(DamageSource source, float amount) {
         if (sleeping.isSleeping()) sleeping.wakeUp(this);
         return super.damage(source, amount);
@@ -123,70 +104,5 @@ public class MinerNpcEntity extends WorkerNpcEntity {
                 && getWorld().getRegistryKey().getValue().toString().equals(nbt.getString("MinerChestDimension"))) {
             restoreChestPos(BlockPos.fromLong(nbt.getLong("MinerChestPos")));
         }
-        // Thợ mỏ chỉ đi nộp khi có đồ không phải thức ăn
-        boolean hasOre = false;
-        for (int slot = 0; slot < cargo.size(); slot++) {
-            ItemStack stack = cargo.getStack(slot);
-            if (!stack.isEmpty() && !stack.isFood()) {
-                hasOre = true;
-                break;
-            }
-        }
-        setNeedsToDeposit(hasOre);
-    }
-
-    // ===== Quặng =====
-
-    public void onOreDepleted(BlockPos ore) {
-        oreSearchCooldown = 0;
-        unreachableOres.remove(ore);
-    }
-
-    public boolean hasEmptyOreSlot() {
-        return !isInventoryFull();
-    }
-
-    public void skipUnreachableOre(BlockPos ore) {
-        unreachableOres.put(ore.toImmutable(), getWorld().getTime() + 200);
-        oreSearchCooldown = 0;
-    }
-
-    /**
-     * Tìm ngẫu nhiên một block Mỏ Quặng trong bán kính FIND_ORE_DISTANCE quanh rương.
-     * Có cooldown 3 giây; chỉ quét Y từ -4 đến +8 vì Mỏ Quặng là block bề mặt.
-     */
-    public BlockPos findRandomOreVein() {
-        if (oreSearchCooldown > 0) return null;
-        World world = getWorld();
-        BlockPos center = findWorkChest();
-        if (center == null) return null;
-
-        List<BlockPos> candidates = new ArrayList<>();
-        long now = world.getTime();
-        unreachableOres.values().removeIf(until -> until <= now);
-        boolean hasBlockedOre = false;
-        int radius = FIND_ORE_DISTANCE;
-        for (int dx = -radius; dx <= radius; dx++) {
-            for (int dy = -4; dy <= 8; dy++) {
-                for (int dz = -radius; dz <= radius; dz++) {
-                    BlockPos pos = center.add(dx, dy, dz);
-                    if (!world.isChunkLoaded(pos)) continue;
-                    if (world.getBlockState(pos).getBlock() != ModBlocks.ORE_VEIN) continue;
-                    if (unreachableOres.containsKey(pos)) {
-                        hasBlockedOre = true;
-                        continue;
-                    }
-                    candidates.add(pos.toImmutable());
-                }
-            }
-        }
-
-        oreSearchCooldown = ORE_SEARCH_COOLDOWN;
-        if (candidates.isEmpty()) {
-            display.report(this, hasBlockedOre ? "Đang chờ thử lại đường tới mỏ" : "Chưa tìm thấy mỏ quặng");
-            return null;
-        }
-        display.clearReport();
-        return candidates.get(random.nextInt(candidates.size()));
     }
 }

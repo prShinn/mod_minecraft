@@ -47,7 +47,6 @@ public class ExampleMod implements ModInitializer {
 
 		// 7. Thêm block vào Creative Tab (BUILDING_BLOCKS)
 		ItemGroupEvents.modifyEntriesEvent(ItemGroups.BUILDING_BLOCKS).register(entries -> {
-			entries.add(ModBlocks.ORE_VEIN.asItem());
 			entries.add(ModBlocks.FOOD_CHEST.asItem());
 			entries.add(ModBlocks.SOLDIER_CHEST.asItem());
 			entries.add(ModBlocks.FARMER_CHEST.asItem());

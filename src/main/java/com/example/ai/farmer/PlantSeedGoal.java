@@ -21,7 +21,7 @@ public class PlantSeedGoal extends Goal {
     /** Tầm gieo hạt / tầm với rương (bình phương), khớp điều kiện trong tick(). */
     private static final double PLANT_REACH_SQ = 4.0;
     private static final double CHEST_REACH_SQ = 6.25;
-    private static final int MAX_PATH_CHECKS = 6;
+    private static final int MAX_PATH_CHECKS = 3; // tầm 64 → mỗi lần tính đường tới 1024 nút
     private long retryAt;
     private boolean finished;
 
@@ -95,8 +95,9 @@ public class PlantSeedGoal extends Goal {
 
     private void beginPlanting() {
         plots.clear();
-        for (BlockPos pos : BlockPos.iterate(chest.add(-12, -2, -12), chest.add(12, 2, 12))) {
-            if (isPlantable(pos)) plots.add(pos.toImmutable());
+        // Cả mảnh ruộng liền quanh rương neo (ruộng rộng, bậc thang), không chỉ ô 25×25 sát rương
+        for (BlockPos pos : npc.farmPlots()) {
+            if (isEmptyFarmland(pos)) plots.add(pos);
         }
         nextPlot();
     }
@@ -110,11 +111,15 @@ public class PlantSeedGoal extends Goal {
             finished = true;
             return;
         }
-        plots.removeIf(plot -> !isPlantable(plot) || npc.isPlotSkipped(plot));
+        plots.removeIf(plot -> !isEmptyFarmland(plot) || npc.isPlotSkipped(plot));
         plots.sort(Comparator.comparingDouble(npc.getBlockPos()::getSquaredDistance));
         // Ưu tiên ô có đường đi thật (vòng qua cửa rào); giới hạn số lần tính đường mỗi lượt để không lag
         for (int checks = 0; checks < MAX_PATH_CHECKS && !plots.isEmpty(); checks++) {
             BlockPos candidate = plots.remove(0);
+            if (npc.isWorkedByAnother(candidate)) { // chỉ hỏi entity cho ô sắp chọn (cả nghìn ô thì quá đắt)
+                checks--;
+                continue;
+            }
             if (moveTo(candidate.up(), PLANT_REACH_SQ)) {
                 farmland = candidate;
                 return;
@@ -149,10 +154,14 @@ public class PlantSeedGoal extends Goal {
     }
 
     private boolean isPlantable(BlockPos plot) {
+        return isEmptyFarmland(plot) && !npc.isWorkedByAnother(plot);
+    }
+
+    /** Đất cày trống (không hỏi entity — rẻ, dùng để lọc cả mảnh ruộng). */
+    private boolean isEmptyFarmland(BlockPos plot) {
         return npc.getWorld().isChunkLoaded(plot)
                 && npc.getWorld().getBlockState(plot).isOf(Blocks.FARMLAND)
-                && npc.getWorld().getBlockState(plot.up()).isAir()
-                && !npc.isWorkedByAnother(plot);
+                && npc.getWorld().getBlockState(plot.up()).isAir();
     }
 
     private boolean travelFailed() {

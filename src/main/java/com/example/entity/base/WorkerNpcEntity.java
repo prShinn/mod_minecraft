@@ -76,6 +76,10 @@ public abstract class WorkerNpcEntity extends PathAwareEntity {
     private static final double IDLE_HOME_RADIUS = 20.0;
     private static final double IDLE_HOME_ARRIVE = 6.0;
     private int chestSearchCooldown;
+    /** Đang dùng chung rương neo của NPC khác (không lưu NBT, tính lại khi kiểm tra rương). */
+    private boolean sharedChest;
+    private long sharedRecheckAt;
+    private static final int SHARED_RECHECK_TICKS = 200; // đang dùng chung: 10 giây tìm rương trống một lần
 
     protected WorkerNpcEntity(EntityType<? extends PathAwareEntity> type, World world) {
         this(type, world, DEFAULT_CARGO_SIZE);
@@ -175,7 +179,7 @@ public abstract class WorkerNpcEntity extends PathAwareEntity {
         addWorkGoals();
         // Rảnh (không goal việc nào chạy ≥ 5s) mà ở xa rương nghề quá 20 block → về rương; đang làm thì không ép
         this.goalSelector.add(8, new com.example.ai.ReturnToAnchorGoal(this, this::getChestPos,
-                () -> !sleeping.isSleeping() && workIdleTicks >= IDLE_BEFORE_HOME_TICKS,
+                () -> !sleeping.isSleeping() && workIdleTicks >= IDLE_BEFORE_HOME_TICKS && !isInWorkArea(),
                 IDLE_HOME_RADIUS, IDLE_HOME_ARRIVE, 1.0));
         this.goalSelector.add(10, new LookAtEntityGoal(this, PlayerEntity.class, 8.0F) {
             @Override
@@ -192,6 +196,7 @@ public abstract class WorkerNpcEntity extends PathAwareEntity {
         if (getWorld().isClient) return;
 
         display.tick(this, supplies, goalSelector);
+        if (age % 2 == 0 && !sleeping.isSleeping()) doorOpener.tick(this, canOpenFenceGates());
         if (age % 10 == 0) {
             workIdleTicks = NpcDisplayComponent.hasWorkGoal(goalSelector) ? 0 : Math.min(workIdleTicks + 10, 20 * 60);
         }
@@ -243,42 +248,155 @@ public abstract class WorkerNpcEntity extends PathAwareEntity {
 
     // ===== Rương nghề =====
 
-    /** Trả về vị trí rương nghề gần nhất (có cache), null nếu không có. */
+    /**
+     * Rương neo của NPC (1 NPC ↔ 1 rương, ghi cả trong rương lẫn NPC).
+     * - Rương neo còn → dùng; nếu đang phải dùng chung thì định kỳ tìm rương trống để chuyển sang.
+     * - Rương bị phá / mất → tìm rương đúng nghề của chủ mà chưa NPC nào neo (gần nhất) và neo vào.
+     * - Không còn rương trống → tạm dùng chung rương đúng nghề gần nhất cho tới khi có rương mới.
+     */
     @Nullable
     public BlockPos findWorkChest() {
         World world = getWorld();
         if (chestPos != null) {
             // NPC bị đưa đi quá xa (dắt dây, đẩy...) → quên rương cũ, tìm rương mới quanh chỗ đang đứng
-            double far = 3.0 * chestSearchRadius();
+            double far = chestForgetDistance();
             if (getBlockPos().getSquaredDistance(chestPos) > far * far) {
-                chestPos = null;
+                unbindChest();
                 chestSearchCooldown = 0;
             }
         }
         if (chestPos != null) {
             // Chunk của rương chưa nạp: giữ nguyên vị trí, chờ nạp lại (giống Thợ mỏ cũ)
             if (!world.isChunkLoaded(chestPos)) return null;
-            if (isOwnChest(world.getBlockEntity(chestPos))) return chestPos;
-            chestPos = null;
+            BlockEntity be = world.getBlockEntity(chestPos);
+            if (isOwnChest(be)) {
+                ProfessionChestBlockEntity chest = (ProfessionChestBlockEntity) be;
+                if (chest.isFreeFor(getUuid())) {
+                    chest.bind(getUuid());
+                    sharedChest = false;
+                } else {
+                    sharedChest = true;
+                    if (world.getTime() >= sharedRecheckAt) {
+                        sharedRecheckAt = world.getTime() + SHARED_RECHECK_TICKS;
+                        BlockPos free = searchChest(true);
+                        if (free != null) bindChest(free);
+                    }
+                }
+                return chestPos;
+            }
+            chestPos = null; // rương bị phá hoặc đổi chỗ
+            sharedChest = false;
             chestSearchCooldown = 0;
         }
         if (chestSearchCooldown > 0) return null;
         chestSearchCooldown = CHEST_SEARCH_COOLDOWN;
 
+        BlockPos free = searchChest(true);
+        if (free != null) {
+            bindChest(free);
+            return chestPos;
+        }
+        BlockPos shared = searchChest(false);
+        if (shared != null) {
+            chestPos = shared; // dùng chung, KHÔNG neo; vẫn tìm rương trống định kỳ
+            sharedChest = true;
+            sharedRecheckAt = world.getTime() + SHARED_RECHECK_TICKS;
+            return chestPos;
+        }
+        display.report(this, "Không tìm thấy rương " + professionName().toLowerCase());
+        return null;
+    }
+
+    /** Rương đúng nghề của chủ gần nhất quanh NPC; freeOnly = chỉ rương chưa NPC khác neo. */
+    @Nullable
+    private BlockPos searchChest(boolean freeOnly) {
+        World world = getWorld();
         int r = chestSearchRadius();
         int h = chestSearchHeight();
         BlockPos center = getBlockPos();
-        double best = Double.MAX_VALUE;
-        for (BlockPos pos : BlockPos.iterate(center.add(-r, -h, -r), center.add(r, h, r))) {
-            if (!world.isChunkLoaded(pos) || !isOwnChest(world.getBlockEntity(pos))) continue;
-            double distance = center.getSquaredDistance(pos);
-            if (distance < best) {
-                best = distance;
-                chestPos = pos.toImmutable();
+        BlockPos best = null;
+        double bestDist = Double.MAX_VALUE;
+        // Duyệt block entity theo chunk thay vì từng block
+        for (int cx = (center.getX() - r) >> 4; cx <= (center.getX() + r) >> 4; cx++) {
+            for (int cz = (center.getZ() - r) >> 4; cz <= (center.getZ() + r) >> 4; cz++) {
+                if (!world.isChunkLoaded(cx, cz)) continue;
+                for (BlockEntity be : world.getChunk(cx, cz).getBlockEntities().values()) {
+                    BlockPos pos = be.getPos();
+                    if (Math.abs(pos.getX() - center.getX()) > r || Math.abs(pos.getZ() - center.getZ()) > r
+                            || Math.abs(pos.getY() - center.getY()) > h || !isOwnChest(be)) continue;
+                    if (freeOnly && !((ProfessionChestBlockEntity) be).isFreeFor(getUuid())) continue;
+                    double distance = center.getSquaredDistance(pos);
+                    if (distance < bestDist) {
+                        bestDist = distance;
+                        best = pos.toImmutable();
+                    }
+                }
             }
         }
-        if (chestPos == null) display.report(this, "Không tìm thấy rương " + professionName().toLowerCase());
-        return chestPos;
+        return best;
+    }
+
+    private void bindChest(BlockPos pos) {
+        if (!pos.equals(chestPos)) unbindChest();
+        chestPos = pos.toImmutable();
+        sharedChest = false;
+        if (getWorld().getBlockEntity(pos) instanceof ProfessionChestBlockEntity chest) chest.bind(getUuid());
+        display.clearReport();
+    }
+
+    /** Gỡ neo khỏi rương hiện tại (nếu rương còn và đúng là NPC này neo) rồi quên rương. */
+    private void unbindChest() {
+        if (chestPos != null && getWorld().isChunkLoaded(chestPos)
+                && getWorld().getBlockEntity(chestPos) instanceof ProfessionChestBlockEntity chest) {
+            chest.unbind(getUuid());
+        }
+        chestPos = null;
+        sharedChest = false;
+    }
+
+    /** Đang tạm dùng chung rương với NPC khác (chưa có rương riêng). */
+    public boolean isSharingChest() {
+        return sharedChest;
+    }
+
+    // ===== Cửa gỗ / cổng rào =====
+    private final com.example.ai.pathing.DoorGateOpener doorOpener = new com.example.ai.pathing.DoorGateOpener();
+
+    /** Được mở cổng rào gỗ (mặc định có). Thợ chăn nuôi làm việc qua hàng rào nên không mở để vật nuôi không xổng. */
+    protected boolean canOpenFenceGates() {
+        return true;
+    }
+
+    @Override
+    protected net.minecraft.entity.ai.pathing.EntityNavigation createNavigation(World world) {
+        // Gọi trong constructor (trước khi field lớp con khởi tạo): canOpenFenceGates() chỉ được trả hằng số
+        boolean gates = canOpenFenceGates();
+        net.minecraft.entity.ai.pathing.MobNavigation navigation = new net.minecraft.entity.ai.pathing.MobNavigation(this, world) {
+            @Override
+            protected net.minecraft.entity.ai.pathing.PathNodeNavigator createPathNodeNavigator(int range) {
+                this.nodeMaker = new com.example.ai.pathing.GateAwareNodeMaker(gates);
+                this.nodeMaker.setCanEnterOpenDoors(true);
+                return new net.minecraft.entity.ai.pathing.PathNodeNavigator(this.nodeMaker, range);
+            }
+        };
+        navigation.setCanPathThroughDoors(true); // tính đường xuyên cửa gỗ (và cổng rào) đang đóng
+        return navigation;
+    }
+
+    /** Đang đứng trong khu làm việc riêng của nghề (vd. mảnh ruộng) → rảnh cũng không bị kéo về rương. */
+    protected boolean isInWorkArea() {
+        return false;
+    }
+
+    /** Đi xa rương neo hơn khoảng này thì quên rương (bị dắt/đẩy đi nơi khác). */
+    protected double chestForgetDistance() {
+        return 3.0 * chestSearchRadius();
+    }
+
+    /** Có được dùng rương này không (nộp hàng dự phòng): đúng nghề, của chủ, không phải rương NPC khác đã neo. */
+    public boolean canUseChest(BlockEntity be) {
+        return isOwnChest(be) && (be.getPos().equals(chestPos)
+                || ((ProfessionChestBlockEntity) be).isFreeFor(getUuid()));
     }
 
     /** Như findWorkChest nhưng trả về inventory của rương (API cũ của các goal). */
@@ -290,7 +408,7 @@ public abstract class WorkerNpcEntity extends PathAwareEntity {
 
     /** Quên rương cũ và tìm lại ngay (dùng khi triệu hồi từ token ở chỗ mới). */
     public void relocateWorkChest() {
-        chestPos = null;
+        unbindChest();
         chestSearchCooldown = 0;
         findWorkChest();
     }
@@ -391,6 +509,9 @@ public abstract class WorkerNpcEntity extends PathAwareEntity {
             sleeping.wakeUp(this);
         }
         reservationSystem.releaseAll(getUuid());
+        // Chết / thu hồi bằng token → trả rương cho NPC khác; dỡ chunk thì giữ neo
+        if (!getWorld().isClient && reason.shouldDestroy()) unbindChest();
+        if (!getWorld().isClient) doorOpener.closeAll(this);
         super.remove(reason);
     }
 

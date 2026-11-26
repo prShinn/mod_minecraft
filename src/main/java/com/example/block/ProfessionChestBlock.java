@@ -52,6 +52,12 @@ public abstract class ProfessionChestBlock extends BlockWithEntity {
                         : "Đã tắt vùng chặt."), true);
                 return ActionResult.CONSUME;
             }
+            if (chest instanceof MinerChestBlockEntity minerChest && player.isSneaking() && held.isEmpty()
+                    && player instanceof net.minecraft.server.network.ServerPlayerEntity serverPlayer) {
+                chest.setOwner(player);
+                QuarryNetworking.sendOpen(serverPlayer, minerChest); // Shift + chuột phải tay không: cấu hình vùng đào
+                return ActionResult.CONSUME;
+            }
             if (!foodChest && held.getItem() instanceof com.example.item.WorkChestToken token) {
                 if (!matchesToken(state, held)) {
                     player.sendMessage(net.minecraft.text.Text.translatable("message.datnc_mod.chest_unavailable"), true);
@@ -92,6 +98,8 @@ public abstract class ProfessionChestBlock extends BlockWithEntity {
                 && placer instanceof PlayerEntity player
                 && world.getBlockEntity(pos) instanceof ProfessionChestBlockEntity chest) {
             chest.setOwner(player);
+            // Vùng đào nằm phía trước rương theo hướng người chơi nhìn lúc đặt
+            if (chest instanceof MinerChestBlockEntity minerChest) minerChest.ensureDirection(player.getHorizontalFacing());
         }
     }
 

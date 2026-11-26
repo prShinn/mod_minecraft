@@ -45,6 +45,8 @@ public final class DeliveryTarget {
             if (pos.equals(preferred) || !world.isChunkLoaded(pos)) continue;
             var be = world.getBlockEntity(pos);
             if (!type.isInstance(be)) continue;
+            // 1 NPC 1 rương: không nộp sang rương người khác hay rương NPC khác đã neo
+            if (npc instanceof com.example.entity.base.WorkerNpcEntity worker && !worker.canUseChest(be)) continue;
             foundChest = true;
             if (hasSpace(type.cast(be), cargo, accepts)) {
                 foundSpace = true;

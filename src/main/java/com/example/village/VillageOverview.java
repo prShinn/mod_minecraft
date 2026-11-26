@@ -136,8 +136,19 @@ public final class VillageOverview {
                 detail = "Sắp đói và hết đồ ăn — cho NPC ăn hoặc bổ sung rương thức ăn";
             }
         }
+        if (npc instanceof WorkerNpcEntity worker && status != VillageNpcStatus.MISSING) {
+            detail = detail + " · " + chestLabel(worker);
+        }
         return new VillageNpcInfo(npc.getUuid(), name, status, detail,
                 npc.getHealth(), npc.getMaxHealth(), hunger, food, npc.getBlockPos());
+    }
+
+    /** Rương neo của NPC nghề: tọa độ, hoặc báo đang dùng chung / chưa có. */
+    private static String chestLabel(WorkerNpcEntity worker) {
+        BlockPos chest = worker.getChestPos();
+        if (chest == null) return "Chưa có rương";
+        String pos = chest.getX() + " " + chest.getY() + " " + chest.getZ();
+        return worker.isSharingChest() ? "Dùng chung rương " + pos + " (đặt thêm rương)" : "Rương " + pos;
     }
 
     /** Phân loại theo cùng quy tắc với nhãn trên đầu NPC: sự cố chỉ tính khi không có việc nào đang chạy. */
@@ -170,7 +181,8 @@ public final class VillageOverview {
         BlockPos p = npc.getBlockPos();
         int dist = (int) Math.round(Math.sqrt(npc.squaredDistanceTo(player)));
         String name = npc instanceof WorkerNpcEntity w ? w.professionName() : "Binh lính";
+        String chest = npc instanceof WorkerNpcEntity w ? " · " + chestLabel(w) : "";
         player.sendMessage(Text.literal("Đã đánh dấu " + name + " tại " + p.getX() + " " + p.getY() + " " + p.getZ()
-                + " (cách " + dist + " block)").formatted(Formatting.GOLD), true);
+                + " (cách " + dist + " block)" + chest).formatted(Formatting.GOLD), true);
     }
 }

@@ -10,7 +10,6 @@ import net.minecraft.util.Identifier;
 
 public class ModBlockEntities {
 
-    public static BlockEntityType<OreVeinBlockEntity> ORE_VEIN_BLOCK_ENTITY;
 
     // ===== PROFESSION CHEST BLOCK ENTITIES =====
     public static BlockEntityType<FarmerChestBlockEntity> FARMER_CHEST_BE;
@@ -30,12 +29,6 @@ public class ModBlockEntities {
                 new Identifier(ExampleMod.MODID, "utility_chest"),
                 FabricBlockEntityTypeBuilder.create((pos, state) -> new ProfessionChestBlockEntity(UTILITY_CHEST, pos, state),
                         ModBlocks.FOOD_CHEST, ModBlocks.SOLDIER_CHEST).build());
-        ORE_VEIN_BLOCK_ENTITY = Registry.register(
-                Registries.BLOCK_ENTITY_TYPE,
-                new Identifier(ExampleMod.MODID, "ore_vein_block_entity"),
-                FabricBlockEntityTypeBuilder.create(OreVeinBlockEntity::new, ModBlocks.ORE_VEIN).build()
-        );
-
         FARMER_CHEST_BE = Registry.register(
                 Registries.BLOCK_ENTITY_TYPE,
                 new Identifier(ExampleMod.MODID, "farmer_chest_be"),

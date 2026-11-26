@@ -1,6 +1,7 @@
 package com.example.entity;
 
 import com.example.ai.farmer.DepositToChestGoal;
+import com.example.ai.farmer.FarmField;
 import com.example.ai.farmer.FarmerMemory;
 import com.example.ai.farmer.HarvestCropGoal;
 import com.example.ai.farmer.PlantSeedGoal;
@@ -29,7 +30,10 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /** Nông dân: thu hoạch và gieo lại ruộng quanh Rương Nông dân, nộp nông sản về rương. */
@@ -53,6 +57,32 @@ public class FarmerNpcEntity extends WorkerNpcEntity {
 
     public FarmerNpcEntity(EntityType<? extends PathAwareEntity> entityType, World world) {
         super(entityType, world, 9);
+    }
+
+    /** Cánh đồng rộng tới 40 block: tầm tìm đường 64 (mặc định 32 → ô xa bị tính nhầm "không có đường"). */
+    private static final double FOLLOW_RANGE = 64.0;
+
+    @Override
+    protected net.minecraft.entity.ai.pathing.EntityNavigation createNavigation(World world) {
+        // Gọi trong constructor, trước khi tạo bộ tìm đường (số nút tối đa = tầm × 16)
+        applyFollowRange();
+        return super.createNavigation(world);
+    }
+
+    private void applyFollowRange() {
+        var attribute = getAttributeInstance(net.minecraft.entity.attribute.EntityAttributes.GENERIC_FOLLOW_RANGE);
+        if (attribute != null && attribute.getBaseValue() < FOLLOW_RANGE) attribute.setBaseValue(FOLLOW_RANGE);
+    }
+
+    @Override
+    protected double chestForgetDistance() {
+        return FarmField.MAX_RADIUS + 32; // làm ở mép cánh đồng vẫn nhớ rương neo
+    }
+
+    /** Đứng trong mảnh ruộng (hoặc sát mép 6 block) thì đang rảnh cũng không bị kéo về rương. */
+    @Override
+    protected boolean isInWorkArea() {
+        return fieldBounds != null && fieldBounds.expand(6).contains(getPos());
     }
 
     @Override
@@ -103,6 +133,7 @@ public class FarmerNpcEntity extends WorkerNpcEntity {
     public void tick() {
         super.tick();
         if (getWorld().isClient) return;
+        if (age % 100 == 0) applyFollowRange(); // NBT cũ ghi đè tầm 32
         if (farmlandSearchCooldown > 0) farmlandSearchCooldown--;
         else scanFarmland();
         if (getNavigation().isIdle()) memory.tickIdle();
@@ -167,11 +198,54 @@ public class FarmerNpcEntity extends WorkerNpcEntity {
 
     // ===== Ruộng =====
 
+    /** Ô đất cày thuộc ruộng của nông dân: trong mảnh ruộng liền, hoặc sát rương (ô mới cày chưa kịp quét lại). */
     public boolean isNearFarmChest(BlockPos pos) {
         BlockPos chest = getChestPos();
-        return chest != null && Math.abs(pos.getX() - chest.getX()) <= FARM_RADIUS
+        if (chest == null) return false;
+        if (chest.equals(fieldChest) && field.contains(pos)) return true;
+        return Math.abs(pos.getX() - chest.getX()) <= FARM_RADIUS
                 && Math.abs(pos.getZ() - chest.getZ()) <= FARM_RADIUS
-                && Math.abs(pos.getY() - chest.getY()) <= 2;
+                && Math.abs(pos.getY() - chest.getY()) <= FarmField.SEED_HEIGHT;
+    }
+
+    // ===== Mảnh ruộng =====
+    private Set<BlockPos> field = Set.of();
+    @org.jetbrains.annotations.Nullable
+    private BlockPos fieldChest;
+    @org.jetbrains.annotations.Nullable
+    private Box fieldBounds;
+    private long fieldRebuildAt;
+    /** Quét lại mảnh ruộng 20 giây một lần (ô mới cày, ruộng bị phá). */
+    private static final int FIELD_REBUILD_TICKS = 400;
+
+    /** Các ô đất cày của mảnh ruộng quanh rương neo (quét lại khi đổi rương hoặc hết hạn). */
+    public Collection<BlockPos> farmPlots() {
+        BlockPos chest = getChestPos();
+        if (chest == null) return List.of();
+        World world = getWorld();
+        if (!chest.equals(fieldChest) || world.getTime() >= fieldRebuildAt) {
+            field = FarmField.discover(chest, pos -> world.isChunkLoaded(pos)
+                    && world.getBlockState(pos).getBlock() instanceof FarmlandBlock);
+            fieldChest = chest;
+            fieldRebuildAt = world.getTime() + FIELD_REBUILD_TICKS;
+            fieldBounds = null;
+            for (BlockPos plot : field) {
+                Box b = new Box(plot);
+                fieldBounds = fieldBounds == null ? b : fieldBounds.union(b);
+            }
+        }
+        return field;
+    }
+
+    /** Ô ruộng các nông dân khác đang thao tác (một lần truy vấn thay vì mỗi ô một lần). */
+    private Set<BlockPos> plotsWorkedByOthers() {
+        if (fieldBounds == null) return Set.of();
+        Set<BlockPos> busy = new HashSet<>();
+        for (FarmerNpcEntity other : getWorld().getEntitiesByClass(FarmerNpcEntity.class, fieldBounds.expand(4),
+                o -> o != this && o.activeFarmPlot != null)) {
+            busy.add(other.activeFarmPlot);
+        }
+        return busy;
     }
 
     public boolean isWorkedByAnother(BlockPos plot) {
@@ -193,40 +267,31 @@ public class FarmerNpcEntity extends WorkerNpcEntity {
         double nearestCropDist = Double.MAX_VALUE;
         BlockPos nearestEmptyFarmland = null;
         double nearestFarmlandDist = Double.MAX_VALUE;
-        BlockPos.Mutable mutable = new BlockPos.Mutable();
         boolean skippedAny = false;
         long now = world.getTime();
         skippedPlots.values().removeIf(until -> until <= now);
 
-        for (int dx = -FARM_RADIUS; dx <= FARM_RADIUS; dx++) {
-            for (int dz = -FARM_RADIUS; dz <= FARM_RADIUS; dz++) {
-                for (int dy = -2; dy <= 2; dy++) {
-                    mutable.set(center.getX() + dx, center.getY() + dy, center.getZ() + dz);
-                    if (!world.isChunkLoaded(mutable)) continue;
-                    if (!(world.getBlockState(mutable).getBlock() instanceof FarmlandBlock)) continue;
-
-                    BlockPos farmlandPos = mutable.toImmutable();
-                    BlockPos cropPos = farmlandPos.up();
-                    BlockState cropState = world.getBlockState(cropPos);
-                    double dist = squaredDistanceTo(cropPos.getX() + 0.5, cropPos.getY() + 0.5, cropPos.getZ() + 0.5);
-                    if (isPlotSkipped(farmlandPos)) {
-                        skippedAny = true;
-                        continue; // vừa thử mà không có đường tới → để ô khác lên trước
-                    }
-                    if (cropState.getBlock() instanceof CropBlock crop && crop.isMature(cropState)) {
-                        if (isWorkedByAnother(farmlandPos)) continue;
-                        if (dist < nearestCropDist) {
-                            nearestCropDist = dist;
-                            nearestMatureCrop = cropPos;
-                        }
-                    } else if (cropState.isAir()) {
-                        if (isWorkedByAnother(farmlandPos)) continue;
-                        if (dist < nearestFarmlandDist) {
-                            nearestFarmlandDist = dist;
-                            nearestEmptyFarmland = farmlandPos;
-                        }
-                    }
+        Collection<BlockPos> plots = farmPlots();
+        Set<BlockPos> busy = plotsWorkedByOthers();
+        for (BlockPos farmlandPos : plots) {
+            if (!world.isChunkLoaded(farmlandPos)
+                    || !(world.getBlockState(farmlandPos).getBlock() instanceof FarmlandBlock)) continue;
+            if (isPlotSkipped(farmlandPos)) {
+                skippedAny = true;
+                continue; // vừa thử mà không có đường tới → để ô khác lên trước
+            }
+            if (busy.contains(farmlandPos)) continue;
+            BlockPos cropPos = farmlandPos.up();
+            BlockState cropState = world.getBlockState(cropPos);
+            double dist = squaredDistanceTo(cropPos.getX() + 0.5, cropPos.getY() + 0.5, cropPos.getZ() + 0.5);
+            if (cropState.getBlock() instanceof CropBlock crop && crop.isMature(cropState)) {
+                if (dist < nearestCropDist) {
+                    nearestCropDist = dist;
+                    nearestMatureCrop = cropPos;
                 }
+            } else if (cropState.isAir() && dist < nearestFarmlandDist) {
+                nearestFarmlandDist = dist;
+                nearestEmptyFarmland = farmlandPos;
             }
         }
         cachedMatureCrop = nearestMatureCrop;

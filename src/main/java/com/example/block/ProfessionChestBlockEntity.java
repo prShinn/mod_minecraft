@@ -43,6 +43,55 @@ public class ProfessionChestBlockEntity extends BlockEntity
         markDirty();
     }
 
+    // ===== Neo NPC: mỗi rương chỉ một NPC nghề =====
+    /** NPC đã neo vào rương này (null = rương trống, NPC nào đúng nghề cũng nhận được). */
+    @Nullable
+    private java.util.UUID boundNpc;
+    /** Lần đầu thấy NPC neo không còn trong thế giới (không lưu NBT); -1 = đang thấy. */
+    private long boundMissingSince = -1;
+    /** NPC neo vắng mặt quá lâu (chết khi chunk chưa nạp, bị xoá bằng lệnh...) thì coi rương là trống. */
+    private static final long STALE_BINDING_TICKS = 20 * 60;
+
+    @Nullable
+    public java.util.UUID getBoundNpc() {
+        return boundNpc;
+    }
+
+    /** Rương còn trống cho NPC này: chưa ai neo, chính NPC này neo, hoặc NPC neo cũ đã mất. */
+    public boolean isFreeFor(java.util.UUID npc) {
+        if (boundNpc == null) return true;
+        if (boundNpc.equals(npc)) {
+            boundMissingSince = -1; // chính chủ đang dùng → không bao giờ bị coi là vắng mặt
+            return true;
+        }
+        if (!(world instanceof net.minecraft.server.world.ServerWorld server)) return false;
+        var bound = server.getEntity(boundNpc);
+        if (bound != null) {
+            boundMissingSince = -1;
+            // NPC neo còn sống nhưng đã chuyển sang rương khác (bị dắt đi xa khi chunk này chưa nạp) → rương trống
+            return bound instanceof com.example.entity.base.WorkerNpcEntity worker && !pos.equals(worker.getChestPos());
+        }
+        long now = server.getTime();
+        if (boundMissingSince < 0) boundMissingSince = now;
+        return now - boundMissingSince > STALE_BINDING_TICKS;
+    }
+
+    public void bind(java.util.UUID npc) {
+        if (npc.equals(boundNpc)) return;
+        boundNpc = npc;
+        boundMissingSince = -1;
+        markDirty();
+    }
+
+    /** Gỡ neo — chỉ khi đúng NPC đang neo. */
+    public void unbind(java.util.UUID npc) {
+        if (npc.equals(boundNpc)) {
+            boundNpc = null;
+            boundMissingSince = -1;
+            markDirty();
+        }
+    }
+
 
     public ProfessionChestBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
         super(type, pos, state);
@@ -116,6 +165,7 @@ public class ProfessionChestBlockEntity extends BlockEntity
         super.readNbt(nbt);
         Inventories.readNbt(nbt, inventory);
         ownerId = nbt.containsUuid("ChestOwner") ? nbt.getUuid("ChestOwner") : null;
+        boundNpc = nbt.containsUuid("BoundNpc") ? nbt.getUuid("BoundNpc") : null;
         // "StoredTool" của rương cũ bị bỏ qua: không còn trả công cụ khi phá rương
     }
 
@@ -124,5 +174,6 @@ public class ProfessionChestBlockEntity extends BlockEntity
         super.writeNbt(nbt);
         Inventories.writeNbt(nbt, inventory);
         if (ownerId != null) nbt.putUuid("ChestOwner", ownerId);
+        if (boundNpc != null) nbt.putUuid("BoundNpc", boundNpc);
     }
 }

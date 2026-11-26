@@ -22,7 +22,6 @@ public class ModBlocks {
      * Block "Mỏ Quặng" — tương tự coal ore về độ cứng và âm thanh.
      * Texture lấy từ coal_ore của vanilla.
      */
-    public static Block ORE_VEIN;
 
     // ===== PROFESSION CHESTS =====
     public static Block FARMER_CHEST;
@@ -57,23 +56,6 @@ public class ModBlocks {
     public static void register() {
         FOOD_CHEST = registerUtilityChest("food_chest");
         SOLDIER_CHEST = registerUtilityChest("soldier_chest");
-        // ===== ORE VEIN =====
-        ORE_VEIN = Registry.register(
-                Registries.BLOCK,
-                new Identifier(ExampleMod.MODID, "ore_vein"),
-                new OreVeinBlock(
-                        FabricBlockSettings.copyOf(Blocks.COAL_ORE)
-                                .hardness(3.0f)
-                                .resistance(3.0f)
-                                .requiresTool()
-                )
-        );
-        Registry.register(
-                Registries.ITEM,
-                new Identifier(ExampleMod.MODID, "ore_vein"),
-                new BlockItem(ORE_VEIN, new FabricItemSettings())
-        );
-
         // ===== FARMER CHEST =====
         FARMER_CHEST = Registry.register(
                 Registries.BLOCK,

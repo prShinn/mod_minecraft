@@ -200,13 +200,12 @@ public class NpcDisplayComponent {
         if (goal instanceof com.example.ai.foodChest.FindAndEatFoodGoal) return "Đang đi lấy thức ăn";
         if (goal instanceof com.example.ai.farmer.DepositToChestGoal
                 || goal instanceof com.example.ai.lumberjack.DepositWoodToChestGoal
-                || goal instanceof com.example.ai.miner.DepositOreToChestGoal
                 || goal instanceof com.example.ai.fisherman.DepositFishToChestGoal) return "Đang mang đồ về rương";
         if (goal instanceof com.example.ai.farmer.HarvestCropGoal) return "Đang thu hoạch";
         if (goal instanceof com.example.ai.farmer.PlantSeedGoal) return "Đang gieo hạt";
         if (goal instanceof com.example.ai.lumberjack.ChopTreeGoal) return "Đang chặt cây";
         if (goal instanceof com.example.ai.lumberjack.PlantSaplingGoal) return "Đang trồng mầm";
-        if (goal instanceof com.example.ai.miner.MineOreVeinGoal) return "Đang đào quặng";
+        if (goal instanceof com.example.ai.miner.MineQuarryGoal) return "Đang đào mỏ";
         if (goal instanceof com.example.ai.fisherman.FindFishingSpotGoal) return "Đang đi tới bờ câu";
         if (goal instanceof com.example.ai.fisherman.FishermanFishGoal) return "Đang câu cá";
         if (goal instanceof com.example.ai.worker.DepositCargoGoal) return "Đang mang đồ về rương";

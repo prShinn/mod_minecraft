@@ -39,6 +39,12 @@ public class RancherNpcEntity extends WorkerNpcEntity {
         super(type, world);
     }
 
+    /** Làm việc từ ngoài hàng rào (cố ý): không mở cổng chuồng để vật nuôi không xổng. */
+    @Override
+    protected boolean canOpenFenceGates() {
+        return false;
+    }
+
     @Override
     protected void addWorkGoals() {
         this.goalSelector.add(5, new DepositCargoGoal(this));

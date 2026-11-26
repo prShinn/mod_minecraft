@@ -16,6 +16,8 @@ public class ExampleModClient implements ClientModInitializer {
                 com.example.registry.ModScreenHandlers.SOLDIER, com.example.gui.SoldierScreen::new);
         ClientTickHandler.register();
         com.example.gui.VillageOverviewScreen.registerClient();
+        com.example.gui.QuarryConfigScreen.registerClient();
+        com.example.render.QuarryPreviewRenderer.register();
 
     }
 }
