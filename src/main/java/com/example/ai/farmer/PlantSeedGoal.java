@@ -33,6 +33,7 @@ public class PlantSeedGoal extends Goal {
     @Override
     public boolean canStart() {
         if (npc.sleeping.isSleeping() || npc.getWorld().getTime() < retryAt) return false;
+        retryAt = npc.getWorld().getTime() + 10; // kiểm tra (hạt giống, truy vấn entity) tối đa 2 lần/giây
         if (!npc.plantingSeeds.isEmpty() && npc.getSeedChest(npc.seedChestPos) != null) {
             chest = npc.seedChestPos;
             return true;

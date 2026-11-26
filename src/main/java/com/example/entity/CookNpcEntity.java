@@ -111,8 +111,8 @@ public class CookNpcEntity extends WorkerNpcEntity {
         int r = ModConfig.get().cookWorkRadius;
         BlockPos center = getBlockPos();
         List<BlockPos> candidates = new ArrayList<>();
-        for (BlockPos pos : BlockPos.iterate(center.add(-r, -4, -r), center.add(r, 4, r))) {
-            if (world.isChunkLoaded(pos) && isFoodChest(world.getBlockEntity(pos))) candidates.add(pos.toImmutable());
+        for (var be : com.example.helper.BlockEntityScan.inBox(world, center, r, 4)) {
+            if (isFoodChest(be)) candidates.add(be.getPos().toImmutable());
         }
         candidates.sort(Comparator.comparingDouble(center::getSquaredDistance));
         for (int i = 0; i < Math.min(4, candidates.size()); i++) {

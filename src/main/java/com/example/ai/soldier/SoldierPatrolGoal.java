@@ -123,7 +123,9 @@ public class SoldierPatrolGoal extends Goal {
      * không có tuyến thì lính xử lý như "Tự do canh gác".
      */
     public static boolean isOnPatrolDuty(SoldierNPCEntity soldier) {
-        return soldier.getMoveMode() == ModeNpc.ModeMove.PATROL && routeOf(soldier).size() >= 2;
+        // Nhiều goal hỏi mỗi tick → nhớ kết quả 1 giây (duyệt cờ cả thế giới là đắt)
+        return soldier.getMoveMode() == ModeNpc.ModeMove.PATROL
+                && soldier.cachedPatrolDuty(() -> routeOf(soldier).size() >= 2);
     }
 
     /** Cờ kế tiếp trong tuyến sau {@code previous}; chưa có mốc thì chọn cờ gần nhất. */

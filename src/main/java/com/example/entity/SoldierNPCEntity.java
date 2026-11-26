@@ -101,7 +101,22 @@ public class SoldierNPCEntity extends PathAwareEntity {
         this.dataTracker.set(MOVE_MODE, moveMode.ordinal());
         guardAnchor = null; // đổi chế độ → lấy chỗ đang đứng làm gốc, tìm lại điểm neo quanh đó
         guardHome = moveMode == ModeNpc.ModeMove.FOLLOW ? null : getBlockPos().toImmutable();
+        patrolDutyCheckedAt = Long.MIN_VALUE; // đổi chế độ → tính lại tuyến ngay
         guardAnchorCooldown = 0;
+    }
+
+    // ===== TUYẾN TUẦN TRA (cache) =====
+    private long patrolDutyCheckedAt = Long.MIN_VALUE;
+    private boolean patrolDuty;
+
+    /** Kết quả "có tuyến tuần tra hợp lệ", tính lại tối đa 1 lần mỗi giây. */
+    public boolean cachedPatrolDuty(java.util.function.BooleanSupplier compute) {
+        long now = getWorld().getTime();
+        if (now < patrolDutyCheckedAt || now - patrolDutyCheckedAt >= 20) {
+            patrolDuty = compute.getAsBoolean();
+            patrolDutyCheckedAt = now;
+        }
+        return patrolDuty;
     }
 
     // ===== ĐIỂM NEO CANH GÁC =====
@@ -445,13 +460,14 @@ public class SoldierNPCEntity extends PathAwareEntity {
             if (isPlayerNearby()) {
                 this.setCustomNameVisible(true);
                 nameVisibleTicks = SHOW_NAME_DURATION;
+                updateNameText();
             }
             playerSearchCooldown = PLAYER_SEARCH_INTERVAL;
         }
         // Update name visibility
         if (nameVisibleTicks > 0) {
             nameVisibleTicks--;
-            updateNameText();
+            if (this.age % 10 == 0) updateNameText();
         } else {
             this.setCustomNameVisible(false);
         }

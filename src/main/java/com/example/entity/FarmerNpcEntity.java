@@ -215,8 +215,8 @@ public class FarmerNpcEntity extends WorkerNpcEntity {
     @org.jetbrains.annotations.Nullable
     private Box fieldBounds;
     private long fieldRebuildAt;
-    /** Quét lại mảnh ruộng 20 giây một lần (ô mới cày, ruộng bị phá). */
-    private static final int FIELD_REBUILD_TICKS = 400;
+    /** Quét lại mảnh ruộng 60 giây một lần (ô mới cày sát rương vẫn được nhận ngay qua vùng 25×25). */
+    private static final int FIELD_REBUILD_TICKS = 1200;
 
     /** Các ô đất cày của mảnh ruộng quanh rương neo (quét lại khi đổi rương hoặc hết hạn). */
     public Collection<BlockPos> farmPlots() {
@@ -227,7 +227,8 @@ public class FarmerNpcEntity extends WorkerNpcEntity {
             field = FarmField.discover(chest, pos -> world.isChunkLoaded(pos)
                     && world.getBlockState(pos).getBlock() instanceof FarmlandBlock);
             fieldChest = chest;
-            fieldRebuildAt = world.getTime() + FIELD_REBUILD_TICKS;
+            // Lệch ngẫu nhiên để nhiều nông dân không quét lại cùng một tick
+            fieldRebuildAt = world.getTime() + FIELD_REBUILD_TICKS + getRandom().nextInt(200);
             fieldBounds = null;
             for (BlockPos plot : field) {
                 Box b = new Box(plot);

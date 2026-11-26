@@ -121,7 +121,10 @@ public class FishermanNpcEntity extends WorkerNpcEntity {
                 }
             }
         }
-        if (best == null) display.report(this, blockedShore ? "Không có đường tới bờ câu" : "Chưa tìm thấy hồ nước nguồn 4×4");
+        if (best == null) {
+            display.report(this, blockedShore ? "Không có đường tới bờ câu" : "Chưa tìm thấy hồ nước nguồn 4×4");
+            if (!blockedShore) waterSearchCooldown = WATER_SEARCH_COOLDOWN * 3; // không có hồ: 15 giây mới quét lại
+        }
         return best;
     }
 

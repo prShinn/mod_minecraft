@@ -43,6 +43,8 @@ public final class FarmField {
             }
         }
         BlockPos.Mutable next = new BlockPos.Mutable();
+        // Ô đã đọc mà không phải đất cày: nhớ lại để các ô ruộng lân cận không đọc lại (giảm ~10 lần số lần đọc block)
+        it.unimi.dsi.fastutil.longs.LongOpenHashSet rejected = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
         while (!queue.isEmpty() && field.size() < MAX_PLOTS) {
             BlockPos plot = queue.poll();
             for (int dx = -LINK_GAP; dx <= LINK_GAP; dx++) {
@@ -51,7 +53,13 @@ public final class FarmField {
                     if ((dx == 0 && dz == 0) || (Math.abs(dx) == LINK_GAP && dz != 0) || (Math.abs(dz) == LINK_GAP && dx != 0)) continue;
                     for (int dy = -LINK_STEP; dy <= LINK_STEP; dy++) {
                         next.set(plot.getX() + dx, plot.getY() + dy, plot.getZ() + dz);
-                        if (!inBounds(chest, next) || field.contains(next) || !isFarmland.test(next)) continue;
+                        if (!inBounds(chest, next) || field.contains(next)) continue;
+                        long key = next.asLong();
+                        if (rejected.contains(key)) continue;
+                        if (!isFarmland.test(next)) {
+                            rejected.add(key);
+                            continue;
+                        }
                         BlockPos found = next.toImmutable();
                         field.add(found);
                         queue.add(found);

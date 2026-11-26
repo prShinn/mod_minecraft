@@ -34,13 +34,13 @@ public class FindSightAttack {
             Path path = npc.getNavigation().findPathTo(leftPos.x, leftPos.y, leftPos.z, 0);
             // Kiểm tra đường đi tới leftPos
             if (path != null && path.reachesTarget()) {
-                npc.getNavigation().startMovingTo(leftPos.x, leftPos.y, leftPos.z, 1.2);
+                npc.getNavigation().startMovingAlong(path, 1.2);
             }
         }else{
             // Nếu trái không đi được → thử phải
             Path path = npc.getNavigation().findPathTo(rightPos.x, rightPos.y, rightPos.z, 0);
             if (path != null && path.reachesTarget()) {
-                npc.getNavigation().startMovingTo(rightPos.x, rightPos.y, rightPos.z, 1.2);
+                npc.getNavigation().startMovingAlong(path, 1.2);
             }
         }
         // Nếu cả hai không đi được → đứng yên (fallback)

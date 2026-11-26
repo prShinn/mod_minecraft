@@ -69,6 +69,10 @@ public abstract class ProfessionChestBlock extends BlockWithEntity {
                 }
                 return result;
             }
+            // Rương thức ăn đặt từ bản cũ chưa có trong sổ chung: mở ra là ghi sổ
+            if (foodChest && world instanceof net.minecraft.server.world.ServerWorld server) {
+                com.example.ai.foodChest.FoodChestRegistry.get(server).register(pos);
+            }
             NamedScreenHandlerFactory factory = state.createScreenHandlerFactory(world, pos);
             if (factory != null) {
                 player.openHandledScreen(factory);
@@ -94,6 +98,10 @@ public abstract class ProfessionChestBlock extends BlockWithEntity {
                          @Nullable net.minecraft.entity.LivingEntity placer,
                          ItemStack itemStack) {
         super.onPlaced(world, pos, state, placer, itemStack);
+        // Rương thức ăn: ghi vào sổ chung của làng để NPC ở xa (tới 96 block) tìm được
+        if (world instanceof net.minecraft.server.world.ServerWorld server && state.isOf(com.example.registry.ModBlocks.FOOD_CHEST)) {
+            com.example.ai.foodChest.FoodChestRegistry.get(server).register(pos);
+        }
         if (!world.isClient && !state.isOf(com.example.registry.ModBlocks.FOOD_CHEST)
                 && placer instanceof PlayerEntity player
                 && world.getBlockEntity(pos) instanceof ProfessionChestBlockEntity chest) {
@@ -114,6 +122,9 @@ public abstract class ProfessionChestBlock extends BlockWithEntity {
                                 BlockState newState, boolean moved) {
         if (!state.isOf(newState.getBlock())) {
             BlockEntity be = world.getBlockEntity(pos);
+            if (world instanceof net.minecraft.server.world.ServerWorld server && state.isOf(com.example.registry.ModBlocks.FOOD_CHEST)) {
+                com.example.ai.foodChest.FoodChestRegistry.get(server).remove(pos);
+            }
             if (!world.isClient && be instanceof ProfessionChestBlockEntity chestBe) {
                 // Scatter inventory items
                 ItemScatterer.spawn(world, pos, chestBe);

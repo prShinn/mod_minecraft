@@ -119,9 +119,8 @@ public class CookFoodGoal extends Goal {
         int reserve = ModConfig.get().cookLeaveInSupplierChest;
         BlockPos best = null;
         double bestDistance = Double.MAX_VALUE;
-        for (BlockPos pos : BlockPos.iterate(chest.add(-r, -4, -r), chest.add(r, 4, r))) {
-            if (!world.isChunkLoaded(pos)) continue;
-            BlockEntity be = world.getBlockEntity(pos);
+        for (BlockEntity be : com.example.helper.BlockEntityScan.inBox(world, chest, r, 4)) {
+            BlockPos pos = be.getPos();
             if (!isSupplierChest(be)) continue;
             Inventory inv = (Inventory) be;
             if (takeable(inv, reserve, fuel) == 0) {

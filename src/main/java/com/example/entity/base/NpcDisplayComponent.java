@@ -73,15 +73,18 @@ public class NpcDisplayComponent {
         if (world.isClient) return;
         handleFoodSystem(npc, inventory);
         handleGradualHeal(npc);
-        PlayerEntity player =
-                world.getClosestPlayer(npc, com.example.config.ModConfig.get().statusViewDistance);
-
-
-        if (player != null) {
-            npc.setCustomNameVisible(true);
-            visibleTicks = SHOW_NAME_DURATION;
-            updateName(npc, inventory, goals);
-        } else if (visibleTicks-- <= 0) {
+        if (npc.age % 10 == 0) {
+            PlayerEntity player =
+                    world.getClosestPlayer(npc, com.example.config.ModConfig.get().statusViewDistance);
+            if (player != null) {
+                npc.setCustomNameVisible(true);
+                visibleTicks = SHOW_NAME_DURATION;
+                updateName(npc, inventory, goals);
+            }
+        }
+        if (visibleTicks > 0) {
+            visibleTicks--;
+        } else {
             npc.setCustomNameVisible(false);
         }
     }

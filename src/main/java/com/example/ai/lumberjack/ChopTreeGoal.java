@@ -85,7 +85,8 @@ public class ChopTreeGoal extends Goal {
         return base != null && allowsCutting(base) && npc.isTreeRoot(base)
                 && npc.getWorld().getBlockState(base).isOf(logType)
                 && !logs.isEmpty() && !npc.isInventoryFull()
-                && approachTicks < APPROACH_TIMEOUT && !npc.isWorkedByAnother(base);
+                && approachTicks < APPROACH_TIMEOUT
+                && (npc.age % 20 != 0 || !npc.isWorkedByAnother(base)); // truy vấn entity 1 lần/giây
     }
 
     @Override

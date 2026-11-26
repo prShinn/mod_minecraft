@@ -42,6 +42,7 @@ public class HarvestCropGoal extends Goal {
     @Override
     public boolean canStart() {
         if (npc.getWorld().getTime() < retryAt) return false;
+        retryAt = npc.getWorld().getTime() + 5; // kiểm tra tối đa 4 lần/giây
         BlockPos found = npc.cachedMatureCrop;
         if (found == null || npc.isInventoryFull() || npc.findNearestChest() == null
                 || !npc.isNearFarmChest(found.down()) || !npc.getWorld().isChunkLoaded(found)) return false;

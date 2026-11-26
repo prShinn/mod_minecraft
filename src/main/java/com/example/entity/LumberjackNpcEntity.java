@@ -30,7 +30,8 @@ import net.minecraft.world.World;
 public class LumberjackNpcEntity extends WorkerNpcEntity {
     public final static int FIND_CHEST_DISTANCE = 16;
     public final static int FIND_TREE_DISTANCE = 8;
-    private static final int TREE_SEARCH_COOLDOWN = 20; // 1 giây
+    private static final int TREE_SEARCH_COOLDOWN = 60; // 3 giây
+    private static final int TREE_SEARCH_IDLE_COOLDOWN = 100; // không thấy cây: 5 giây
 
     public final LumberjackMemory memory = new LumberjackMemory();
     public final SimpleInventory plantingSaplings = new SimpleInventory(27);
@@ -39,6 +40,9 @@ public class LumberjackNpcEntity extends WorkerNpcEntity {
     public BlockPos activeTree;
     public boolean needsWoodDelivery;
     private int treeSearchCooldown = 0;
+    /** Gốc cây tìm được ở lần quét gần nhất (dùng lại trong lúc chờ quét). */
+    @org.jetbrains.annotations.Nullable
+    private BlockPos cachedTree;
 
     public LumberjackNpcEntity(EntityType<? extends PathAwareEntity> entityType, World world) {
         super(entityType, world, 9);
@@ -163,6 +167,13 @@ public class LumberjackNpcEntity extends WorkerNpcEntity {
 
     // ===== Tìm cây =====
 
+    private static boolean isNearTree(java.util.List<BlockPos> busy, BlockPos tree) {
+        for (BlockPos b : busy) {
+            if (Math.abs(tree.getX() - b.getX()) <= 2 && Math.abs(tree.getZ() - b.getZ()) <= 2) return true;
+        }
+        return false;
+    }
+
     public boolean isWorkedByAnother(BlockPos tree) {
         return !getWorld().getEntitiesByClass(LumberjackNpcEntity.class,
                 new Box(tree).expand(8, 40, 8),
@@ -186,7 +197,15 @@ public class LumberjackNpcEntity extends WorkerNpcEntity {
 
     /** Tìm gốc cây gần nhất trong vùng chặt đã bật của rương. */
     public BlockPos findNearestTree() {
-        if (treeSearchCooldown > 0) return null;
+        if (treeSearchCooldown > 0) {
+            // Đang chờ quét lại: trả kết quả lần trước nếu cây đó vẫn còn (goal chặt / goal đi dạo hỏi xen kẽ
+            // không bị "null" giả trong lúc chờ)
+            // Chỉ kiểm tra rẻ (đọc block); việc "tiều phu khác đang chặt" do goal chặt kiểm tra một lần khi bắt đầu
+            if (cachedTree != null && (!isTreeRoot(cachedTree) || isTreeSkipped(cachedTree))) {
+                cachedTree = null;
+            }
+            return cachedTree;
+        }
         BlockPos chestPos = findWorkChest();
         if (chestPos == null) return null;
 
@@ -201,13 +220,24 @@ public class LumberjackNpcEntity extends WorkerNpcEntity {
         long now = world.getTime();
         skippedTrees.values().removeIf(until -> until <= now);
         int radius = LumberjackChestBlockEntity.CUT_RADIUS;
+        // Cây các tiều phu khác đang chặt: 1 truy vấn entity cho cả lượt quét (thay vì mỗi gốc cây một lần)
+        java.util.List<BlockPos> busyTrees = new java.util.ArrayList<>();
+        for (LumberjackNpcEntity other : world.getEntitiesByClass(LumberjackNpcEntity.class,
+                new Box(chestPos).expand(radius + 8, 72, radius + 8), o -> o != this && o.activeTree != null)) {
+            busyTrees.add(other.activeTree);
+        }
         BlockPos found = null;
         double bestDist = Double.MAX_VALUE;
         for (int dx = -radius; dx <= radius; dx++) {
             for (int dz = -radius; dz <= radius; dz++) {
-                for (int dy = -LumberjackChestBlockEntity.CUT_BELOW; dy <= LumberjackChestBlockEntity.CUT_ABOVE; dy++) {
+                int x = chestPos.getX() + dx, z = chestPos.getZ() + dz;
+                if (!world.isChunkLoaded(new BlockPos(x, chestPos.getY(), z))) continue;
+                // Gốc cây luôn nằm dưới đỉnh cột (heightmap bỏ lá): khỏi đọc khoảng trời trống phía trên (70 → ~10 ô/cột)
+                int top = world.getTopY(net.minecraft.world.Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, x, z);
+                int maxDy = Math.min(LumberjackChestBlockEntity.CUT_ABOVE, top - chestPos.getY());
+                for (int dy = -LumberjackChestBlockEntity.CUT_BELOW; dy <= maxDy; dy++) {
                     BlockPos pos = chestPos.add(dx, dy, dz);
-                    if (!zone.allowsCutting(pos) || !isTreeRoot(pos) || isTreeSkipped(pos) || isWorkedByAnother(pos)) continue;
+                    if (!zone.allowsCutting(pos) || !isTreeRoot(pos) || isTreeSkipped(pos) || isNearTree(busyTrees, pos)) continue;
                     double dist = squaredDistanceTo(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
                     if (dist < bestDist) {
                         bestDist = dist;
@@ -217,7 +247,9 @@ public class LumberjackNpcEntity extends WorkerNpcEntity {
             }
         }
 
-        treeSearchCooldown = TREE_SEARCH_COOLDOWN;
+        // Không có cây thì cây mới cần cả phút mới lớn: chờ 5 giây mới quét lại
+        treeSearchCooldown = found == null ? TREE_SEARCH_IDLE_COOLDOWN : TREE_SEARCH_COOLDOWN;
+        cachedTree = found;
         if (found == null) display.report(this, "Chưa có cây trong vùng chặt");
         return found;
     }

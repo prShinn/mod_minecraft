@@ -75,9 +75,8 @@ public class DepositLootGoal extends Goal {
         World world = soldier.getWorld();
         BlockPos center = soldier.getBlockPos();
         List<BlockPos> candidates = new ArrayList<>();
-        for (BlockPos pos : BlockPos.iterate(center.add(-SEARCH_RADIUS, -SEARCH_HEIGHT, -SEARCH_RADIUS),
-                center.add(SEARCH_RADIUS, SEARCH_HEIGHT, SEARCH_RADIUS))) {
-            if (isUsableChest(world, pos)) candidates.add(pos.toImmutable());
+        for (var be : com.example.helper.BlockEntityScan.inBox(world, center, SEARCH_RADIUS, SEARCH_HEIGHT)) {
+            if (isUsableChest(world, be.getPos())) candidates.add(be.getPos().toImmutable());
         }
         candidates.sort(Comparator.comparingDouble(center::getSquaredDistance));
         for (int i = 0; i < Math.min(MAX_PATH_CHECKS, candidates.size()); i++) {

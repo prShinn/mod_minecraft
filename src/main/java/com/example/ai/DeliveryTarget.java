@@ -41,9 +41,10 @@ public final class DeliveryTarget {
                 return preferred;
             }
         }
-        for (BlockPos pos : BlockPos.iterate(center.add(-radius, -height, -radius), center.add(radius, height, radius))) {
-            if (pos.equals(preferred) || !world.isChunkLoaded(pos)) continue;
-            var be = world.getBlockEntity(pos);
+        // Duyệt block entity của chunk thay vì đọc từng block trong hộp
+        for (var be : com.example.helper.BlockEntityScan.inBox(world, center, radius, height)) {
+            BlockPos pos = be.getPos();
+            if (pos.equals(preferred)) continue;
             if (!type.isInstance(be)) continue;
             // 1 NPC 1 rương: không nộp sang rương người khác hay rương NPC khác đã neo
             if (npc instanceof com.example.entity.base.WorkerNpcEntity worker && !worker.canUseChest(be)) continue;

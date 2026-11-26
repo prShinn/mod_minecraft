@@ -132,7 +132,7 @@ public class SoldierCrossbowGoal extends Goal {
         Vec3d escapePos = npc.getPos().add(dir.multiply(6));
         Path path = npc.getNavigation().findPathTo(escapePos.x, escapePos.y, escapePos.z, 0);
         if (path != null && path.reachesTarget()) {
-            npc.getNavigation().startMovingTo(escapePos.x, escapePos.y, escapePos.z, 1.3);
+            npc.getNavigation().startMovingAlong(path, 1.3);
         } else {
             moveToSideOfTarget();
         }
@@ -146,13 +146,13 @@ public class SoldierCrossbowGoal extends Goal {
 
         Path path = npc.getNavigation().findPathTo(sidePos.x, sidePos.y, sidePos.z, 0);
         if (path != null && path.reachesTarget()) {
-            npc.getNavigation().startMovingTo(sidePos.x, sidePos.y, sidePos.z, 1.2);
+            npc.getNavigation().startMovingAlong(path, 1.2);
         } else {
             perpendicular = perpendicular.multiply(-1);
             sidePos = npc.getPos().add(perpendicular.multiply(8));
             path = npc.getNavigation().findPathTo(sidePos.x, sidePos.y, sidePos.z, 0);
             if (path != null && path.reachesTarget()) {
-                npc.getNavigation().startMovingTo(sidePos.x, sidePos.y, sidePos.z, 1.2);
+                npc.getNavigation().startMovingAlong(path, 1.2);
             }
         }
     }

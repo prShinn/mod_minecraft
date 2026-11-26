@@ -15,10 +15,10 @@ import java.util.function.Predicate;
  * (lưu NBT, nạp lại thế giới vẫn đào tiếp chỗ cũ).
  */
 public class MinerChestBlockEntity extends ProfessionChestBlockEntity {
-    /** Số ô CÓ BLOCK (không phải không khí) tối đa xét trong một lần tìm; ô không khí rẻ nên không tính. */
-    private static final int SCAN_BUDGET = 2048;
-    /** Đào hết vùng → chờ bấy nhiêu tick mới quét lại từ đầu (block rơi xuống, người chơi đặt thêm...). */
-    private static final int RESCAN_TICKS = 200;
+    /** Số ô tối đa xét trong một lần tìm (kể cả không khí) — giới hạn chi phí mỗi tick, lần sau tìm tiếp. */
+    private static final int SCAN_BUDGET = 4096;
+    /** Đào hết vùng → chờ 1 phút mới quét lại từ đầu (block rơi xuống, người chơi đặt thêm...). */
+    private static final int RESCAN_TICKS = 1200;
 
     private QuarryConfig quarry = QuarryConfig.DEFAULT;
     /** Đã có hướng đào (đặt từ hướng nhìn của người đặt rương). Rương cũ chưa có thì lấy hướng người mở cấu hình. */
@@ -109,8 +109,11 @@ public class MinerChestBlockEntity extends ProfessionChestBlockEntity {
         scanPending = false;
         if (!configured) return null;
         int volume = quarry.volume();
-        int solid = 0;
         for (int visited = 0; visited <= volume; visited++) {
+            if (visited >= SCAN_BUDGET) {
+                scanPending = true; // còn phần vùng chưa xét: tick sau xét tiếp
+                return null;
+            }
             if (cursor >= volume) {
                 // Đi hết vùng: chờ RESCAN_TICKS kể từ lúc hết rồi mới quét lại từ đầu
                 long now = world.getTime();
@@ -121,14 +124,7 @@ public class MinerChestBlockEntity extends ProfessionChestBlockEntity {
                 markDirty();
             }
             BlockPos target = quarry.positionAt(pos, cursor);
-            if (world.isChunkLoaded(target) && !world.getBlockState(target).isAir()) {
-                if (canMine.test(target)) return target;
-                if (++solid >= SCAN_BUDGET) {
-                    cursor++;
-                    scanPending = true;
-                    return null;
-                }
-            }
+            if (world.isChunkLoaded(target) && !world.getBlockState(target).isAir() && canMine.test(target)) return target;
             cursor++;
         }
         return null;

@@ -110,12 +110,7 @@ public class SoldierBowGoal extends Goal {
                 escapePos.x, escapePos.y, escapePos.z, 0
         );
         if (path != null && path.reachesTarget()) {
-            npc.getNavigation().startMovingTo(
-                    escapePos.x,
-                    escapePos.y,
-                    escapePos.z,
-                    1.2
-            );
+            npc.getNavigation().startMovingAlong(path, 1.2);
         } else {
             moveToSideOfTarget();
         }
@@ -144,9 +139,7 @@ public class SoldierBowGoal extends Goal {
 
         if (path != null && path.reachesTarget()) {
             // ✅ Đi ngang được
-            npc.getNavigation().startMovingTo(
-                    sidePos.x, sidePos.y, sidePos.z, 1.1
-            );
+            npc.getNavigation().startMovingAlong(path, 1.1);
         } else {
             // ❌ Không đi được → thử đi ngang hướng ngược lại
             perpendicular = perpendicular.multiply(-1);
@@ -157,9 +150,7 @@ public class SoldierBowGoal extends Goal {
             );
 
             if (path != null && path.reachesTarget()) {
-                npc.getNavigation().startMovingTo(
-                        sidePos.x, sidePos.y, sidePos.z, 1.1
-                );
+                npc.getNavigation().startMovingAlong(path, 1.1);
             }
             // Nếu cả 2 hướng đều không đi được → đứng yên và cố bắn
         }
