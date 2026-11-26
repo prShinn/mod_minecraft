@@ -24,6 +24,7 @@ public class SoldierPatrolGoal extends Goal {
     private static final int LEG_TIMEOUT_TICKS = 20 * 40; // kẹt đường > 40s → bỏ qua cờ này
     private static final int REPATH_COOLDOWN_TICKS = 20;
     private static final int SCAN_INTERVAL_TICKS = 20;
+    private static final double DIRECT_PATH_SQ = 24.0 * 24.0;
 
     private final SoldierNPCEntity soldier;
     private BlockPos target;
@@ -47,6 +48,7 @@ public class SoldierPatrolGoal extends Goal {
         List<BlockPos> route = route();
         if (route.size() < 2) return false;
         target = nextAfter(route, lastReached);
+        soldier.setPatrolHint(target);
         return target != null;
     }
 
@@ -82,7 +84,10 @@ public class SoldierPatrolGoal extends Goal {
             return;
         }
         if (legTicks > LEG_TIMEOUT_TICKS) {
-            lastReached = target; // không tới được → sang cờ kế tiếp
+            // Kẹt đường quá 40s → báo chủ qua Sổ quản lý làng rồi sang cờ kế tiếp (không đứng đơ mãi)
+            com.example.entity.base.NpcDisplayComponent.reportWorker(soldier,
+                    "Không tới được cờ tuần tra " + target.getX() + " " + target.getY() + " " + target.getZ());
+            lastReached = target;
             advance();
             return;
         }
@@ -114,7 +119,9 @@ public class SoldierPatrolGoal extends Goal {
     private static List<BlockPos> routeOf(SoldierNPCEntity soldier) {
         UUID owner = soldier.getOwnerUuid();
         if (owner == null || !(soldier.getWorld() instanceof ServerWorld world)) return List.of();
-        return PatrolFlagState.get(world).routeFor(world, owner, soldier.getBlockPos());
+        // Tâm = cờ đang nhắm tới: lính đuổi quái ra xa tuyến vẫn nhận đúng tuyến cũ
+        BlockPos center = soldier.getPatrolHint() != null ? soldier.getPatrolHint() : soldier.getBlockPos();
+        return PatrolFlagState.get(world).routeFor(world, owner, center);
     }
 
     /**
@@ -128,8 +135,13 @@ public class SoldierPatrolGoal extends Goal {
                 && soldier.cachedPatrolDuty(() -> routeOf(soldier).size() >= 2);
     }
 
-    /** Cờ kế tiếp trong tuyến sau {@code previous}; chưa có mốc thì chọn cờ gần nhất. */
+    /**
+     * Cờ kế tiếp theo thứ tự đặt cờ sau {@code previous}. Bị ngắt (đánh quái, ăn) giữa đường thì đi tiếp
+     * đúng cờ đang nhắm dở, không nhảy cờ. Chưa có mốc thì chọn cờ gần nhất.
+     */
     private BlockPos nextAfter(List<BlockPos> route, BlockPos previous) {
+        BlockPos pending = soldier.getPatrolHint();
+        if (pending != null && !pending.equals(previous) && route.contains(pending)) return pending;
         int idx = previous == null ? -1 : route.indexOf(previous);
         if (idx >= 0) return route.get((idx + 1) % route.size());
 
@@ -153,14 +165,20 @@ public class SoldierPatrolGoal extends Goal {
             return;
         }
         target = nextAfter(route, lastReached);
+        soldier.setPatrolHint(target);
         moveToTarget();
     }
 
     private void moveToTarget() {
         repathCooldown = REPATH_COOLDOWN_TICKS;
-        if (target != null) {
-            soldier.getNavigation().startMovingTo(target.getX() + 0.5, target.getY(), target.getZ() + 0.5, SPEED);
+        if (target == null) return;
+        // Cờ xa hơn tầm tìm đường của lính → đi từng chặng ~16 block hướng về cờ
+        if (soldier.squaredDistanceTo(net.minecraft.util.math.Vec3d.ofBottomCenter(target)) > DIRECT_PATH_SQ) {
+            net.minecraft.util.math.Vec3d step = net.minecraft.entity.ai.NoPenaltyTargeting.findTo(
+                    soldier, 16, 7, net.minecraft.util.math.Vec3d.ofBottomCenter(target), Math.PI / 2);
+            if (step != null && soldier.getNavigation().startMovingTo(step.x, step.y, step.z, SPEED)) return;
         }
+        soldier.getNavigation().startMovingTo(target.getX() + 0.5, target.getY(), target.getZ() + 0.5, SPEED);
     }
 
     private boolean hasArrived() {

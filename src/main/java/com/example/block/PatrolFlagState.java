@@ -61,7 +61,7 @@ public class PatrolFlagState extends PersistentState {
      */
     public List<BlockPos> routeFor(ServerWorld world, UUID owner, BlockPos center) {
         double rangeSq = RANGE * RANGE;
-        List<BlockPos> route = new ArrayList<>();
+        List<BlockPos> mine = new ArrayList<>(); // cờ của chủ, theo thứ tự đặt
         Iterator<Flag> it = flags.iterator();
         boolean dirty = false;
         while (it.hasNext()) {
@@ -71,9 +71,37 @@ public class PatrolFlagState extends PersistentState {
                 dirty = true;
                 continue;
             }
-            if (f.owner.equals(owner) && f.pos.getSquaredDistance(center) <= rangeSq) route.add(f.pos);
+            if (f.owner.equals(owner)) mine.add(f.pos);
         }
         if (dirty) markDirty();
+
+        // Tuyến = CỤM cờ nối nhau (mỗi cờ cách một cờ khác trong cụm ≤ RANGE), bắt đầu từ cờ gần center nhất.
+        // Không lọc theo chỗ lính đang đứng → thứ tự tuyến cố định suốt vòng tuần, không bỏ cờ ở xa.
+        int seed = -1;
+        double best = rangeSq;
+        for (int i = 0; i < mine.size(); i++) {
+            double d = mine.get(i).getSquaredDistance(center);
+            if (d <= best) {
+                best = d;
+                seed = i;
+            }
+        }
+        if (seed < 0) return List.of();
+        boolean[] in = new boolean[mine.size()];
+        in[seed] = true;
+        java.util.ArrayDeque<Integer> queue = new java.util.ArrayDeque<>();
+        queue.add(seed);
+        while (!queue.isEmpty()) {
+            BlockPos from = mine.get(queue.poll());
+            for (int j = 0; j < mine.size(); j++) {
+                if (!in[j] && mine.get(j).getSquaredDistance(from) <= rangeSq) {
+                    in[j] = true;
+                    queue.add(j);
+                }
+            }
+        }
+        List<BlockPos> route = new ArrayList<>();
+        for (int i = 0; i < mine.size(); i++) if (in[i]) route.add(mine.get(i));
         return route;
     }
 

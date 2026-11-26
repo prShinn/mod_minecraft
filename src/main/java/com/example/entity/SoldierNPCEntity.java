@@ -102,7 +102,22 @@ public class SoldierNPCEntity extends PathAwareEntity {
         guardAnchor = null; // đổi chế độ → lấy chỗ đang đứng làm gốc, tìm lại điểm neo quanh đó
         guardHome = moveMode == ModeNpc.ModeMove.FOLLOW ? null : getBlockPos().toImmutable();
         patrolDutyCheckedAt = Long.MIN_VALUE; // đổi chế độ → tính lại tuyến ngay
+        patrolHint = null;
         guardAnchorCooldown = 0;
+    }
+
+    // ===== TUYẾN TUẦN TRA =====
+    /** Cờ đang nhắm tới / vừa nhắm (không lưu NBT): giữ tuyến khi bị ngắt hoặc đuổi quái ra xa. */
+    @Nullable
+    private net.minecraft.util.math.BlockPos patrolHint;
+
+    @Nullable
+    public net.minecraft.util.math.BlockPos getPatrolHint() {
+        return patrolHint;
+    }
+
+    public void setPatrolHint(@Nullable net.minecraft.util.math.BlockPos hint) {
+        patrolHint = hint;
     }
 
     // ===== TUYẾN TUẦN TRA (cache) =====
@@ -261,8 +276,10 @@ public class SoldierNPCEntity extends PathAwareEntity {
                 return false;
             }
         }); // cung thu
+        // Thứ tự ưu tiên: đánh quái (2) → né nguy hiểm / chữa đồng đội (3) → ăn uống, nhặt đồ (4)
+        // → theo chủ (5) → về chủ, cất chiến lợi phẩm (6) → TUẦN TRA (7) → đi dạo, nhìn quanh (8)
         this.goalSelector.add(3, new EscapeDangerGoal(this, 1.4));
-        this.goalSelector.add(4, new HealAllyGoal(this) {
+        this.goalSelector.add(3, new HealAllyGoal(this) {
             @Override
             public boolean canStart() {
                 // chỉ start nếu cầm riu
@@ -280,10 +297,10 @@ public class SoldierNPCEntity extends PathAwareEntity {
         this.goalSelector.add(6, new ReturnToPlayerGoal(this));
         // mang chiến lợi phẩm về cất vào Rương binh lính của chủ
         this.goalSelector.add(6, new DepositLootGoal(this));
+        // đi tuần giữa các Cờ Tuần Tra (chế độ Đi tuần tra): sau ăn uống / theo chủ / cất chiến lợi phẩm
+        this.goalSelector.add(7, new SoldierPatrolGoal(this));
 // nhin player
         this.goalSelector.add(7, new LookAtEntityGoal(this, PlayerEntity.class, 8.0F));
-        // đi tuần giữa các Cờ Tuần Tra (chỉ khi owner đặt >= 2 cờ gần đó)
-        this.goalSelector.add(7, new SoldierPatrolGoal(this));
         // đi lang thang xa
         // canh gác: lang thang quá 38 block khỏi điểm neo → quay về điểm neo 1 lần rồi lang thang lại
         // (priority 7 để chen được WanderAroundFar; ngoài giao tranh, không ngủ, không giữ tuyến tuần tra)
