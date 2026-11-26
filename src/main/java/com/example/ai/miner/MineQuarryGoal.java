@@ -33,7 +33,7 @@ import java.util.List;
  * Thợ mỏ đứng cạnh rương neo và đào từ xa từng block trong vùng đào của rương (thứ tự trên xuống).
  * <ul>
  *     <li>Thời gian đào = độ cứng × 30 / tốc độ cúp (cúp tốt hơn + Hiệu suất → nhanh hơn), như người chơi.</li>
- *     <li>Dùng cúp tốt nhất trong rương, mỗi block trừ 1 độ bền (có tính Không phá vỡ); cúp gãy thì mất.</li>
+ *     <li>Dùng cúp tốt nhất trong rương; cúp KHÔNG mất độ bền (đồ nghề NPC không bao giờ hỏng).</li>
  *     <li>Đồ rơi cho thẳng vào rương; rương không đủ chỗ thì dừng chờ.</li>
  *     <li>Bỏ qua: không khí, chất lỏng, block không phá được, block có block entity (rương, lò...),
  *         block cần cúp tốt hơn (không mất đồ), chỗ Thợ mỏ đang đứng.</li>
@@ -176,7 +176,7 @@ public class MineQuarryGoal extends Goal {
             ItemStack rest = DepositCargoGoal.insert(box, drop);
             if (!rest.isEmpty()) Block.dropStack(world, chest.up(), rest); // không xảy ra vì đã kiểm tra fits
         }
-        if (pick.damage(1, npc.getRandom(), null)) pick.decrement(1); // cúp gãy
+        // Đồ nghề của NPC không bao giờ hỏng: cúp chỉ quyết định tốc độ/cấp đào, không mất độ bền
         box.markDirty();
         npc.display.clearReport();
         box.advance();

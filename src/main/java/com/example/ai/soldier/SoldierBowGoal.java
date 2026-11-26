@@ -197,6 +197,8 @@ public class SoldierBowGoal extends Goal {
         if (npc.getRandom().nextFloat() < 0.05F) {
             arrow.setCritical(true);
         }
+        // Bắn vô hạn: tên tạo ra không lấy từ túi, và không nhặt lại được (tránh nhân tên)
+        arrow.pickupType = net.minecraft.entity.projectile.PersistentProjectileEntity.PickupPermission.DISALLOWED;
         npc.getWorld().spawnEntity(arrow);
         npc.swingHand(Hand.MAIN_HAND, true);
         // Sound effect (optional)

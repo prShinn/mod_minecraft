@@ -166,6 +166,7 @@ public class SoldierCrossbowGoal extends Goal {
         // Tạo arrow trực tiếp từ ArrowItem
         ArrowItem arrowItem = (ArrowItem) Items.ARROW;
         PersistentProjectileEntity arrow = arrowItem.createArrow(npc.getWorld(), Items.ARROW.getDefaultStack(), npc);
+        arrow.pickupType = PersistentProjectileEntity.PickupPermission.DISALLOWED; // bắn vô hạn, không nhặt lại được
 
         arrow.setDamage(5.5F);
 
@@ -213,6 +214,7 @@ public class SoldierCrossbowGoal extends Goal {
                                      double distance, double heightAdjust, float inaccuracy) {
         ArrowItem arrowItem = (ArrowItem) Items.ARROW;
         PersistentProjectileEntity arrow = arrowItem.createArrow(npc.getWorld(), Items.ARROW.getDefaultStack(), npc);
+        arrow.pickupType = PersistentProjectileEntity.PickupPermission.DISALLOWED; // bắn vô hạn, không nhặt lại được
         arrow.setDamage(2.4);
 
         double radians = Math.toRadians(angleOffset);
