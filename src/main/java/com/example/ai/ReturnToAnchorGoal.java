@@ -101,8 +101,11 @@ public class ReturnToAnchorGoal extends Goal {
     @Override
     public void stop() {
         mob.getNavigation().stop();
-        // Chưa về tới (tắc đường / hết giờ / bị goal khác chen) → chờ rồi mới thử lại, tránh tính đường liên tục
-        if (home != null && distSq(home) > arriveSq) retryAt = mob.getWorld().getTime() + RETRY_TICKS;
+        // Tắc đường / hết giờ → chờ rồi mới thử lại (tránh tính đường liên tục).
+        // Bị goal khác chen ngang (đánh quái, làm việc) thì KHÔNG chờ: xong việc là quay về ngay.
+        if (home != null && distSq(home) > arriveSq && (fails >= MAX_FAILS || ticks >= MAX_TICKS)) {
+            retryAt = mob.getWorld().getTime() + RETRY_TICKS;
+        }
         home = null;
     }
 }

@@ -5,7 +5,9 @@ public class ModeNpc {
         FOLLOW("Đi theo chủ"),
         WANDER("Tự do canh gác"),
         /** Đi tuần giữa các Cờ Tuần Tra của chủ; thêm ở cuối để giữ ordinal cũ trong NBT. */
-        PATROL("Đi tuần tra");
+        PATROL("Đi tuần tra"),
+        /** Đứng gác cố định tại chỗ được giao (đi lại 2–3 block), đánh xong quay về; thêm cuối giữ ordinal. */
+        STAND("Đứng canh gác");
 
         private final String displayName;
 

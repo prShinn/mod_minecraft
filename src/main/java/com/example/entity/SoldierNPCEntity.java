@@ -119,6 +119,15 @@ public class SoldierNPCEntity extends PathAwareEntity {
         return patrolDuty;
     }
 
+    // ===== ĐỨNG CANH GÁC =====
+    /** Bán kính đi lại quanh điểm gác; ra xa hơn thì quay về. */
+    public static final int STAND_GUARD_RADIUS = 3;
+
+    /** Đang ở chế độ Đứng canh gác và có điểm gác. */
+    public boolean isStandingGuard() {
+        return getMoveMode() == ModeNpc.ModeMove.STAND && guardAnchor != null;
+    }
+
     // ===== ĐIỂM NEO CANH GÁC =====
     /** Lang thang xa điểm neo hơn khoảng này thì quay về điểm neo một lần rồi lang thang lại. */
     public static final double GUARD_RETURN_RADIUS = 38.0;
@@ -159,6 +168,12 @@ public class SoldierNPCEntity extends PathAwareEntity {
         }
         // Tìm quanh gốc cố định để lính lang thang/đuổi quái ra xa không làm trôi căn cứ
         if (guardHome == null) guardHome = getBlockPos().toImmutable(); // lính cũ chưa có gốc
+        if (getMoveMode() == ModeNpc.ModeMove.STAND) {
+            // Đứng canh gác: neo đúng chỗ được giao, không tìm rương/giường
+            guardAnchor = guardHome;
+            guardAnchorCooldown = 200;
+            return;
+        }
         net.minecraft.util.math.BlockPos found = GuardPost.find(this, guardHome);
         guardAnchor = found != null ? found : guardHome;
         guardAnchorCooldown = 200;
@@ -273,9 +288,26 @@ public class SoldierNPCEntity extends PathAwareEntity {
         // canh gác: lang thang quá 38 block khỏi điểm neo → quay về điểm neo 1 lần rồi lang thang lại
         // (priority 7 để chen được WanderAroundFar; ngoài giao tranh, không ngủ, không giữ tuyến tuần tra)
         this.goalSelector.add(7, new com.example.ai.ReturnToAnchorGoal(this, this::getGuardAnchor,
-                () -> getTarget() == null && getPose() != net.minecraft.entity.EntityPose.SLEEPING && hasGuardPost(),
+                () -> getTarget() == null && getPose() != net.minecraft.entity.EntityPose.SLEEPING && hasGuardPost()
+                        && getMoveMode() != ModeNpc.ModeMove.STAND,
                 GUARD_RETURN_RADIUS, GUARD_ARRIVE_RADIUS, 1.0D));
-        this.goalSelector.add(8, new WanderAroundFarGoal(this, 1.0D));
+        // Đứng canh gác: rời điểm gác quá 3 block (đánh quái, nhặt đồ...) → hết việc thì quay về ngay
+        this.goalSelector.add(7, new com.example.ai.ReturnToAnchorGoal(this, this::getGuardAnchor,
+                () -> getTarget() == null && getPose() != net.minecraft.entity.EntityPose.SLEEPING && isStandingGuard(),
+                STAND_GUARD_RADIUS, 1.0D, 1.1D));
+        this.goalSelector.add(8, new WanderAroundFarGoal(this, 1.0D) {
+            // Đứng canh gác thì không đi xa: chỉ bước quanh điểm gác (StandGuardWanderGoal)
+            @Override
+            public boolean canStart() {
+                return !isStandingGuard() && super.canStart();
+            }
+
+            @Override
+            public boolean shouldContinue() {
+                return !isStandingGuard() && super.shouldContinue();
+            }
+        });
+        this.goalSelector.add(8, new com.example.ai.soldier.StandGuardWanderGoal(this, STAND_GUARD_RADIUS));
         // đi xung quanh gần (phat trien sau)
 //        this.goalSelector.add(8, new WanderAroundGoal(this, 0.8));
         // nhìn xung quanh
