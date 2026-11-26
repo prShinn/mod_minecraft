@@ -90,8 +90,13 @@ class StructurePlansTest {
 
     @Test
     void doorwaysAreOpenWhereExpected() {
-        assertFalse(hasStep(StructurePlans.HOUSE, 3, 0, 0), "Nhà dân: cửa");
-        assertFalse(hasStep(StructurePlans.HOUSE, 3, 1, 0), "Nhà dân: cửa");
+        // Nhà dân: cửa gỗ ở ô dưới, ô trên để trống cho nửa trên cửa
+        assertEquals(BuildMaterial.DOOR, stepAt(StructurePlans.HOUSE, 3, 0, 0).material(), "Nhà dân nhỏ: cửa gỗ");
+        assertFalse(hasStep(StructurePlans.HOUSE, 3, 1, 0), "Nhà dân nhỏ: nửa trên cửa");
+        assertEquals(BuildMaterial.DOOR, stepAt(StructurePlans.HOUSE_LARGE, 2, 0, 2).material(), "Nhà dân lớn: cửa gỗ");
+        assertFalse(hasStep(StructurePlans.HOUSE_LARGE, 2, 1, 2), "Nhà dân lớn: nửa trên cửa");
+        assertFalse(hasStep(StructurePlans.HOUSE_LARGE, 4, 0, 5), "Nhà dân lớn: lối thông 2 gian");
+        assertFalse(hasStep(StructurePlans.HOUSE_LARGE, 4, 1, 5), "Nhà dân lớn: lối thông 2 gian");
         assertFalse(hasStep(StructurePlans.TOWER, 2, 0, 0), "Chòi canh: cửa");
         assertFalse(hasStep(StructurePlans.CABIN, 2, 0, 0), "Nhà gỗ nhỏ: cửa");
         assertFalse(hasStep(StructurePlans.CABIN, 2, 1, 0), "Nhà gỗ nhỏ: cửa");
@@ -116,6 +121,57 @@ class StructurePlansTest {
             assertEquals(origin.offset(facing, 3), StructurePlan.toWorld(origin, facing, 0, 0, 3), facing + " z→trước");
             assertEquals(origin.up(4), StructurePlan.toWorld(origin, facing, 0, 4, 0), facing + " y→lên");
         }
+    }
+
+    /** Hướng cục bộ của block (cầu thang, cửa) quay cùng phép với toạ độ. */
+    @Test
+    void localDirectionsRotateLikePositions() {
+        BlockPos origin = new BlockPos(100, 64, 100);
+        for (Direction facing : Direction.Type.HORIZONTAL) {
+            for (Direction local : Direction.Type.HORIZONTAL) {
+                BlockPos moved = StructurePlan.toWorld(origin, facing, 5 + local.getOffsetX(), 0, 5 + local.getOffsetZ());
+                BlockPos base = StructurePlan.toWorld(origin, facing, 5, 0, 5);
+                assertEquals(base.offset(StructurePlan.toWorldDir(local, facing)), moved, facing + " " + local);
+            }
+        }
+    }
+
+    /** Mái nhà dân: cầu thang hai bên leo vào nóc, nóc là thân gỗ nằm dọc. */
+    @Test
+    void houseRoofsSlopeTowardRidge() {
+        for (StructurePlan plan : List.of(StructurePlans.HOUSE, StructurePlans.HOUSE_LARGE)) {
+            int ridgeX = plan.width() / 2;
+            boolean hasRidge = false;
+            for (StructurePlan.Step s : plan.steps()) {
+                if (s.material() == BuildMaterial.STAIRS && s.facing().getAxis() == Direction.Axis.X) { // mái
+                    assertEquals(s.x() < ridgeX ? Direction.EAST : Direction.WEST, s.facing(), plan.id() + " " + s);
+                }
+                if (s.material() == BuildMaterial.LOGS && s.facing() == Direction.SOUTH) {
+                    assertEquals(ridgeX, s.x(), plan.id() + " nóc");
+                    assertEquals(plan.height() - 1, s.y(), plan.id() + " nóc ở trên cùng");
+                    hasRidge = true;
+                }
+            }
+            assertTrue(hasRidge, plan.id());
+        }
+    }
+
+    /** Nhà dân lớn 2 tầng: cầu thang trong nhà leo đủ 5 bậc tới sàn tầng 2, phía trên bậc có chỗ đứng (lỗ sàn). */
+    @Test
+    void largeHouseStaircaseReachesSecondFloor() {
+        StructurePlan plan = StructurePlans.HOUSE_LARGE;
+        for (int k = 0; k <= 4; k++) {
+            StructurePlan.Step stair = stepAt(plan, 7, k, 3 + k);
+            assertEquals(BuildMaterial.STAIRS, stair.material(), "bậc " + k);
+            assertEquals(Direction.SOUTH, stair.facing(), "bậc " + k + " leo về phía sau");
+            assertFalse(hasStep(plan, 7, k + 1, 3 + k), "trên bậc " + k + " phải trống");
+            assertFalse(hasStep(plan, 7, k + 2, 3 + k), "đầu người trên bậc " + k + " phải trống");
+        }
+        assertEquals(BuildMaterial.PLANKS, stepAt(plan, 5, 4, 5).material(), "sàn tầng 2");
+    }
+
+    private static StructurePlan.Step stepAt(StructurePlan plan, int x, int y, int z) {
+        return plan.steps().stream().filter(s -> s.x() == x && s.y() == y && s.z() == z).findFirst().orElseThrow();
     }
 
     /** NPC phải đứng ngoài công trình, nếu không sẽ tự xây nhốt mình. */

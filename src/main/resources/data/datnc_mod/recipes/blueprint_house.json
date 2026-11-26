@@ -2,13 +2,22 @@
   "type": "minecraft:crafting_shapeless",
   "ingredients": [
     {
-      "tag": "minecraft:planks"
-    },
-    {
       "item": "minecraft:cobblestone"
     },
     {
-      "item": "minecraft:stone_bricks"
+      "tag": "minecraft:planks"
+    },
+    {
+      "tag": "minecraft:logs"
+    },
+    {
+      "item": "minecraft:glass"
+    },
+    {
+      "tag": "minecraft:wooden_stairs"
+    },
+    {
+      "tag": "minecraft:wooden_doors"
     }
   ],
   "result": {

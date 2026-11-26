@@ -1,7 +1,7 @@
 {
   "parent": "datnc_mod:block/blueprint",
   "textures": {
-    "tex": "minecraft:block/birch_planks",
-    "particle": "minecraft:block/birch_planks"
+    "tex": "datnc_mod:item/blueprint_cabin",
+    "particle": "datnc_mod:item/blueprint_cabin"
   }
 }

@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "datnc_mod:item/blueprint_house_large"
+  }
+}

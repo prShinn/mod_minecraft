@@ -1,5 +1,11 @@
 package com.example.build;
 
+import net.minecraft.block.BlockState;
+import net.minecraft.block.enums.BlockHalf;
+import net.minecraft.block.enums.DoubleBlockHalf;
+import net.minecraft.block.enums.SlabType;
+import net.minecraft.state.property.Properties;
+import org.jetbrains.annotations.Nullable;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 
@@ -18,7 +24,18 @@ import java.util.Set;
  * vì block bản vẽ phải còn đó (giữ tiến độ) tới khi xong.
  */
 public final class StructurePlan {
-    public record Step(int x, int y, int z, BuildMaterial material) {}
+    /**
+     * Một bước đặt block. {@code facing}: hướng CỤC BỘ của block có hướng (cầu thang, cửa, trục thân gỗ),
+     * null = mặc định; EAST = +x (sang phải), SOUTH = +z (vào trong công trình). {@code top}: nửa trên
+     * (cầu thang úp, phiến trên).
+     */
+    public record Step(int x, int y, int z, BuildMaterial material, @Nullable Direction facing, boolean top) {
+        public Step(int x, int y, int z, BuildMaterial material) {
+            this(x, y, z, material, null, false);
+        }
+    }
+
+    private record Cell(BuildMaterial material, @Nullable Direction facing, boolean top) {}
 
     private final String id;
     private final String name;
@@ -89,6 +106,33 @@ public final class StructurePlan {
         return toWorld(origin, facing, step.x(), step.y(), step.z());
     }
 
+    /** Hướng cục bộ (EAST = +x, SOUTH = +z) → hướng thế giới, cùng phép quay với {@link #toWorld}. */
+    public static Direction toWorldDir(Direction local, Direction facing) {
+        if (!local.getAxis().isHorizontal()) return local;
+        Direction right = facing.rotateYClockwise();
+        int wx = local.getOffsetX() * right.getOffsetX() + local.getOffsetZ() * facing.getOffsetX();
+        int wz = local.getOffsetX() * right.getOffsetZ() + local.getOffsetZ() * facing.getOffsetZ();
+        Direction world = Direction.fromVector(wx, 0, wz);
+        return world != null ? world : local;
+    }
+
+    /** Xoay block theo bước: hướng (cầu thang, cửa), nửa trên/dưới, trục thân gỗ. Block không có thuộc tính thì giữ nguyên. */
+    public static BlockState orient(BlockState state, Step step, Direction facing) {
+        if (step.facing() != null) {
+            Direction world = toWorldDir(step.facing(), facing);
+            if (state.contains(Properties.HORIZONTAL_FACING)) state = state.with(Properties.HORIZONTAL_FACING, world);
+            if (state.contains(Properties.AXIS)) state = state.with(Properties.AXIS, world.getAxis());
+        }
+        if (state.contains(Properties.BLOCK_HALF)) {
+            state = state.with(Properties.BLOCK_HALF, step.top() ? BlockHalf.TOP : BlockHalf.BOTTOM);
+        }
+        if (state.contains(Properties.SLAB_TYPE)) {
+            state = state.with(Properties.SLAB_TYPE, step.top() ? SlabType.TOP : SlabType.BOTTOM);
+        }
+        if (state.contains(Properties.DOUBLE_BLOCK_HALF)) state = state.with(Properties.DOUBLE_BLOCK_HALF, DoubleBlockHalf.LOWER);
+        return state;
+    }
+
     /** Chỗ NPC đứng xây: chính giữa, cách mặt trước 2 block (luôn ở ngoài công trình). */
     public BlockPos standPos(BlockPos origin, Direction facing) {
         return toWorld(origin, facing, width / 2, 0, -2);
@@ -101,7 +145,7 @@ public final class StructurePlan {
     public static final class Builder {
         private final String id;
         private final String name;
-        private final Map<Integer, BuildMaterial> cells = new LinkedHashMap<>();
+        private final Map<Integer, Cell> cells = new LinkedHashMap<>();
 
         private Builder(String id, String name) {
             this.id = id;
@@ -116,7 +160,39 @@ public final class StructurePlan {
         }
 
         public Builder set(int x, int y, int z, BuildMaterial material) {
-            cells.put(key(x, y, z), material);
+            cells.put(key(x, y, z), new Cell(material, null, false));
+            return this;
+        }
+
+        /** Block có hướng (cầu thang, thân gỗ nằm ngang...) — facing là hướng cục bộ. */
+        public Builder shaped(int x, int y, int z, BuildMaterial material, @Nullable Direction facing, boolean top) {
+            cells.put(key(x, y, z), new Cell(material, facing, top));
+            return this;
+        }
+
+        /** Hàng cầu thang dọc trục z từ z0..z1, cùng hướng. */
+        public Builder stairsRow(int x, int y, int z0, int z1, Direction facing) {
+            for (int z = z0; z <= z1; z++) shaped(x, y, z, BuildMaterial.STAIRS, facing, false);
+            return this;
+        }
+
+        /** Thân gỗ nằm dọc trục z (nóc nhà) từ z0..z1. */
+        public Builder logRow(int x, int y, int z0, int z1) {
+            for (int z = z0; z <= z1; z++) shaped(x, y, z, BuildMaterial.LOGS, Direction.SOUTH, false);
+            return this;
+        }
+
+        /** Phiến gỗ (top = phiến trên) trong khối x0..x1 × z0..z1 ở tầng y. */
+        public Builder slabs(int x0, int z0, int x1, int z1, int y, boolean top) {
+            for (int z = z0; z <= z1; z++)
+                for (int x = x0; x <= x1; x++) shaped(x, y, z, BuildMaterial.SLABS, null, top);
+            return this;
+        }
+
+        /** Cửa gỗ 2 ô: bước đặt ở ô dưới (Thợ xây đặt luôn nửa trên); ô trên được để trống. */
+        public Builder door(int x, int y, int z, Direction facing) {
+            shaped(x, y, z, BuildMaterial.DOOR, facing, false);
+            cells.remove(key(x, y + 1, z));
             return this;
         }
 
@@ -144,9 +220,10 @@ public final class StructurePlan {
 
         public StructurePlan build() {
             List<Step> steps = new ArrayList<>();
-            for (Map.Entry<Integer, BuildMaterial> e : cells.entrySet()) {
+            for (Map.Entry<Integer, Cell> e : cells.entrySet()) {
                 int k = e.getKey();
-                steps.add(new Step(k >> 16 & 255, k >> 8 & 255, k & 255, e.getValue()));
+                Cell c = e.getValue();
+                steps.add(new Step(k >> 16 & 255, k >> 8 & 255, k & 255, c.material(), c.facing(), c.top()));
             }
             steps.sort(Comparator.comparingInt(Step::y).thenComparingInt(Step::z).thenComparingInt(Step::x));
             // Ô bản vẽ (0,0,0) xây sau cùng

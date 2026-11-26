@@ -19,7 +19,11 @@ public enum BuildMaterial {
     LOGS("Thân gỗ", stack -> stack.isIn(ItemTags.LOGS)),
     COBBLE("Đá", stack -> stack.isOf(Items.COBBLESTONE)),
     BRICKS("Đá mịn", stack -> stack.isOf(Items.STONE_BRICKS)),
-    GLASS("Kính", stack -> stack.isOf(Items.GLASS));
+    GLASS("Kính", stack -> stack.isOf(Items.GLASS)),
+    // Block có hướng: Thợ xây xoay theo bản vẽ (StructurePlan.orient). Thêm CUỐI enum để giữ ordinal cũ.
+    STAIRS("Cầu thang gỗ", stack -> stack.isIn(ItemTags.WOODEN_STAIRS)),
+    SLABS("Phiến gỗ", stack -> stack.isIn(ItemTags.WOODEN_SLABS)),
+    DOOR("Cửa gỗ", stack -> stack.isIn(ItemTags.WOODEN_DOORS));
 
     private final String displayName;
     private final Predicate<ItemStack> matcher;

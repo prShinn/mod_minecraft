@@ -324,6 +324,8 @@ public class BuildStructureGoal extends Goal {
             defer(world, idx);
             return;
         }
+        place = StructurePlan.orient(place, step, bp.facing()); // cầu thang/cửa/phiến/thân gỗ đúng hướng
+        boolean door = place.getBlock() instanceof net.minecraft.block.DoorBlock;
         boolean isOrigin = idx == bp.plan().originIndex();
         if (!world.isChunkLoaded(cell)) {
             defer(world, idx);
@@ -363,9 +365,21 @@ public class BuildStructureGoal extends Goal {
             }
             return;
         }
+        if (door) {
+            // Cửa 2 ô: ô trên phải trống, không thì bỏ qua (không tốn cửa)
+            BlockState above = world.getBlockState(cell.up());
+            if (!above.isAir() && !above.isReplaceable()) {
+                bp.markDone(idx);
+                return;
+            }
+        }
         if (!world.setBlockState(cell, place, Block.NOTIFY_ALL)) {
             defer(world, idx); // đặt thất bại → giữ nguyên vật liệu, thử lại sau
             return;
+        }
+        if (door) {
+            world.setBlockState(cell.up(), place.with(net.minecraft.state.property.Properties.DOUBLE_BLOCK_HALF,
+                    net.minecraft.block.enums.DoubleBlockHalf.UPPER), Block.NOTIFY_ALL);
         }
         stack.decrement(1);
         bp.markDone(idx);

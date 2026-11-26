@@ -1,0 +1,7 @@
+{
+  "parent": "datnc_mod:block/blueprint",
+  "textures": {
+    "tex": "datnc_mod:item/blueprint_house_large",
+    "particle": "datnc_mod:item/blueprint_house_large"
+  }
+}

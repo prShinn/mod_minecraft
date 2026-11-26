@@ -1,0 +1,30 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    {
+      "item": "minecraft:cobblestone"
+    },
+    {
+      "tag": "minecraft:planks"
+    },
+    {
+      "tag": "minecraft:logs"
+    },
+    {
+      "item": "minecraft:glass"
+    },
+    {
+      "tag": "minecraft:wooden_stairs"
+    },
+    {
+      "tag": "minecraft:wooden_doors"
+    },
+    {
+      "tag": "minecraft:wooden_slabs"
+    }
+  ],
+  "result": {
+    "item": "datnc_mod:blueprint_house_large",
+    "count": 1
+  }
+}

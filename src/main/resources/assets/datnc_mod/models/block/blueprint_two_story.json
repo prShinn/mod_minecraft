@@ -1,7 +1,7 @@
 {
   "parent": "datnc_mod:block/blueprint",
   "textures": {
-    "tex": "minecraft:block/jungle_planks",
-    "particle": "minecraft:block/jungle_planks"
+    "tex": "datnc_mod:item/blueprint_two_story",
+    "particle": "datnc_mod:item/blueprint_two_story"
   }
 }
