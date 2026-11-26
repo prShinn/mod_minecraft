@@ -81,9 +81,18 @@ public final class NpcStuckHelper {
             BlockState state = world.getBlockState(pos);
             if (state.isAir()) return;
             var shape = state.getCollisionShape(world, pos);
-            if (!shape.isEmpty() && shape.getBoundingBox().offset(pos).intersects(box)) result.add(pos.toImmutable());
+            // So từng hộp con: hộp bao của cầu thang/hàng rào góc là nguyên khối → báo kẹt sai khi đứng trên bậc
+            if (!shape.isEmpty() && shape.getBoundingBoxes().stream().anyMatch(b -> b.offset(pos).intersects(box))) {
+                result.add(pos.toImmutable());
+            }
         });
         return result;
+    }
+
+    /** Lá mọc tự nhiên (không phải lá người chơi đặt) — chỉ loại này NPC được phá. */
+    public static boolean isNaturalLeaves(BlockState state) {
+        return state.isIn(BlockTags.LEAVES)
+                && !(state.contains(net.minecraft.block.LeavesBlock.PERSISTENT) && state.get(net.minecraft.block.LeavesBlock.PERSISTENT));
     }
 
     /** Phá block, đồ rơi cho vào sink (null → rơi ra đất). */

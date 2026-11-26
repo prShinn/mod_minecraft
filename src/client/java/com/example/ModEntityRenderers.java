@@ -21,7 +21,8 @@ public class ModEntityRenderers {
     private static final Identifier BIOME_TEXTURE = new Identifier("minecraft", "textures/entity/villager/type/plains.png");
 
     public static void register() {
-        registerNpc(ModEntities.SOLDIER_NPC, "weaponsmith");
+        // Áo lính riêng (mũ vải, giáp da) thay áo Thợ rèn vũ khí có miếng bịt mắt
+        registerNpc(ModEntities.SOLDIER_NPC, new Identifier("datnc_mod", "textures/entity/soldier.png"));
         registerNpc(ModEntities.FARMER_NPC, "farmer");
         registerNpc(ModEntities.LUMBERJACK_NPC, "fletcher");
         registerNpc(ModEntities.MINER_NPC, "toolsmith");
@@ -33,7 +34,11 @@ public class ModEntityRenderers {
 
     /** @param profession tên file trong textures/entity/villager/profession của vanilla. */
     private static <T extends MobEntity> void registerNpc(EntityType<T> type, String profession) {
-        Identifier professionTexture = new Identifier("minecraft", "textures/entity/villager/profession/" + profession + ".png");
+        registerNpc(type, new Identifier("minecraft", "textures/entity/villager/profession/" + profession + ".png"));
+    }
+
+    /** @param professionTexture lớp áo nghề 64×64 theo UV dân làng, vẽ trên thân + áo biome, dưới giáp. */
+    private static <T extends MobEntity> void registerNpc(EntityType<T> type, Identifier professionTexture) {
         EntityRendererRegistry.register(
                 type,
                 ctx -> new BipedEntityRenderer<T, BipedEntityModel<T>>(

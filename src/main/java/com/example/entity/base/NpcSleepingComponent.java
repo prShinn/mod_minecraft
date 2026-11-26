@@ -21,8 +21,15 @@ public class NpcSleepingComponent {
     private int cooldownFindBed = 0;
     private boolean shouldWander = false;
     private int wanderTime = 0;
+    /** Số lần tính lại đường tới giường hiện tại (giới hạn để không tính đường liên tục). */
+    private int bedRepaths = 0;
+    private static final int MAX_BED_REPATHS = 2;
 
-    private int searchRadius = 16;
+    private int searchRadius = 32;
+    /** Giường lệch tầng so với rương nghề tối đa bấy nhiêu block (nhà 2 tầng, rương ngoài sân...). */
+    private static final int SEARCH_HEIGHT = 6;
+    /** Tới trong khoảng này (ngang, bình phương) là lên giường; navigation hay dừng cạnh/chéo giường. */
+    private static final double BED_REACH_SQ = 2.0 * 2.0;
     private BlockPos searchCenter;
 
     public void setSearchCenter(BlockPos center) {
@@ -165,12 +172,18 @@ public class NpcSleepingComponent {
             return;
         }
 
-        // Đã đến gần giường
-        if (npc.squaredDistanceTo(Vec3d.ofCenter(targetBed)) < 1.4) {
+        // Đã đến gần giường (tính ngang + lệch tầng ≤ 1): navigation thường dừng ở ô cạnh hoặc chéo giường
+        double dx = npc.getX() - (targetBed.getX() + 0.5);
+        double dz = npc.getZ() - (targetBed.getZ() + 0.5);
+        boolean near = dx * dx + dz * dz <= BED_REACH_SQ && Math.abs(npc.getY() - targetBed.getY()) <= 1.0;
+        if (near) {
             startSleeping(npc, targetBed);
         } else if (npc.getNavigation().isIdle()) {
-            cancelMovingToBed(npc);
-            startWandering();
+            // Dừng giữa chừng (đường vòng, cửa...) → tính lại đường một lần trước khi bỏ cuộc
+            if (++bedRepaths > MAX_BED_REPATHS || !startMovingToBed(npc) || npc.getNavigation().isIdle()) {
+                cancelMovingToBed(npc);
+                startWandering();
+            }
         }
 
     }
@@ -192,6 +205,7 @@ public class NpcSleepingComponent {
         this.sleeping = true;
         this.bedPos = bed;
         this.targetBed = null;
+        this.bedRepaths = 0;
         this.shouldWander = false;
         this.wanderTime = 0;
 
@@ -226,6 +240,7 @@ public class NpcSleepingComponent {
         npc.getNavigation().stop();
         targetBed = null;
         cachedBedPos = null;
+        bedRepaths = 0;
 
     }
 
@@ -283,14 +298,20 @@ public class NpcSleepingComponent {
         BlockPos nearestBed = null;
         double nearestDist = Double.MAX_VALUE;
 
-        for (BlockPos pos : BlockPos.iterate(
-                center.add(-searchRadius, -2, -searchRadius),
-                center.add(searchRadius, 2, searchRadius))) {
-
+        // Duyệt block entity giường của các chunk quanh tâm (rẻ hơn quét từng block, cho phép lệch nhiều tầng)
+        List<BlockPos> beds = new ArrayList<>();
+        for (int cx = (center.getX() - searchRadius) >> 4; cx <= (center.getX() + searchRadius) >> 4; cx++) {
+            for (int cz = (center.getZ() - searchRadius) >> 4; cz <= (center.getZ() + searchRadius) >> 4; cz++) {
+                if (!world.isChunkLoaded(cx, cz)) continue;
+                for (var be : world.getChunk(cx, cz).getBlockEntities().values()) {
+                    if (be instanceof net.minecraft.block.entity.BedBlockEntity) beds.add(be.getPos());
+                }
+            }
+        }
+        for (BlockPos pos : beds) {
+            if (Math.abs(pos.getY() - center.getY()) > SEARCH_HEIGHT) continue;
             double distSquared = center.getSquaredDistance(pos);
             if (distSquared > radiusSquared) continue;
-
-            if (!world.isChunkLoaded(pos)) continue;
 
             BlockState state = world.getBlockState(pos);
             if (!(state.getBlock() instanceof BedBlock)) continue;
@@ -326,6 +347,7 @@ public class NpcSleepingComponent {
         if (pos == null || !npc.getWorld().isChunkLoaded(pos)) return false;
         BlockPos center = searchCenter == null ? npc.getBlockPos() : searchCenter;
         return center.getSquaredDistance(pos) <= searchRadius * searchRadius
+                && Math.abs(pos.getY() - center.getY()) <= SEARCH_HEIGHT + 1
                 && npc.getWorld().getBlockState(pos).getBlock() instanceof BedBlock;
     }
 

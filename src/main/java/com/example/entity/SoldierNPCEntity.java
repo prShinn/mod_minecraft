@@ -99,14 +99,24 @@ public class SoldierNPCEntity extends PathAwareEntity {
     public void setMoveMode(ModeNpc.ModeMove moveMode) {
         this.moveMode = moveMode;
         this.dataTracker.set(MOVE_MODE, moveMode.ordinal());
-        guardAnchor = null; // đổi chế độ → tìm lại điểm neo quanh chỗ đang đứng
+        guardAnchor = null; // đổi chế độ → lấy chỗ đang đứng làm gốc, tìm lại điểm neo quanh đó
+        guardHome = moveMode == ModeNpc.ModeMove.FOLLOW ? null : getBlockPos().toImmutable();
         guardAnchorCooldown = 0;
     }
 
     // ===== ĐIỂM NEO CANH GÁC =====
-    /** Rương binh lính / giường / rương nghề gần nhất (40 block) mà lính canh quanh khi không theo chủ. */
+    /** Lang thang xa điểm neo hơn khoảng này thì quay về điểm neo một lần rồi lang thang lại. */
+    public static final double GUARD_RETURN_RADIUS = 38.0;
+    private static final double GUARD_ARRIVE_RADIUS = 4.0;
+    /**
+     * Điểm neo: Rương binh lính / giường / rương nghề gần nhất (40 block quanh gốc);
+     * không có thì chính là gốc {@link #guardHome}. Luôn có khi không theo chủ.
+     */
     @Nullable
     private net.minecraft.util.math.BlockPos guardAnchor;
+    /** Gốc canh gác: chỗ lính đứng khi chuyển sang chế độ không theo chủ (lưu NBT). */
+    @Nullable
+    private net.minecraft.util.math.BlockPos guardHome;
     private int guardAnchorCooldown;
 
     @Nullable
@@ -132,9 +142,11 @@ public class SoldierNPCEntity extends PathAwareEntity {
             guardAnchorCooldown = 40;
             return;
         }
-        // Tìm quanh điểm neo cũ (nếu có) để lính đuổi quái ra xa không làm mất căn cứ
-        guardAnchor = GuardPost.find(this, guardAnchor != null ? guardAnchor : getBlockPos());
-        guardAnchorCooldown = guardAnchor != null ? 200 : 40;
+        // Tìm quanh gốc cố định để lính lang thang/đuổi quái ra xa không làm trôi căn cứ
+        if (guardHome == null) guardHome = getBlockPos().toImmutable(); // lính cũ chưa có gốc
+        net.minecraft.util.math.BlockPos found = GuardPost.find(this, guardHome);
+        guardAnchor = found != null ? found : guardHome;
+        guardAnchorCooldown = 200;
     }
 
     public static final TrackedData<Integer> MOVE_MODE =
@@ -243,20 +255,12 @@ public class SoldierNPCEntity extends PathAwareEntity {
         // đi tuần giữa các Cờ Tuần Tra (chỉ khi owner đặt >= 2 cờ gần đó)
         this.goalSelector.add(7, new SoldierPatrolGoal(this));
         // đi lang thang xa
-        // canh gác: đi quanh điểm neo (rương binh lính / giường / rương nghề gần nhất)
-        this.goalSelector.add(8, new GuardPostWanderGoal(this));
-        this.goalSelector.add(8, new WanderAroundFarGoal(this, 1.0D) {
-            // Chỉ lang thang tự do khi KHÔNG có điểm neo (giữ cách cũ)
-            @Override
-            public boolean canStart() {
-                return !SoldierNPCEntity.this.hasGuardPost() && super.canStart();
-            }
-
-            @Override
-            public boolean shouldContinue() {
-                return !SoldierNPCEntity.this.hasGuardPost() && super.shouldContinue();
-            }
-        });
+        // canh gác: lang thang quá 38 block khỏi điểm neo → quay về điểm neo 1 lần rồi lang thang lại
+        // (priority 7 để chen được WanderAroundFar; ngoài giao tranh, không ngủ, không giữ tuyến tuần tra)
+        this.goalSelector.add(7, new com.example.ai.ReturnToAnchorGoal(this, this::getGuardAnchor,
+                () -> getTarget() == null && getPose() != net.minecraft.entity.EntityPose.SLEEPING && hasGuardPost(),
+                GUARD_RETURN_RADIUS, GUARD_ARRIVE_RADIUS, 1.0D));
+        this.goalSelector.add(8, new WanderAroundFarGoal(this, 1.0D));
         // đi xung quanh gần (phat trien sau)
 //        this.goalSelector.add(8, new WanderAroundGoal(this, 0.8));
         // nhìn xung quanh
@@ -856,6 +860,7 @@ public class SoldierNPCEntity extends PathAwareEntity {
         loot.writeNbt(nbt);
 
         nbt.putInt("MoveMode", this.dataTracker.get(MOVE_MODE));
+        if (guardHome != null) nbt.putLong("GuardHome", guardHome.asLong());
 
         NbtCompound combatNbt = new NbtCompound();
         combat.writeToNbt(combatNbt);
@@ -888,6 +893,7 @@ public class SoldierNPCEntity extends PathAwareEntity {
         if (nbt.contains("MoveMode")) {
             this.dataTracker.set(MOVE_MODE, nbt.getInt("MoveMode"));
         }
+        guardHome = nbt.contains("GuardHome") ? net.minecraft.util.math.BlockPos.fromLong(nbt.getLong("GuardHome")) : null;
         if (nbt.contains("CombatData")) {
             combat.readFromNbt(nbt.getCompound("CombatData"));
         }

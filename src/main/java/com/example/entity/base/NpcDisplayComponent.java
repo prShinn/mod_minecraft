@@ -189,6 +189,11 @@ public class NpcDisplayComponent {
                 .orElseGet(() -> issue != null ? issue : "Đang chờ việc");
     }
 
+    /** Có goal việc (hoặc ăn/ngủ/tránh nguy hiểm) đang chạy — tức NPC không rảnh. */
+    public static boolean hasWorkGoal(net.minecraft.entity.ai.goal.GoalSelector goals) {
+        return goals.getRunningGoals().anyMatch(entry -> describeGoal(entry.getGoal()) != null);
+    }
+
     private static String describeGoal(net.minecraft.entity.ai.goal.Goal goal) {
         if (goal instanceof com.example.ai.FindAndSleepGoal) return "Đang đi ngủ";
         if (goal instanceof net.minecraft.entity.ai.goal.EscapeDangerGoal) return "Đang tránh nguy hiểm";

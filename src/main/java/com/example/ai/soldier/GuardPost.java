@@ -17,8 +17,6 @@ import org.jetbrains.annotations.Nullable;
 public final class GuardPost {
     public static final int SEARCH_RADIUS = 40;
     private static final int SEARCH_HEIGHT = 16;
-    /** Bán kính lính được đi lang thang quanh điểm neo. */
-    public static final double WANDER_RADIUS = 12.0;
 
     private GuardPost() {
     }

@@ -45,7 +45,7 @@ public class MinerNpcEntity extends WorkerNpcEntity {
     @Override
     protected NpcSleepingComponent createSleepingComponent() {
         return new NpcSleepingComponent()
-                .withSearchRadius(16)
+                .withSearchRadius(32)
                 .withCooldown(120)
                 .withWanderDuration(120);
     }

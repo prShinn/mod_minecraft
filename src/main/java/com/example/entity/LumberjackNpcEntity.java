@@ -119,7 +119,7 @@ public class LumberjackNpcEntity extends WorkerNpcEntity {
             for (BlockPos pos : new BlockPos[]{node, node.up()}) {
                 if (getBlockPos().getSquaredDistance(pos) > LEAVES_CLEAR_RANGE_SQ) continue;
                 BlockState state = world.getBlockState(pos);
-                if (state.isIn(BlockTags.LEAVES)) {
+                if (com.example.helper.NpcStuckHelper.isNaturalLeaves(state)) { // không phá lá người chơi đặt
                     swingHand(net.minecraft.util.Hand.MAIN_HAND);
                     com.example.helper.NpcStuckHelper.breakInto(world, this, pos, state, cargo);
                 }

@@ -70,6 +70,11 @@ public abstract class WorkerNpcEntity extends PathAwareEntity {
     private BlockPos chestPos;
     private boolean needsToDeposit;
     private int idleTicks;
+    /** Số tick liên tục không có goal việc nào chạy (cập nhật mỗi 10 tick). */
+    private int workIdleTicks;
+    private static final int IDLE_BEFORE_HOME_TICKS = 100;
+    private static final double IDLE_HOME_RADIUS = 20.0;
+    private static final double IDLE_HOME_ARRIVE = 6.0;
     private int chestSearchCooldown;
 
     protected WorkerNpcEntity(EntityType<? extends PathAwareEntity> type, World world) {
@@ -168,6 +173,10 @@ public abstract class WorkerNpcEntity extends PathAwareEntity {
         this.goalSelector.add(4, new FindAndEatFoodGoal(this, () -> supplies, 24,
                 () -> display.shouldEat(), amount -> display.feed(amount)));
         addWorkGoals();
+        // Rảnh (không goal việc nào chạy ≥ 5s) mà ở xa rương nghề quá 20 block → về rương; đang làm thì không ép
+        this.goalSelector.add(8, new com.example.ai.ReturnToAnchorGoal(this, this::getChestPos,
+                () -> !sleeping.isSleeping() && workIdleTicks >= IDLE_BEFORE_HOME_TICKS,
+                IDLE_HOME_RADIUS, IDLE_HOME_ARRIVE, 1.0));
         this.goalSelector.add(10, new LookAtEntityGoal(this, PlayerEntity.class, 8.0F) {
             @Override
             public boolean canStart() {
@@ -183,6 +192,9 @@ public abstract class WorkerNpcEntity extends PathAwareEntity {
         if (getWorld().isClient) return;
 
         display.tick(this, supplies, goalSelector);
+        if (age % 10 == 0) {
+            workIdleTicks = NpcDisplayComponent.hasWorkGoal(goalSelector) ? 0 : Math.min(workIdleTicks + 10, 20 * 60);
+        }
         sleeping.setSearchCenter(chestPos);
         sleeping.tick(this);
 
