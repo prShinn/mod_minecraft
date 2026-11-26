@@ -33,6 +33,8 @@ public class BreedAnimalsGoal extends Goal {
     private static final int MAX_TICKS = 600;
     private static final int FEED_PER_TRIP = 2;
     private static final double FEED_RANGE_SQ = 2.5 * 2.5;
+    /** Đứng yên trong khoảng này quanh rương là lấy được thức ăn. */
+    private static final double FETCH_REACH_SQ = 3.0 * 3.0;
 
     private enum Phase { FETCH, FEED }
 
@@ -76,38 +78,84 @@ public class BreedAnimalsGoal extends Goal {
         }
 
         Inventory chestInv = npc.getWorld().getBlockEntity(chest) instanceof Inventory inv ? inv : null;
-        boolean hungryHerd = false;
+        List<String> missing = new ArrayList<>();
         for (List<AnimalEntity> herd : herds.values()) {
             if (herd.size() >= ModConfig.get().rancherMaxAnimalsPerType) continue;
             // Con không tới được vẫn tính vào tổng đàn (ngưỡng), chỉ không chọn để cho ăn
             List<AnimalEntity> ready = herd.stream()
                     .filter(a -> canBreedNow(a) && !npc.isSkipped(a)).toList();
             if (ready.size() < 2) continue;
-            hungryHerd = true;
             AnimalEntity sample = ready.get(0);
-            if (hasFeed(npc.getFeed(), sample) || (chestInv != null && hasFeed(chestInv, sample))) {
+            BlockPos source = null;
+            if (chestInv != null && hasFeed(chestInv, sample, 1, 0)) source = chest;
+            else if (!hasFeed(npc.getFeed(), sample)) source = findFarmerSupply(sample); // rương mình thiếu → rương Nông dân
+            if (source != null || hasFeed(npc.getFeed(), sample)) {
                 pair.clear();
                 pair.add(ready.get(0));
                 pair.add(ready.get(1));
-                phase = hasFeed(npc.getFeed(), sample, FEED_PER_TRIP) ? Phase.FEED : Phase.FETCH;
+                fetchFrom = source;
+                phase = hasFeed(npc.getFeed(), sample, FEED_PER_TRIP) || source == null ? Phase.FEED : Phase.FETCH;
                 return true;
             }
+            missing.add(feedHint(sample));
         }
-        if (hungryHerd) npc.display.report(npc, "Rương chăn nuôi thiếu thức ăn cho vật nuôi");
+        if (!missing.isEmpty()) {
+            npc.display.report(npc, "Thiếu thức ăn: " + String.join(", ", missing)
+                    + " (bỏ vào rương chăn nuôi hoặc rương nông dân)");
+        }
         return false;
     }
+
+    /** Gợi ý thức ăn theo loài (luật sinh sản của Minecraft). */
+    private static String feedHint(AnimalEntity animal) {
+        if (animal instanceof PigEntity) return "lợn cần cà rốt/khoai tây/củ dền";
+        if (animal instanceof ChickenEntity) return "gà cần hạt giống";
+        return "bò/cừu cần lúa mì";
+    }
+
+    /** Rương lấy thức ăn của lượt này (rương mình hoặc rương Nông dân). */
+    private BlockPos fetchFrom;
+
+    /** Rương Nông dân cùng chủ gần rương chăn nuôi còn thức ăn cho loài này (sau khi chừa phần để gieo lại). */
+    private BlockPos findFarmerSupply(AnimalEntity sample) {
+        BlockPos best = null;
+        double bestDist = Double.MAX_VALUE;
+        for (var be : com.example.helper.BlockEntityScan.inBox(npc.getWorld(), chest, FARMER_SUPPLY_RADIUS, 4)) {
+            if (!(be instanceof com.example.block.FarmerChestBlockEntity farm)
+                    || !farm.isAccessibleBy(npc.getOwnerUUID())
+                    || !hasFeed(farm, sample, 1, FARMER_RESERVE)) continue;
+            double dist = be.getPos().getSquaredDistance(chest);
+            if (dist < bestDist) {
+                bestDist = dist;
+                best = be.getPos().toImmutable();
+            }
+        }
+        return best;
+    }
+
+    /** Bán kính tìm rương Nông dân quanh rương chăn nuôi. */
+    private static final int FARMER_SUPPLY_RADIUS = 24;
+    /** Chừa lại trong rương Nông dân mỗi loại thức ăn (hạt/củ giống để Nông dân gieo lại). */
+    private static final int FARMER_RESERVE = 16;
 
     private static boolean hasFeed(Inventory inv, AnimalEntity animal) {
         return hasFeed(inv, animal, 1);
     }
 
     private static boolean hasFeed(Inventory inv, AnimalEntity animal, int amount) {
-        int count = 0;
+        return hasFeed(inv, animal, amount, 0);
+    }
+
+    /** Có ít nhất amount món thức ăn cho loài này sau khi chừa reserve món mỗi loại item. */
+    private static boolean hasFeed(Inventory inv, AnimalEntity animal, int amount, int reserve) {
+        Map<net.minecraft.item.Item, Integer> counts = new HashMap<>();
         for (int i = 0; i < inv.size(); i++) {
             ItemStack stack = inv.getStack(i);
-            if (!stack.isEmpty() && animal.isBreedingItem(stack)) count += stack.getCount();
+            if (!stack.isEmpty() && animal.isBreedingItem(stack)) counts.merge(stack.getItem(), stack.getCount(), Integer::sum);
         }
-        return count >= amount;
+        int usable = 0;
+        for (int count : counts.values()) usable += Math.max(0, count - reserve);
+        return usable >= amount;
     }
 
     @Override
@@ -119,7 +167,7 @@ public class BreedAnimalsGoal extends Goal {
 
     private void moveToCurrentTarget() {
         if (phase == Phase.FETCH) {
-            npc.getNavigation().startMovingTo(chest.getX() + 0.5, chest.getY(), chest.getZ() + 0.5, 1.0);
+            npc.getNavigation().startMovingTo(fetchFrom.getX() + 0.5, fetchFrom.getY(), fetchFrom.getZ() + 0.5, 1.0);
         } else if (!pair.isEmpty()) {
             npc.getNavigation().startMovingTo(pair.get(0), 1.0);
         }
@@ -133,22 +181,39 @@ public class BreedAnimalsGoal extends Goal {
         if (!done && ticks % 20 == 0) moveToCurrentTarget();
         if (ticks >= MAX_TICKS) {
             if (phase == Phase.FEED && !pair.isEmpty()) npc.skipTarget(pair.get(0), 600);
+            if (phase == Phase.FETCH) npc.display.report(npc, "Không tới được rương để lấy thức ăn cho vật nuôi");
             done = true;
         }
     }
 
     private void tickFetch() {
-        if (!DeliveryTarget.canReach(npc, chest)) return;
-        if (!(npc.getWorld().getBlockEntity(chest) instanceof Inventory chestInv)) {
+        // Đi bằng startMovingTo(rương) thường dừng cách 2.5–3 block → canReach (2.5 + tầm nhìn) không bao giờ đạt.
+        // Đã dừng lại trong FETCH_REACH thì coi như tới rương (Thợ chăn nuôi vốn thao tác từ xa qua hàng rào).
+        boolean atChest = DeliveryTarget.canReach(npc, fetchFrom)
+                || (npc.getNavigation().isIdle()
+                    && npc.squaredDistanceTo(net.minecraft.util.math.Vec3d.ofCenter(fetchFrom)) <= FETCH_REACH_SQ);
+        if (!atChest) return;
+        if (!(npc.getWorld().getBlockEntity(fetchFrom) instanceof Inventory chestInv)) {
             done = true;
             return;
         }
         AnimalEntity sample = pair.get(0);
+        // Rương Nông dân: chừa FARMER_RESERVE món mỗi loại để Nông dân còn hạt/củ gieo lại
+        int reserve = fetchFrom.equals(chest) ? 0 : FARMER_RESERVE;
+        Map<net.minecraft.item.Item, Integer> allowed = new HashMap<>();
+        for (int i = 0; i < chestInv.size(); i++) {
+            ItemStack s = chestInv.getStack(i);
+            if (!s.isEmpty() && sample.isBreedingItem(s)) allowed.merge(s.getItem(), s.getCount(), Integer::sum);
+        }
+        allowed.replaceAll((item, count) -> Math.max(0, count - reserve));
         int needed = FEED_PER_TRIP;
         for (int i = 0; i < chestInv.size() && needed > 0; i++) {
             ItemStack stack = chestInv.getStack(i);
             if (stack.isEmpty() || !sample.isBreedingItem(stack)) continue;
-            ItemStack taken = stack.split(Math.min(needed, stack.getCount()));
+            int canTake = Math.min(needed, Math.min(stack.getCount(), allowed.getOrDefault(stack.getItem(), 0)));
+            if (canTake <= 0) continue;
+            allowed.merge(stack.getItem(), -canTake, Integer::sum);
+            ItemStack taken = stack.split(canTake);
             ItemStack rest = DepositCargoGoal.insert(npc.getFeed(), taken);
             stack.increment(rest.getCount()); // túi thức ăn đầy thì trả lại
             needed -= taken.getCount() - rest.getCount();

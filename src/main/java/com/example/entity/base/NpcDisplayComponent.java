@@ -62,6 +62,7 @@ public class NpcDisplayComponent {
 
     public static void reportWorker(PathAwareEntity npc, String message) {
         if (npc instanceof WorkerNpcEntity worker) worker.display.report(npc, message);
+        else if (npc instanceof com.example.entity.SoldierNPCEntity soldier) soldier.report(message);
     }
 
     public void clearReport() {

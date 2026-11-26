@@ -9,14 +9,8 @@ public class ExampleModClient implements ClientModInitializer {
     public void onInitializeClient() {
         // This entrypoint is suitable for setting up client-specific logic, such as rendering.
         ModEntityRenderers.register();
-        // Rương nghề: biểu tượng dụng cụ vẽ đè lên mặt thùng có nền trong suốt → cần lớp cutout
-        net.fabricmc.fabric.api.blockrenderlayer.v1.BlockRenderLayerMap.INSTANCE.putBlocks(
-                net.minecraft.client.render.RenderLayer.getCutout(),
-                com.example.registry.ModBlocks.FARMER_CHEST, com.example.registry.ModBlocks.MINER_CHEST,
-                com.example.registry.ModBlocks.LUMBERJACK_CHEST, com.example.registry.ModBlocks.FISHERMAN_CHEST,
-                com.example.registry.ModBlocks.RANCHER_CHEST, com.example.registry.ModBlocks.COOK_CHEST,
-                com.example.registry.ModBlocks.BUILDER_CHEST, com.example.registry.ModBlocks.FOOD_CHEST,
-                com.example.registry.ModBlocks.SOLDIER_CHEST);
+        // Rương nghề là khối đặc (che mặt block bên cạnh) nên texture phải đặc 100% và vẽ ở lớp solid mặc định.
+        // KHÔNG đưa vào lớp cutout: pixel trong suốt sẽ thành lỗ nhìn xuyên ra khoảng trống phía sau (x-ray).
 
         // handle GUI thao tác
         ModKeybinds.register();

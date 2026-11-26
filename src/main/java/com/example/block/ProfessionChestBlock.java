@@ -46,10 +46,12 @@ public abstract class ProfessionChestBlock extends BlockWithEntity {
                     || !chest.canOpen(player)) return ActionResult.FAIL;
             if (chest instanceof LumberjackChestBlockEntity lumberChest && player.isSneaking() && held.isEmpty()) {
                 chest.setOwner(player);
-                boolean enabled = lumberChest.toggleCutting();
-                player.sendMessage(net.minecraft.text.Text.literal(enabled
-                        ? "Đã bật vùng chặt: 8 block mỗi phía, thấp hơn 6 và cao hơn 64 block tính từ rương."
-                        : "Đã tắt vùng chặt."), true);
+                int radius = lumberChest.cycleCutRadius(); // 3 → 5 → 8 → tắt
+                int side = radius * 2 + 1;
+                player.sendMessage(net.minecraft.text.Text.literal(radius > 0
+                        ? "Vùng chặt: " + radius + " block mỗi phía (" + side + "×" + side
+                          + "). Shift + chuột phải để đổi: 3 → 5 → 8 → tắt."
+                        : "Đã tắt vùng chặt. Shift + chuột phải để bật lại (3 block)."), true);
                 return ActionResult.CONSUME;
             }
             if (chest instanceof MinerChestBlockEntity minerChest && player.isSneaking() && held.isEmpty()

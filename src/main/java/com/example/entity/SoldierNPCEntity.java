@@ -541,9 +541,21 @@ public class SoldierNPCEntity extends PathAwareEntity {
                 .append(Text.literal(" [" + hp + "/" + maxHp + "] ").formatted(Formatting.GREEN))
                 .append(Text.literal("🍖[" + hunger + "/" + MAX_HUNGER + "] x" + foodCount).formatted(Formatting.GOLD));
 
-        this.setCustomName(name.append(Text.literal(" • "
-                + com.example.entity.base.NpcDisplayComponent.workLabel(this, goalSelector, null))
-                .formatted(Formatting.YELLOW)));
+        String currentIssue = getWorld().getTime() < issueUntil ? issue : null;
+        String label = com.example.entity.base.NpcDisplayComponent.workLabel(this, goalSelector, currentIssue);
+        this.setCustomName(name.append(Text.literal(" • " + label)
+                .formatted(label.equals(currentIssue) ? Formatting.RED : Formatting.YELLOW)));
+    }
+
+    // ===== SỰ CỐ (hiện trên đầu như NPC nghề) =====
+    @Nullable
+    private String issue;
+    private long issueUntil;
+
+    /** Báo sự cố (vd. không tìm được rương thức ăn) — hiện trên đầu ~6 giây khi lính đang rảnh. */
+    public void report(String message) {
+        issue = message;
+        issueUntil = getWorld().getTime() + 120;
     }
 
     public int getTotalFoodCount() {

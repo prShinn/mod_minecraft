@@ -224,8 +224,19 @@ public class FarmerNpcEntity extends WorkerNpcEntity {
         if (chest == null) return List.of();
         World world = getWorld();
         if (!chest.equals(fieldChest) || world.getTime() >= fieldRebuildAt) {
-            field = FarmField.discover(chest, pos -> world.isChunkLoaded(pos)
+            Set<BlockPos> discovered = FarmField.discover(chest, pos -> world.isChunkLoaded(pos)
                     && world.getBlockState(pos).getBlock() instanceof FarmlandBlock);
+            if (chest.equals(fieldChest) && !field.isEmpty()) {
+                // Giữ ô ruộng cũ vừa bị dẫm thành đất: người chơi cuốc lại là ô có mặt ngay trong ruộng
+                // (scanFarmland chỉ nhận ô đang là đất cày), không phải chờ 60s quét lại.
+                // Cũng giữ được mảng ruộng phía ngoài khi chỗ bị dẫm làm đứt mạch nối.
+                Set<BlockPos> merged = new java.util.LinkedHashSet<>(discovered);
+                for (BlockPos old : field) {
+                    if (!merged.contains(old) && world.isChunkLoaded(old) && isTrampledPlot(world, old)) merged.add(old);
+                }
+                discovered = java.util.Collections.unmodifiableSet(merged);
+            }
+            field = discovered;
             fieldChest = chest;
             // Lệch ngẫu nhiên để nhiều nông dân không quét lại cùng một tick
             fieldRebuildAt = world.getTime() + FIELD_REBUILD_TICKS + getRandom().nextInt(200);
@@ -236,6 +247,12 @@ public class FarmerNpcEntity extends WorkerNpcEntity {
             }
         }
         return field;
+    }
+
+    /** Ô ruộng bị dẫm: đất cày hoá đất (bên trên trống), chưa bị người chơi xây đè. */
+    private static boolean isTrampledPlot(World world, BlockPos pos) {
+        return world.getBlockState(pos).isOf(net.minecraft.block.Blocks.DIRT)
+                && world.getBlockState(pos.up()).getCollisionShape(world, pos.up()).isEmpty();
     }
 
     /** Ô ruộng các nông dân khác đang thao tác (một lần truy vấn thay vì mỗi ô một lần). */

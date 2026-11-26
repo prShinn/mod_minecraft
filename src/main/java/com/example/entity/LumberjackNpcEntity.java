@@ -219,7 +219,7 @@ public class LumberjackNpcEntity extends WorkerNpcEntity {
 
         long now = world.getTime();
         skippedTrees.values().removeIf(until -> until <= now);
-        int radius = LumberjackChestBlockEntity.CUT_RADIUS;
+        int radius = zone.getCutRadius(); // bán kính riêng của rương (3 / 5 / 8)
         // Cây các tiều phu khác đang chặt: 1 truy vấn entity cho cả lượt quét (thay vì mỗi gốc cây một lần)
         java.util.List<BlockPos> busyTrees = new java.util.ArrayList<>();
         for (LumberjackNpcEntity other : world.getEntitiesByClass(LumberjackNpcEntity.class,

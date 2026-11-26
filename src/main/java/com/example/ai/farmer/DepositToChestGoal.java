@@ -20,6 +20,10 @@ public class DepositToChestGoal extends Goal {
     private BlockPos chestPos;
     private final com.example.ai.DeliveryTarget delivery = new com.example.ai.DeliveryTarget();
     private int taskTicks = 0;
+    /** Số lần đã tính lại đường khi NPC đứng lại giữa chừng (trước khi báo "không có đường"). */
+    private int repaths;
+    private int idleWait;
+    private static final int MAX_REPATHS = 3;
     private static final int MAX_TASK_TICKS = 240;
     private long retryAt;
     private static final int SEARCH_RADIUS = 18;
@@ -55,6 +59,8 @@ public class DepositToChestGoal extends Goal {
     @Override
     public void start() {
         taskTicks = 0;
+        repaths = 0;
+        idleWait = 0;
         delivery.start(npc);
     }
 
@@ -74,6 +80,13 @@ public class DepositToChestGoal extends Goal {
             depositItems();
             com.example.helper.NpcFeedback.success(npc);
             stop();
+        } else if (npc.getNavigation().isIdle() && repaths < MAX_REPATHS && taskTicks < MAX_TASK_TICKS) {
+            // Đứng lại giữa chừng (dừng lệch, đang nhảy...) → chờ 0.5s rồi tính lại đường, tối đa 3 lần
+            if (++idleWait >= 10) {
+                idleWait = 0;
+                repaths++;
+                if (!com.example.ai.DeliveryTarget.resumeTowards(npc, chestPos)) repaths = MAX_REPATHS;
+            }
         } else if (npc.getNavigation().isIdle() || taskTicks >= MAX_TASK_TICKS) {
             delivery.markBlocked(npc, chestPos);
             npc.display.report(npc, "Không có đường tới rương nghề");
