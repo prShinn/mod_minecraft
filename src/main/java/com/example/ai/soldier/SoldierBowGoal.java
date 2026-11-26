@@ -160,7 +160,7 @@ public class SoldierBowGoal extends Goal {
         if (npc.getWorld().isClient) return;
         ItemStack bow = npc.getMainHandStack();
         if (!(bow.getItem() instanceof BowItem)) return;
-        ArrowEntity arrow = new ArrowEntity(npc.getWorld(), npc); // tạo arrow
+        ArrowEntity arrow = SoldierNPCEntity.createAllySafeArrow(npc); // bay xuyên phe ta, không nhặt được
         arrow.setDamage(3.5F);
         // ===== ÁP DỤNG ENCHANTMENTS =====
         // 1️⃣ POWER (I-V) - Tăng damage

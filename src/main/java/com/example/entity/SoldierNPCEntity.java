@@ -844,6 +844,33 @@ public class SoldierNPCEntity extends PathAwareEntity {
     }
 
     /** Sát thương đến từ Binh lính (kể cả tên/đạn họ bắn) có cùng chủ với nạn nhân. */
+    /**
+     * Phe ta của lính: chủ, Binh lính và NPC nghề cùng chủ, thú cưng của chủ, dân làng, golem sắt.
+     * Tên của lính bay XUYÊN qua phe ta (không trúng, không mất tên vào người đồng đội).
+     */
+    public boolean isAlly(net.minecraft.entity.Entity e) {
+        if (e == this) return true;
+        UUID owner = ownerUUID;
+        if (e instanceof PlayerEntity player) return owner != null && owner.equals(player.getUuid());
+        if (e instanceof SoldierNPCEntity soldier) return owner != null && owner.equals(soldier.getOwnerUuid());
+        if (e instanceof com.example.entity.base.WorkerNpcEntity worker) return owner != null && owner.equals(worker.getOwnerUUID());
+        if (e instanceof net.minecraft.entity.passive.TameableEntity pet) return owner != null && owner.equals(pet.getOwnerUuid());
+        return e instanceof VillagerEntity || e instanceof net.minecraft.entity.passive.IronGolemEntity;
+    }
+
+    /** Mũi tên của lính: bắn vô hạn, không nhặt được, bay xuyên qua phe ta ({@link #isAlly}). */
+    public static net.minecraft.entity.projectile.ArrowEntity createAllySafeArrow(SoldierNPCEntity shooter) {
+        net.minecraft.entity.projectile.ArrowEntity arrow = new net.minecraft.entity.projectile.ArrowEntity(shooter.getWorld(), shooter) {
+            @Override
+            protected boolean canHit(net.minecraft.entity.Entity entity) {
+                return super.canHit(entity) && !shooter.isAlly(entity);
+            }
+        };
+        arrow.initFromStack(Items.ARROW.getDefaultStack());
+        arrow.pickupType = net.minecraft.entity.projectile.PersistentProjectileEntity.PickupPermission.DISALLOWED;
+        return arrow;
+    }
+
     public static boolean isFriendlyFire(DamageSource source, @Nullable UUID victimOwner) {
         return victimOwner != null && source.getAttacker() instanceof SoldierNPCEntity soldier
                 && victimOwner.equals(soldier.getOwnerUuid());
