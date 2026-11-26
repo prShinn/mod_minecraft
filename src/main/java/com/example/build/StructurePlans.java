@@ -17,7 +17,7 @@ import static net.minecraft.util.math.Direction.WEST;
  * của bản vẽ (mỗi vật liệu x1) không trùng nhau:
  * Nhà dân nhỏ {đá, gỗ, thân gỗ, kính, cầu thang, cửa} · Nhà dân lớn {… + phiến gỗ} · Tường {đá, đá mịn} · Cổng {thân gỗ, gỗ, đá mịn} ·
  * Chòi {thân gỗ, đá, gỗ} · Kho {thân gỗ, gỗ} ·
- * Nhà gỗ nhỏ {thân gỗ, gỗ, kính} · Nhà đá {đá, đá mịn, kính} · Nhà hai tầng {thân gỗ, gỗ, đá, kính}.
+ * Nhà gỗ nhỏ {thân gỗ, gỗ, kính, cửa} · Nhà đá {đá, đá mịn, kính, cửa} · Nhà hai tầng {thân gỗ, gỗ, đá, kính, cửa}.
  */
 public final class StructurePlans {
     private StructurePlans() {}
@@ -138,7 +138,7 @@ public final class StructurePlans {
             .set(0, 1, 2, GLASS).set(4, 1, 2, GLASS).set(2, 1, 4, GLASS)
             .fill(0, 3, 0, 4, 3, 4, PLANKS)
             .fill(1, 4, 2, 3, 4, 2, LOGS)
-            .clear(2, 0, 0).clear(2, 1, 0)
+            .door(2, 0, 0, SOUTH)
             .build();
 
     /** Nhà đá 7×5, cao 6: tường đá, góc + mái đá mịn, 5 cửa sổ kính. Cửa ở giữa mặt trước. */
@@ -150,7 +150,7 @@ public final class StructurePlans {
             .set(0, 2, 2, GLASS).set(6, 2, 2, GLASS).set(3, 2, 4, GLASS)
             .fill(0, 4, 0, 6, 4, 4, BRICKS)
             .fill(1, 5, 2, 5, 5, 2, BRICKS)
-            .clear(3, 0, 0).clear(3, 1, 0)
+            .door(3, 0, 0, SOUTH)
             .build();
 
     /**
@@ -168,7 +168,7 @@ public final class StructurePlans {
             .set(2, 6, 6, GLASS).set(4, 6, 6, GLASS)
             .fill(0, 8, 0, 6, 8, 6, PLANKS)
             .fill(1, 9, 3, 5, 9, 3, LOGS)
-            .clear(3, 0, 0).clear(3, 1, 0)
+            .door(3, 0, 0, SOUTH)
             .clear(5, 4, 5)
             .build();
 

@@ -41,7 +41,8 @@ public class BuildStructureGoal extends Goal {
     private enum Phase { PLAN, GATHER, BUILD, WAIT }
 
     /** Tầm với khi đặt block (bình phương). */
-    private static final double REACH_SQ = 14.0 * 14.0;
+    /** Tầm đặt block từ chỗ đứng trước công trình — đủ tới nóc phía sau Nhà dân lớn 2 tầng (~16 block). */
+    private static final double REACH_SQ = 18.0 * 18.0;
     private static final int LEG_TIMEOUT_TICKS = 20 * 40;
     private static final int SCAN_INTERVAL_TICKS = 40;
     private static final int WAIT_RECHECK_TICKS = 40;

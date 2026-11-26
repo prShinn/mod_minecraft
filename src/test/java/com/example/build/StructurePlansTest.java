@@ -98,12 +98,12 @@ class StructurePlansTest {
         assertFalse(hasStep(StructurePlans.HOUSE_LARGE, 4, 0, 5), "Nhà dân lớn: lối thông 2 gian");
         assertFalse(hasStep(StructurePlans.HOUSE_LARGE, 4, 1, 5), "Nhà dân lớn: lối thông 2 gian");
         assertFalse(hasStep(StructurePlans.TOWER, 2, 0, 0), "Chòi canh: cửa");
-        assertFalse(hasStep(StructurePlans.CABIN, 2, 0, 0), "Nhà gỗ nhỏ: cửa");
-        assertFalse(hasStep(StructurePlans.CABIN, 2, 1, 0), "Nhà gỗ nhỏ: cửa");
-        assertFalse(hasStep(StructurePlans.STONE_HOUSE, 3, 0, 0), "Nhà đá: cửa");
-        assertFalse(hasStep(StructurePlans.STONE_HOUSE, 3, 1, 0), "Nhà đá: cửa");
-        assertFalse(hasStep(StructurePlans.TWO_STORY, 3, 0, 0), "Nhà hai tầng: cửa");
-        assertFalse(hasStep(StructurePlans.TWO_STORY, 3, 1, 0), "Nhà hai tầng: cửa");
+        assertEquals(BuildMaterial.DOOR, stepAt(StructurePlans.CABIN, 2, 0, 0).material(), "Nhà gỗ nhỏ: cửa gỗ");
+        assertFalse(hasStep(StructurePlans.CABIN, 2, 1, 0), "Nhà gỗ nhỏ: nửa trên cửa");
+        assertEquals(BuildMaterial.DOOR, stepAt(StructurePlans.STONE_HOUSE, 3, 0, 0).material(), "Nhà đá: cửa gỗ");
+        assertFalse(hasStep(StructurePlans.STONE_HOUSE, 3, 1, 0), "Nhà đá: nửa trên cửa");
+        assertEquals(BuildMaterial.DOOR, stepAt(StructurePlans.TWO_STORY, 3, 0, 0).material(), "Nhà hai tầng: cửa gỗ");
+        assertFalse(hasStep(StructurePlans.TWO_STORY, 3, 1, 0), "Nhà hai tầng: nửa trên cửa");
         assertFalse(hasStep(StructurePlans.TWO_STORY, 5, 4, 5), "Nhà hai tầng: lỗ thang");
         for (int x = 1; x <= 5; x++) {
             for (int y = 0; y <= 3; y++) {
