@@ -1,119 +1,12 @@
 {
-  "parent": "minecraft:block/block",
+  "parent": "minecraft:block/cube",
   "textures": {
     "particle": "datnc_mod:block/chest_side_soldier",
-    "side": "datnc_mod:block/chest_side_soldier",
-    "top": "datnc_mod:block/chest_top_soldier",
-    "bottom": "datnc_mod:block/chest_bottom",
-    "emblem": "minecraft:item/iron_sword"
-  },
-  "elements": [
-    {
-      "from": [
-        0,
-        0,
-        0
-      ],
-      "to": [
-        16,
-        16,
-        16
-      ],
-      "faces": {
-        "down": {
-          "texture": "#bottom",
-          "cullface": "down"
-        },
-        "up": {
-          "texture": "#top",
-          "cullface": "up"
-        },
-        "north": {
-          "texture": "#side",
-          "cullface": "north"
-        },
-        "south": {
-          "texture": "#side",
-          "cullface": "south"
-        },
-        "west": {
-          "texture": "#side",
-          "cullface": "west"
-        },
-        "east": {
-          "texture": "#side",
-          "cullface": "east"
-        }
-      }
-    },
-    {
-      "from": [
-        3,
-        3,
-        -0.01
-      ],
-      "to": [
-        13,
-        13,
-        16.01
-      ],
-      "shade": true,
-      "faces": {
-        "north": {
-          "uv": [
-            0,
-            0,
-            16,
-            16
-          ],
-          "texture": "#emblem",
-          "cullface": "north"
-        },
-        "south": {
-          "uv": [
-            0,
-            0,
-            16,
-            16
-          ],
-          "texture": "#emblem",
-          "cullface": "south"
-        }
-      }
-    },
-    {
-      "from": [
-        -0.01,
-        3,
-        3
-      ],
-      "to": [
-        16.01,
-        13,
-        13
-      ],
-      "faces": {
-        "west": {
-          "uv": [
-            0,
-            0,
-            16,
-            16
-          ],
-          "texture": "#emblem",
-          "cullface": "west"
-        },
-        "east": {
-          "uv": [
-            0,
-            0,
-            16,
-            16
-          ],
-          "texture": "#emblem",
-          "cullface": "east"
-        }
-      }
-    }
-  ]
+    "north": "datnc_mod:block/chest_side_soldier",
+    "south": "datnc_mod:block/chest_side_soldier",
+    "east": "datnc_mod:block/chest_side_soldier",
+    "west": "datnc_mod:block/chest_side_soldier",
+    "up": "datnc_mod:block/chest_top_soldier",
+    "down": "datnc_mod:block/chest_bottom"
+  }
 }

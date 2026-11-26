@@ -1,7 +1,6 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "datnc_mod:item/token_badge_miner",
-    "layer1": "minecraft:item/iron_pickaxe"
+    "layer0": "datnc_mod:item/token_miner"
   }
 }

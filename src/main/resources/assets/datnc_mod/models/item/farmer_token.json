@@ -1,7 +1,6 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "datnc_mod:item/token_badge_farmer",
-    "layer1": "minecraft:item/iron_hoe"
+    "layer0": "datnc_mod:item/token_farmer"
   }
 }

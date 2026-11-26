@@ -1,7 +1,6 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "datnc_mod:item/token_badge_lumberjack",
-    "layer1": "minecraft:item/iron_axe"
+    "layer0": "datnc_mod:item/token_lumberjack"
   }
 }
