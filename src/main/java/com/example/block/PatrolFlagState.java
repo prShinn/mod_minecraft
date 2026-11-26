@@ -45,6 +45,22 @@ public class PatrolFlagState extends PersistentState {
         if (flags.removeIf(f -> f.pos.equals(pos))) markDirty();
     }
 
+    /** Cờ của owner gần pos nhất (mọi khoảng cách), null nếu chưa có cờ. */
+    @org.jetbrains.annotations.Nullable
+    public BlockPos nearestOwned(UUID owner, BlockPos pos) {
+        BlockPos best = null;
+        double bestDist = Double.MAX_VALUE;
+        for (Flag f : flags) {
+            if (!f.owner.equals(owner)) continue;
+            double d = f.pos.getSquaredDistance(pos);
+            if (d < bestDist) {
+                bestDist = d;
+                best = f.pos;
+            }
+        }
+        return best;
+    }
+
     /** Số cờ của owner trong bán kính RANGE quanh center (dùng giới hạn khi đặt). */
     public int countNear(UUID owner, BlockPos center) {
         double rangeSq = RANGE * RANGE;

@@ -19,8 +19,8 @@ public class SoldierPatrolGoal extends Goal {
     private static final double SPEED = 1.0D;
     private static final double ARRIVE_HORIZONTAL_SQ = 2.5D * 2.5D;
     private static final double ARRIVE_VERTICAL = 3.0D;
-    private static final int PAUSE_MIN_TICKS = 40;
-    private static final int PAUSE_RANDOM_TICKS = 60;
+    /** Tới mỗi cờ đứng canh đúng 3 giây rồi mới đi tiếp. */
+    private static final int PAUSE_TICKS = 60;
     private static final int LEG_TIMEOUT_TICKS = 20 * 40; // kẹt đường > 40s → bỏ qua cờ này
     private static final int REPATH_COOLDOWN_TICKS = 20;
     private static final int SCAN_INTERVAL_TICKS = 20;
@@ -80,7 +80,7 @@ public class SoldierPatrolGoal extends Goal {
         if (hasArrived()) {
             lastReached = target;
             soldier.getNavigation().stop();
-            pauseTicks = PAUSE_MIN_TICKS + soldier.getRandom().nextInt(PAUSE_RANDOM_TICKS);
+            pauseTicks = PAUSE_TICKS;
             return;
         }
         if (legTicks > LEG_TIMEOUT_TICKS) {
