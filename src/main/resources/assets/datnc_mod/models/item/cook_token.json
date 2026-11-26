@@ -1,4 +1,7 @@
 {
   "parent": "minecraft:item/generated",
-  "textures": { "layer0": "minecraft:item/mushroom_stew" }
+  "textures": {
+    "layer0": "datnc_mod:item/token_badge_cook",
+    "layer1": "minecraft:item/cooked_beef"
+  }
 }

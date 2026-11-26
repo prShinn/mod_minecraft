@@ -1,6 +1,7 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "minecraft:item/fishing_rod"
+    "layer0": "datnc_mod:item/token_badge_fisherman",
+    "layer1": "minecraft:item/fishing_rod"
   }
 }

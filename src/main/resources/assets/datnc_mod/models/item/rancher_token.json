@@ -1,4 +1,7 @@
 {
   "parent": "minecraft:item/generated",
-  "textures": { "layer0": "minecraft:item/lead" }
+  "textures": {
+    "layer0": "datnc_mod:item/token_badge_rancher",
+    "layer1": "minecraft:item/shears"
+  }
 }
