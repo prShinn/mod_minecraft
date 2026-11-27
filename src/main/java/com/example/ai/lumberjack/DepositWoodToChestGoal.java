@@ -55,7 +55,7 @@ public class DepositWoodToChestGoal extends Goal {
 
         npc.findNearestChest();
         chestPos = delivery.find(npc, npc.getChestPos(), com.example.block.LumberjackChestBlockEntity.class,
-                npc.getCargo(), stack -> true, 16, 2, npc.display);
+                npc.getCargo(), stack -> true, 24, 3, npc.display);
         if (chestPos == null) return false;
         return true;
     }

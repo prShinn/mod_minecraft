@@ -88,13 +88,14 @@ public class WanderNearChestGoal extends Goal {
      * Chọn vị trí ngẫu nhiên để lang thang
      */
     private void pickNewWanderTarget() {
-        BlockPos current = npc.getBlockPos();
+        // Neo quanh rương nghề nếu đã có, tránh đi lang thang trôi dần ra ngoài tầm tìm rương
+        BlockPos anchor = npc.getChestPos() != null ? npc.getChestPos() : npc.getBlockPos();
 
-        // Random một điểm trong bán kính 12 blocks
+        // Random một điểm trong bán kính 12 blocks quanh điểm neo
         int dx = random.nextInt(WANDER_RADIUS * 2 + 1) - WANDER_RADIUS;
         int dz = random.nextInt(WANDER_RADIUS * 2 + 1) - WANDER_RADIUS;
 
-        wanderTarget = current.add(dx, 0, dz);
+        wanderTarget = anchor.add(dx, 0, dz);
 
         // Tìm vị trí y hợp lệ (mặt đất)
         wanderTarget = npc.getWorld().getTopPosition(

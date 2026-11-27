@@ -28,7 +28,7 @@ import net.minecraft.world.World;
 
 /** Tiều phu: chặt cây trong vùng chặt của Rương Tiều phu, trồng lại mầm, nộp gỗ về rương. */
 public class LumberjackNpcEntity extends WorkerNpcEntity {
-    public final static int FIND_CHEST_DISTANCE = 16;
+    public final static int FIND_CHEST_DISTANCE = 24;
     public final static int FIND_TREE_DISTANCE = 8;
     private static final int TREE_SEARCH_COOLDOWN = 60; // 3 giây
     private static final int TREE_SEARCH_IDLE_COOLDOWN = 100; // không thấy cây: 5 giây
@@ -59,7 +59,7 @@ public class LumberjackNpcEntity extends WorkerNpcEntity {
         this.goalSelector.add(5, new PlantSaplingGoal(this));
         this.goalSelector.add(6, new DepositWoodToChestGoal(this));
         this.goalSelector.add(7, new ChopTreeGoal(this));
-        this.goalSelector.add(8, new WanderNearChestGoal(this));
+        this.goalSelector.add(9, new WanderNearChestGoal(this));
     }
 
     @Override
@@ -89,7 +89,7 @@ public class LumberjackNpcEntity extends WorkerNpcEntity {
 
     @Override
     protected int chestSearchHeight() {
-        return 2;
+        return 3;
     }
 
     /** Cây mọc trùm lên người → chặt ngay gỗ/lá đang đè, đồ cho vào túi. */

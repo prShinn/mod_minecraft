@@ -8,9 +8,17 @@ import com.example.block.ProfessionChestBlockEntity;
 import com.example.config.ModConfig;
 import com.example.entity.CookNpcEntity;
 import com.example.entity.base.WorkerNpcEntity;
+import com.example.helper.BlockEntityScan;
 import com.example.helper.NpcFeedback;
+import net.minecraft.block.AbstractFurnaceBlock;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.CampfireBlock;
 import net.minecraft.block.entity.AbstractFurnaceBlockEntity;
 import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.block.entity.CampfireBlockEntity;
+import net.minecraft.block.entity.FurnaceBlockEntity;
+import net.minecraft.block.entity.SmokerBlockEntity;
 import net.minecraft.entity.ai.goal.Goal;
 import net.minecraft.inventory.Inventory;
 import net.minecraft.inventory.SimpleInventory;
@@ -48,6 +56,10 @@ public class CookFoodGoal extends Goal {
     private Phase phase;
     private BlockPos chest;
     private BlockPos source;
+    /** Trạm nấu gần rương: ưu tiên Smoker → Furnace → Campfire; null/bằng chest nếu chưa đặt lò. */
+    private BlockPos station;
+    /** Đánh dấu NPC đã bật lửa lò (Smoker/Furnace) để tắt lại khi xong mẻ hoặc bị ngắt. */
+    private boolean litByNpc;
     private long nextScan;
     private int walkTicks;
     private int cookTicks;
@@ -96,6 +108,7 @@ public class CookFoodGoal extends Goal {
         nextScan = now + 60;
         chest = npc.findWorkChest();
         if (chest == null) return false;
+        station = findStation();
         if (!npc.getIngredients().isEmpty()) {
             phase = Phase.COOK;
             return true;
@@ -104,6 +117,33 @@ public class CookFoodGoal extends Goal {
         if (source == null) return false;
         phase = Phase.GATHER;
         return true;
+    }
+
+    /** Tìm trạm nấu gần rương nhất theo thứ tự ưu tiên: Lò hun khói → Lò nung → Bếp lửa trại → Rương. */
+    private BlockPos findStation() {
+        World world = npc.getWorld();
+        int r = ModConfig.get().cookWorkRadius;
+        BlockPos best = null;
+        int bestTier = Integer.MAX_VALUE;
+        double bestDist = Double.MAX_VALUE;
+        for (BlockEntity be : BlockEntityScan.inBox(world, chest, r, 4)) {
+            int tier = stationTier(be);
+            if (tier == Integer.MAX_VALUE) continue;
+            double dist = chest.getSquaredDistance(be.getPos());
+            if (tier < bestTier || (tier == bestTier && dist < bestDist)) {
+                bestTier = tier;
+                bestDist = dist;
+                best = be.getPos().toImmutable();
+            }
+        }
+        return best != null ? best : chest;
+    }
+
+    private static int stationTier(BlockEntity be) {
+        if (be instanceof SmokerBlockEntity) return 0;
+        if (be instanceof FurnaceBlockEntity) return 1;
+        if (be instanceof CampfireBlockEntity) return 2;
+        return Integer.MAX_VALUE;
     }
 
     /** Tìm rương gần nhất còn nguyên liệu nấu được. */
@@ -168,9 +208,11 @@ public class CookFoodGoal extends Goal {
     @Override
     public void start() {
         done = false;
+        litByNpc = false;
         walkTicks = 0;
         cookTicks = 0;
-        moveTo(phase == Phase.GATHER ? source : chest);
+        if (station == null) station = chest;
+        moveTo(phase == Phase.GATHER ? source : station);
     }
 
     private void moveTo(BlockPos pos) {
@@ -179,11 +221,11 @@ public class CookFoodGoal extends Goal {
 
     @Override
     public void tick() {
-        BlockPos target = phase == Phase.GATHER ? source : chest;
+        BlockPos target = phase == Phase.GATHER ? source : station;
         if (!DeliveryTarget.canReach(npc, target)) {
             if (++walkTicks >= MAX_WALK_TICKS) {
                 npc.display.report(npc, phase == Phase.GATHER ? "Không có đường tới rương nguyên liệu"
-                        : "Không có đường tới rương đầu bếp");
+                        : "Không có đường tới bếp nấu");
                 done = true;
             } else if (walkTicks % 20 == 0) {
                 moveTo(target);
@@ -222,16 +264,29 @@ public class CookFoodGoal extends Goal {
             done = true;
             return;
         }
+        // Nếu đang ở rương đầu bếp, tiện tay lấy trước nhiên liệu (gỗ/than) để mang sang lò bật bếp
+        if (npc.getFuelUnits() <= 0 && needsFire(npc.getWorld())) refuel();
         phase = Phase.COOK;
-        moveTo(chest);
+        moveTo(station);
+    }
+
+    private boolean needsFire(World world) {
+        SimpleInventory ingredients = npc.getIngredients();
+        for (int i = 0; i < ingredients.size(); i++) {
+            ItemStack s = ingredients.getStack(i);
+            if (!s.isEmpty() && !smokedResult(world, s).isEmpty()) return true;
+        }
+        return false;
     }
 
     private void cook() {
         if (!(npc.getWorld() instanceof ServerWorld world)) return;
+        if (!ensureStationLit(world)) return;
+
         cookTicks++;
         if (cookTicks % 10 == 0) {
             world.spawnParticles(ParticleTypes.CAMPFIRE_COSY_SMOKE,
-                    chest.getX() + 0.5, chest.getY() + 1.1, chest.getZ() + 0.5, 1, 0.15, 0.05, 0.15, 0.01);
+                    station.getX() + 0.5, station.getY() + 1.1, station.getZ() + 0.5, 1, 0.15, 0.05, 0.15, 0.01);
         }
         if (cookTicks < ModConfig.get().cookTicksPerItem) return;
         cookTicks = 0;
@@ -242,10 +297,51 @@ public class CookFoodGoal extends Goal {
             return;
         }
         npc.swingHand(net.minecraft.util.Hand.MAIN_HAND);
-        world.playSound(null, chest, SoundEvents.BLOCK_SMOKER_SMOKE, SoundCategory.BLOCKS, 0.8F, 1.0F);
+        world.playSound(null, station,
+                world.getBlockEntity(station) instanceof CampfireBlockEntity
+                        ? SoundEvents.BLOCK_CAMPFIRE_CRACKLE : SoundEvents.BLOCK_SMOKER_SMOKE,
+                SoundCategory.BLOCKS, 0.8F, 1.0F);
         ItemStack rest = DepositCargoGoal.insert(npc.getCargo(), result);
         if (!rest.isEmpty()) npc.dropStack(rest);
         if (npc.getIngredients().isEmpty()) finishBatch();
+    }
+
+    /** Tự bật lò (Smoker/Furnace) hoặc châm lửa bếp trại (Campfire) khi có nhiên liệu từ rương. */
+    private boolean ensureStationLit(ServerWorld world) {
+        if (station == null || station.equals(chest) || !world.isChunkLoaded(station)) return true;
+        BlockState state = world.getBlockState(station);
+        BlockEntity be = world.getBlockEntity(station);
+        if (be instanceof AbstractFurnaceBlockEntity && state.contains(AbstractFurnaceBlock.LIT)) {
+            if (needsFire(world) && npc.getFuelUnits() <= 0 && !refuel()) {
+                npc.display.report(npc, "Rương đầu bếp thiếu nhiên liệu (than, gỗ...)");
+                finishBatch();
+                return false;
+            }
+            if (!state.get(AbstractFurnaceBlock.LIT)) {
+                world.setBlockState(station, state.with(AbstractFurnaceBlock.LIT, true), Block.NOTIFY_ALL);
+                litByNpc = true;
+            }
+        } else if (be instanceof CampfireBlockEntity && state.contains(CampfireBlock.LIT) && !state.get(CampfireBlock.LIT)) {
+            if (npc.getFuelUnits() <= 0 && !refuel()) {
+                npc.display.report(npc, "Rương đầu bếp thiếu nhiên liệu (than, gỗ...) để nhóm bếp");
+                finishBatch();
+                return false;
+            }
+            world.setBlockState(station, state.with(CampfireBlock.LIT, true), Block.NOTIFY_ALL);
+            world.playSound(null, station, SoundEvents.ITEM_FLINTANDSTEEL_USE, SoundCategory.BLOCKS, 0.7F, 1.0F);
+        }
+        return true;
+    }
+
+    private void extinguishStationIfLit() {
+        if (!litByNpc || station == null || !(npc.getWorld() instanceof ServerWorld world)) return;
+        litByNpc = false;
+        if (!world.isChunkLoaded(station)) return;
+        BlockState state = world.getBlockState(station);
+        if (world.getBlockEntity(station) instanceof AbstractFurnaceBlockEntity
+                && state.contains(AbstractFurnaceBlock.LIT) && state.get(AbstractFurnaceBlock.LIT)) {
+            world.setBlockState(station, state.with(AbstractFurnaceBlock.LIT, false), Block.NOTIFY_ALL);
+        }
     }
 
     /** Nấu 1 món từ nguyên liệu đang mang; trả về EMPTY nếu không nấu được gì nữa. */
@@ -288,6 +384,7 @@ public class CookFoodGoal extends Goal {
 
     /** Kết thúc mẻ: trả nguyên liệu dư về Rương Đầu bếp, bật cờ đi nộp món chín. */
     private void finishBatch() {
+        extinguishStationIfLit();
         if (npc.getWorld().getBlockEntity(chest) instanceof Inventory inv) {
             DepositCargoGoal.moveAll(npc.getIngredients(), inv);
         }
@@ -324,8 +421,10 @@ public class CookFoodGoal extends Goal {
 
     @Override
     public void stop() {
+        extinguishStationIfLit();
         npc.getNavigation().stop();
         source = null;
+        station = null;
         npc.resetIdle();
     }
 }

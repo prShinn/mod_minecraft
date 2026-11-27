@@ -86,13 +86,14 @@ public class BreedAnimalsGoal extends Goal {
                     .filter(a -> canBreedNow(a) && !npc.isSkipped(a)).toList();
             if (ready.size() < 2) continue;
             AnimalEntity sample = ready.get(0);
-            // Thức ăn chỉ lấy từ Rương Thợ chăn nuôi (không đụng rương Nông dân)
-            boolean inChest = chestInv != null && hasFeed(chestInv, sample);
-            if (inChest || hasFeed(npc.getFeed(), sample)) {
+            // Thức ăn chỉ lấy từ Rương Thợ chăn nuôi (không đụng rương Nông dân), phải đủ >= 2 cho 1 cặp
+            int inPocket = countFeed(npc.getFeed(), sample);
+            int inChest = chestInv != null ? countFeed(chestInv, sample) : 0;
+            if (inPocket + inChest >= FEED_PER_TRIP) {
                 pair.clear();
                 pair.add(ready.get(0));
                 pair.add(ready.get(1));
-                phase = hasFeed(npc.getFeed(), sample, FEED_PER_TRIP) || !inChest ? Phase.FEED : Phase.FETCH;
+                phase = inPocket >= FEED_PER_TRIP ? Phase.FEED : Phase.FETCH;
                 return true;
             }
             missing.add(feedHint(sample));
@@ -110,17 +111,13 @@ public class BreedAnimalsGoal extends Goal {
         return "bò/cừu cần lúa mì";
     }
 
-    private static boolean hasFeed(Inventory inv, AnimalEntity animal) {
-        return hasFeed(inv, animal, 1);
-    }
-
-    private static boolean hasFeed(Inventory inv, AnimalEntity animal, int amount) {
+    private static int countFeed(Inventory inv, AnimalEntity animal) {
         int count = 0;
         for (int i = 0; i < inv.size(); i++) {
             ItemStack stack = inv.getStack(i);
             if (!stack.isEmpty() && animal.isBreedingItem(stack)) count += stack.getCount();
         }
-        return count >= amount;
+        return count;
     }
 
     @Override
@@ -163,7 +160,7 @@ public class BreedAnimalsGoal extends Goal {
             return;
         }
         AnimalEntity sample = pair.get(0);
-        int needed = FEED_PER_TRIP;
+        int needed = Math.max(0, FEED_PER_TRIP - countFeed(npc.getFeed(), sample));
         for (int i = 0; i < chestInv.size() && needed > 0; i++) {
             ItemStack stack = chestInv.getStack(i);
             if (stack.isEmpty() || !sample.isBreedingItem(stack)) continue;
@@ -173,7 +170,7 @@ public class BreedAnimalsGoal extends Goal {
             needed -= taken.getCount() - rest.getCount();
             chestInv.markDirty();
         }
-        if (!hasFeed(npc.getFeed(), sample)) {
+        if (countFeed(npc.getFeed(), sample) < FEED_PER_TRIP) {
             done = true;
             return;
         }
