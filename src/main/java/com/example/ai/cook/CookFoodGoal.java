@@ -284,6 +284,9 @@ public class CookFoodGoal extends Goal {
         if (!ensureStationLit(world)) return;
 
         cookTicks++;
+        if (cookTicks % 14 == 0) {
+            npc.swingHand(net.minecraft.util.Hand.MAIN_HAND, true);
+        }
         if (cookTicks % 10 == 0) {
             world.spawnParticles(ParticleTypes.CAMPFIRE_COSY_SMOKE,
                     station.getX() + 0.5, station.getY() + 1.1, station.getZ() + 0.5, 1, 0.15, 0.05, 0.15, 0.01);

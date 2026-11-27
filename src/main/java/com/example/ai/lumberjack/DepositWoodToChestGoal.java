@@ -82,6 +82,7 @@ public class DepositWoodToChestGoal extends Goal {
             stop();
         } else if (com.example.ai.DeliveryTarget.canReach(npc, chestPos)) {
             depositItems();
+            npc.swingHand(net.minecraft.util.Hand.MAIN_HAND, true);
             com.example.helper.NpcFeedback.success(npc);
             stop();
         } else if (npc.getNavigation().isIdle() && repaths < MAX_REPATHS && taskTicks < MAX_TASK_TICKS) {

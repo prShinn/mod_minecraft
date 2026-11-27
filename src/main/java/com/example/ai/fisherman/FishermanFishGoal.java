@@ -78,6 +78,15 @@ public class FishermanFishGoal extends Goal {
         if (npc.getWorld() instanceof ServerWorld world) {
             world.playSound(null, npc.getBlockPos(), SoundEvents.ENTITY_FISHING_BOBBER_THROW,
                     SoundCategory.NEUTRAL, 0.5F, 1.0F);
+            // Tia hạt nhẹ (5 điểm) mô phỏng dây câu quăng ra mặt nước, tránh spam gây lag
+            if (targetWater != null) {
+                Vec3d start = npc.getEyePos().add(0, -0.35, 0);
+                Vec3d end = new Vec3d(targetWater.getX() + 0.5, targetWater.getY() + 1.0, targetWater.getZ() + 0.5);
+                for (int i = 1; i <= 5; i++) {
+                    Vec3d p = start.lerp(end, i / 5.0);
+                    world.spawnParticles(ParticleTypes.BUBBLE_POP, p.x, p.y, p.z, 1, 0, 0, 0, 0);
+                }
+            }
         }
     }
 
@@ -96,6 +105,9 @@ public class FishermanFishGoal extends Goal {
         }
 
         fishTimer--;
+        if (fishTimer == 15) {
+            npc.swingHand(net.minecraft.util.Hand.MAIN_HAND, true);
+        }
 
         // Nhấp nháy particle trên mặt nước để giả làm phao
         if (fishTimer % 20 == 0 && npc.getWorld() instanceof ServerWorld sw && targetWater != null) {

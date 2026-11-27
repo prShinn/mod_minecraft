@@ -70,6 +70,7 @@ public class DepositFishToChestGoal extends Goal {
             deposited = true;
         } else if (com.example.ai.DeliveryTarget.canReach(npc, targetChestPos)) {
             dumpInventoryToChest();
+            npc.swingHand(net.minecraft.util.Hand.MAIN_HAND, true);
             com.example.helper.NpcFeedback.success(npc);
             deposited = true;
         } else if (npc.getNavigation().isIdle() && repaths < MAX_REPATHS && taskTicks < MAX_TASK_TICKS) {

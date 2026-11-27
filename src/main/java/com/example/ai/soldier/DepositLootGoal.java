@@ -119,6 +119,7 @@ public class DepositLootGoal extends Goal {
             soldier.getLookControl().lookAt(chest.getX() + 0.5, chest.getY() + 0.5, chest.getZ() + 0.5);
             if (world.getBlockEntity(chest) instanceof ProfessionChestBlockEntity box
                     && DepositCargoGoal.moveAll(soldier.loot.bag, box)) {
+                soldier.swingHand(net.minecraft.util.Hand.MAIN_HAND, true);
                 NpcFeedback.success(soldier);
             }
             done = true;

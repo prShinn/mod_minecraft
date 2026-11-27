@@ -71,7 +71,10 @@ public class DepositCargoGoal extends Goal {
             finished = true;
         } else if (DeliveryTarget.canReach(npc, target)) {
             npc.getLookControl().lookAt(target.getX() + 0.5, target.getY() + 0.5, target.getZ() + 0.5);
-            if (moveAll(npc.getCargo(), chest)) NpcFeedback.success(npc);
+            if (moveAll(npc.getCargo(), chest)) {
+                npc.swingHand(net.minecraft.util.Hand.MAIN_HAND, true);
+                NpcFeedback.success(npc);
+            }
             npc.setNeedsToDeposit(!npc.getCargo().isEmpty());
             finished = true;
         } else if (npc.getNavigation().isIdle() || taskTicks >= MAX_TASK_TICKS) {
